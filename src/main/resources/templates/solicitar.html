@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="#{solicitar.titulo} + ' - Portal de Personal'">Nueva Solicitud - Portal de Personal</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link rel="stylesheet" th:href="@{/css/estilos-grammer.css}">
+</head>
+
+<body>
+
+<div th:replace="~{fragments/navbar :: menuPlanta}"></div>
+
+<div style="height: 80px;"></div>
+
+<div class="modal fade" id="modalComercial" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 1rem;">
+            <div class="modal-header bg-warning border-0 text-dark">
+                <h5 class="modal-title fw-bold"><i class="bi bi-exclamation-triangle-fill me-2"></i>¡Aviso Importante!</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center p-4">
+                <i class="bi bi-calendar-x text-warning mb-3" style="font-size: 4rem;"></i>
+                <h5 class="fw-bold">Solicitud fuera de tiempo</h5>
+                <p class="text-muted">No estás cumpliendo con las horas de anticipación requeridas.</p>
+                <div class="bg-light p-3 rounded-3 mt-3">
+                    <p class="mb-0 fw-bold text-dark small">⚠️ Queda bajo revisión manual de tu jefe.</p>
+                </div>
+            </div>
+            <div class="modal-footer border-0 bg-light justify-content-center">
+                <button type="button" class="btn btn-secondary px-4 shadow-sm" data-bs-dismiss="modal">Regresar</button>
+                <button type="button" class="btn text-dark btn-warning px-4 shadow-sm fw-bold" id="btnAceptarComercial">Aceptar y Enviar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalError" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 1rem;">
+            <div class="modal-header bg-danger border-0 text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-x-octagon-fill me-2"></i>Error de Validación</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center p-4">
+                <i class="bi bi-calendar-x-fill text-danger mb-3" style="font-size: 4rem;"></i>
+                <h5 class="fw-bold text-dark">No se pudo procesar</h5>
+                <p class="text-muted mt-2" id="txtErrorModal"></p>
+            </div>
+            <div class="modal-footer border-0 bg-light justify-content-center">
+                <button type="button" class="btn btn-danger px-5 shadow-sm fw-bold" data-bs-dismiss="modal">Entendido</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalExito" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 1rem;">
+            <div class="modal-header bg-success border-0 text-white">
+                <h5 class="modal-title fw-bold"><i class="bi bi-check-circle-fill me-2"></i>¡Registro Exitoso!</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center p-4">
+                <i class="bi bi-send-check text-success mb-3" style="font-size: 4rem;"></i>
+                <h5 class="fw-bold text-dark">Todo listo</h5>
+                <p class="text-muted mt-2" id="txtExitoModal">Tu solicitud ha sido procesada correctamente.</p>
+            </div>
+            <div class="modal-footer border-0 bg-light justify-content-center">
+                <a th:href="@{/pantallas/dashboard}" class="btn btn-success px-5 shadow-sm fw-bold">Ir al Dashboard</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<main class="container px-3 pb-5">
+    <div class="card card-flotante p-4 shadow-sm border-0">
+
+        <input type="hidden" id="nominaEmpleado" name="nominaEmpleado" th:value="${empleado != null ? empleado.nomina : ''}">
+
+        <div class="mb-4">
+            <label for="tipoConcepto" class="form-label text-dark fw-bold small">Tipo de Solicitud</label>
+            <div class="input-group">
+                <span class="input-group-text bg-white text-muted border-end-0"><i class="bi bi-grid-fill"></i></span>
+                <select class="form-select form-select-lg bg-light border-start-0" id="tipoConcepto" required>
+                    <option value="" disabled selected>Cargando opciones disponibles...</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="seccion-vacaciones" class="seccion-dinamica" style="display:none;">
+            <form id="formVacaciones" th:action="@{/pantallas/solicitar-vacaciones}" method="post" autocomplete="off">
+                <input type="hidden" name="nominaEmpleado" class="input-nomina-clon">
+                <input type="hidden" name="tipoSolicitud" value="VACACIONES_ORDINARIAS">
+                <input type="hidden" name="diasSolicitados" id="hiddenDias" value="0">
+                <input type="hidden" name="esExtemporanea" id="hiddenExtemporanea" value="false">
+
+                <div class="row mb-3">
+                    <div class="col-12 col-md-6 mb-3 mb-md-0">
+                        <label for="fechaInicio" class="form-label text-muted fw-bold small">Fecha de Inicio</label>
+                        <input type="date" class="form-control form-control-lg bg-light" id="fechaInicio" name="fechaInicio">
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label for="fechaFin" class="form-label text-muted fw-bold small">Fecha de Fin</label>
+                        <input type="date" class="form-control form-control-lg bg-light" id="fechaFin" name="fechaFin">
+                    </div>
+                </div>
+
+                <div class="alert alert-info d-flex align-items-center mb-3 p-3 border-0 rounded-3">
+                    <i class="bi bi-info-circle-fill fs-4 me-3"></i>
+                    <p class="mb-0 fw-bold"><span>Días a descontar:</span> <span id="lblDias" class="fs-5 ms-1">0</span></p>
+                </div>
+
+                <div id="alertaExtemporanea" class="alert alert-warning d-none small mb-3" role="alert"></div>
+
+                <div id="alertaSaldoProporcional" class="alert alert-warning d-none small mb-3 p-3 border-0 rounded-3 shadow-sm" role="alert">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-exclamation-circle-fill text-warning fs-4 me-2"></i>
+                        <div>
+                            <span class="fw-bold text-dark d-block">Aviso de Balance Contable:</span>
+                            Tu saldo devengado actual está agotado o es insuficiente. Esta solicitud consumirá parcial o totalmente días de tu <strong>saldo proporcional devengado del próximo año de servicios</strong>.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="rolDescansoId" class="form-label text-muted fw-bold small">Turno / Rol de Descanso</label>
+                    <select class="form-select form-select-lg bg-light" id="rolDescansoId" name="rolDescansoId">
+                        <option value="" disabled selected>Selecciona tu turno</option>
+                        <option th:each="rol : ${roles}" th:value="${rol.id}" th:text="${rol.nombreTurno}"></option>
+                    </select>
+                </div>
+
+                <div class="mb-4">
+                    <label for="jefeAutorizadorNomina" class="form-label text-muted fw-bold small">Jefe a Autorizar</label>
+                    <select class="form-select form-select-lg bg-light" id="jefeAutorizadorNomina" name="jefeAutorizadorNomina">
+                        <option value="" disabled selected>Selecciona a tu jefe</option>
+                        <option th:each="jefe : ${jefes}" th:value="${jefe.nomina}" th:text="${jefe.nombreCompleto}"></option>
+                    </select>
+                </div>
+
+                <div class="mb-4">
+                    <label for="comentarios" class="form-label text-muted fw-bold small">Comentarios (Opcional)</label>
+                    <textarea class="form-control bg-light" id="comentarios" name="comentarios" rows="3"></textarea>
+                </div>
+
+                <button id="btnEnviarVacaciones" type="submit" class="btn btn-corporativo btn-lg w-100 py-3 shadow-sm d-flex justify-content-center align-items-center gap-2" disabled>
+                    <span>Enviar Solicitud de Vacaciones</span> <i class="bi bi-send-fill"></i>
+                </button>
+            </form>
+        </div>
+
+        <div id="seccion-txt" class="seccion-dinamica" style="display:none;">
+            <form id="formTXT" autocomplete="off" onsubmit="event.preventDefault();">
+                <div class="alert alert-warning small mb-3 rounded-3 border-0 bg-txt-preview">
+                    <i class="bi bi-exclamation-circle-fill me-2"></i><strong>Regla Operativa:</strong> Las fechas de pago solo pueden registrarse para la semana actual en curso o días futuros. Máximo 2 exhibiciones. En modalidad parcial (por horas) no se permite programar pagos los días domingo.
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-12 col-md-4 mb-3 mb-md-0">
+                        <label for="txtModalidad" class="form-label text-muted fw-bold small">Modalidad</label>
+                        <select class="form-select form-select-lg bg-light fw-bold text-dark" id="txtModalidad">
+                            <option value="COMPLETO" selected>Día Completo</option>
+                            <option value="PARCIAL">Por Horas (Parcial)</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-4 mb-3 mb-md-0">
+                        <label for="txtFechaFalta" class="form-label text-muted fw-bold small">Fecha del Permiso</label>
+                        <input type="date" class="form-control form-control-lg bg-light" id="txtFechaFalta">
+                    </div>
+                    <div class="col-12 col-md-4 d-none" id="divTxtHorasPermiso">
+                        <label for="txtHorasPermiso" class="form-label text-muted fw-bold small">Horas a Deber</label>
+                        <input type="number" class="form-control form-control-lg bg-light fw-bold text-dark" id="txtHorasPermiso" step="0.5" min="0.5" max="24" placeholder="Ej: 4.0">
+                    </div>
+                </div>
+
+                <div class="row mb-3" id="rowTxtTurnoFalta">
+                    <div class="col-12">
+                        <label for="txtTurnoFalta" class="form-label text-muted fw-bold small">Turno del día de la Falta</label>
+                        <select class="form-select form-select-lg bg-light fw-bold text-dark" id="txtTurnoFalta">
+                            <option value="" disabled selected>-- Selecciona el Turno --</option>
+                            <option th:each="turno : ${listaTurnosMaster}"
+                                    th:if="${turno.activo}"
+                                    th:value="${turno.nombreTurno}"
+                                    th:text="${turno.nombreTurno} + ' (' + ${turno.horasJornada} + ' hrs)'">
+                            </option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label text-muted fw-bold small d-flex justify-content-between align-items-center">
+                        <span>Desglose de Fechas de Pago (Anexo de Rows)</span>
+                        <button type="button" id="btnAgregarPago" class="btn btn-sm btn-outline-dark fw-bold"><i class="bi bi-plus-lg me-1"></i>Añadir Día</button>
+                    </label>
+                    <div class="table-responsive">
+                        <table class="table table-bordered align-middle bg-white rounded-3 overflow-hidden" id="tablaPagosTXT">
+                            <thead class="table-light">
+                            <tr class="small text-muted text-uppercase fw-bold">
+                                <th>Fecha de Reposición</th>
+                                <th style="width: 130px;">Horas a Pagar</th>
+                                <th style="width: 50px;" class="text-center">Acción</th>
+                            </tr>
+                            </thead>
+                            <tbody id="tbodyTXT">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="txtJustificacion" class="form-label text-muted fw-bold small">Justificación del permiso</label>
+                    <textarea class="form-control bg-light" id="txtJustificacion" rows="2" placeholder="Explique la causa específica acordada en piso..."></textarea>
+                </div>
+
+                <div class="mb-4">
+                    <label for="txtJefeAutorizadorNomina" class="form-label text-muted fw-bold small">Jefe a Autorizar</label>
+                    <select class="form-select form-select-lg bg-light" id="txtJefeAutorizadorNomina" required>
+                        <option value="" disabled selected>Selecciona a tu jefe inmediato</option>
+                        <option th:each="jefe : ${jefes}" th:value="${jefe.nomina}" th:text="${jefe.nombreCompleto}"></option>
+                    </select>
+                </div>
+
+                <button type="button" id="btnEnviarTXT" class="btn btn-dark btn-lg w-100 py-3 shadow-sm d-flex justify-content-center align-items-center gap-2">
+                    <span>Registrar Tiempo por Tiempo</span> <i class="bi bi-stopwatch-fill"></i>
+                </button>
+            </form>
+        </div>
+
+        <div id="seccion-rangos" class="seccion-dinamica" style="display:none;">
+            <form id="formRangos" autocomplete="off" onsubmit="event.preventDefault();">
+                <div class="alert alert-secondary small mb-3 border-0 rounded-3 bg-light text-dark">
+                    <i class="bi bi-info-circle-fill text-primary me-2"></i><span id="txtReglaDinamicaRango">Configurando fechas para la incidencia.</span>
+                </div>
+
+                <div class="row mb-3">
+                    <div class="col-12 col-md-6 mb-3 mb-md-0">
+                        <label for="rangoFechaInicio" class="form-label text-muted fw-bold small">Fecha de Inicio</label>
+                        <input type="date" class="form-control form-control-lg bg-light" id="rangoFechaInicio">
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label for="rangoFechaFin" class="form-label text-muted fw-bold small">Fecha de Fin</label>
+                        <input type="date" class="form-control form-control-lg bg-light" id="rangoFechaFin">
+                    </div>
+                </div>
+
+                <div class="alert alert-primary d-flex align-items-center mb-3 p-3 border-0 rounded-3">
+                    <i class="bi bi-calendar-range-fill fs-4 me-3"></i>
+                    <p class="mb-0 fw-bold"><span>Total de días hábiles solicitados:</span> <span id="lblDiasRango" class="fs-5 ms-1">0</span></p>
+                </div>
+
+                <div class="mb-3">
+                    <label for="rangoRolDescansoId" class="form-label text-muted fw-bold small">Turno / Rol de Descanso (Filtro para días no laborables)</label>
+                    <select class="form-select form-select-lg bg-light" id="rangoRolDescansoId">
+                        <option value="" disabled selected>Selecciona tu turno para omitir descansos</option>
+                        <option th:each="rol : ${roles}" th:value="${rol.id}" th:text="${rol.nombreTurno}"></option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label for="rangoJefeAutorizadorNomina" class="form-label text-muted fw-bold small">Jefe que Autoriza</label>
+                    <select class="form-select form-select-lg bg-light" id="rangoJefeAutorizadorNomina">
+                        <option value="" disabled selected>Selecciona a tu jefe inmediato</option>
+                        <option value="NULL">-- Sin jefe directo en planta (Anexar Evidencia Obligatoria) --</option>
+                        <option th:each="jefe : ${jefes}" th:value="${jefe.nomina}" th:text="${jefe.nombreCompleto}"></option>
+                    </select>
+                </div>
+
+                <div class="mb-4" id="contenedorEvidenciaRango">
+                    <label for="fileComprobante" class="form-label text-muted fw-bold small">Evidencia de Autorización (Captura de pantalla o correo en imagen/PDF, Máx. 2MB)</label>
+                    <input class="form-control bg-white" type="file" id="fileComprobante" accept="image/png, image/jpeg, image/jpg, application/pdf">
+                    <div id="helpEvidencia" class="form-text text-danger small d-none fw-bold">⚠️ Obligatorio: Al no tener jefe asignado en planta, debes anexar el comprobante técnico.</div>
+                </div>
+
+                <div class="mb-4">
+                    <label for="rangoComentarios" class="form-label text-muted fw-bold small">Comentarios / Notas Operativas</label>
+                    <textarea class="form-control bg-light" id="rangoComentarios" rows="2" placeholder="Escriba aquí detalles adicionales..."></textarea>
+                </div>
+
+                <button type="button" id="btnEnviarRangos" class="btn btn-primary btn-lg w-100 py-3 shadow-sm d-flex justify-content-center align-items-center gap-2" disabled>
+                    <span>Enviar Solicitud</span> <i class="bi bi-file-earmark-check-fill"></i>
+                </button>
+            </form>
+        </div>
+
+    </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<script th:inline="javascript">
+    document.addEventListener("DOMContentLoaded", function() {
+
+        if (document.getElementById("formVacaciones")) document.getElementById("formVacaciones").reset();
+        if (document.getElementById("formTXT")) document.getElementById("formTXT").reset();
+        if (document.getElementById("formRangos")) document.getElementById("formRangos").reset();
+        document.getElementById("tipoConcepto").value = "";
+
+        const msgExito = /*[[${mensajeExito}]]*/ null;
+        const msgError = /*[[${mensajeError}]]*/ null;
+
+        if (msgExito) {
+            document.getElementById("txtExitoModal").innerText = msgExito;
+            new bootstrap.Modal(document.getElementById('modalExito')).show();
+        }
+        if (msgError) {
+            document.getElementById("txtErrorModal").innerText = msgError;
+            new bootstrap.Modal(document.getElementById('modalError')).show();
+        }
+
+        const inputNominaMaestro = document.getElementById("nominaEmpleado");
+        const nominaFinal = parseInt(inputNominaMaestro.value);
+
+        if (!nominaFinal || isNaN(nominaFinal)) {
+            document.getElementById("txtErrorModal").innerText = "Falta el identificador de nómina del empleado para procesar los catálogos.";
+            new bootstrap.Modal(document.getElementById('modalError')).show();
+            return;
+        }
+
+        const saldoDevengado = parseFloat(/*[[${empleado != null && empleado.saldoVacacionesActual != null ? empleado.saldoVacacionesActual : 0}]]*/ '0');
+        const saldoProporcional = parseFloat(/*[[${empleado != null && empleado.getSaldoProporcional() != null ? empleado.getSaldoProporcional() : 0}]]*/ '0');
+        const tipoEmpleadoStr = /*[[${empleado != null ? empleado.tipoEmpleado : ''}]]*/ '';
+        const esSindicalizado = (tipoEmpleadoStr.toUpperCase().includes('SIND'));
+
+        // 🌟 CORRECCIÓN: Regla de Oro del Saldo Adelantado
+        // Si el devengado es negativo (ej. -14), se asume temporalmente como 0 para el cálculo del límite.
+        // Esto permite que el operador goce íntegramente de su saldo proporcional disponible (ej. 7.7).
+        let saldoDevengadoEfectivo = saldoDevengado < 0 ? 0 : saldoDevengado;
+        let saldoTotalCalculado = saldoDevengadoEfectivo + saldoProporcional;
+
+        if (esSindicalizado) {
+            let parteDecimal = saldoTotalCalculado - Math.floor(saldoTotalCalculado);
+            if (parteDecimal >= 0.9) {
+                saldoTotalCalculado = Math.ceil(saldoTotalCalculado);
+            }
+        }
+        const saldoTotalDisponible = saldoTotalCalculado;
+
+        document.querySelectorAll(".input-nomina-clon").forEach(input => {
+            input.value = nominaFinal;
+        });
+
+        if (esSindicalizado) {
+            const contEvidencia = document.getElementById("contenedorEvidenciaRango");
+            if (contEvidencia) contEvidencia.style.display = 'none';
+        }
+
+        let festivosDesdeJava = /*[[${festivos}]]*/ [];
+        let feriadosDesdeJava = /*[[${feriadosJson}]]*/ [];
+        let horasLimite = parseInt(/*[[${horasAnticipacion}]]*/ '48');
+        let catalogoRoles = /*[[${roles}]]*/ [];
+
+        if (!Array.isArray(festivosDesdeJava)) festivosDesdeJava = [];
+        if (!Array.isArray(feriadosDesdeJava)) feriadosDesdeJava = [];
+        if (!Array.isArray(catalogoRoles)) catalogoRoles = [];
+        if (isNaN(horasLimite)) horasLimite = 48;
+
+        let arrayUnido = festivosDesdeJava.concat(feriadosDesdeJava).filter(f => f !== null);
+        const listaFestivos = arrayUnido.map(f => {
+            if (Array.isArray(f) && f.length >= 3) return `${f[0]}-${String(f[1]).padStart(2, '0')}-${String(f[2]).padStart(2, '0')}`;
+            if (typeof f === 'object' && f.fecha) {
+                if (Array.isArray(f.fecha)) return `${f.fecha[0]}-${String(f.fecha[1]).padStart(2, '0')}-${String(f.fecha[2]).padStart(2, '0')}`;
+                return String(f.fecha).substring(0, 10);
+            }
+            return String(f).replace(/\//g, '-').substring(0, 10);
+        });
+
+        const selectConcepto = document.getElementById("tipoConcepto");
+
+        fetch(`/api/permisos/tipos-disponibles?nomina=${nominaFinal}`)
+            .then(res => {
+                if (!res.ok) throw new Error("No se pudo resolver el catálogo de permisos.");
+                return res.json();
+            })
+            .then(data => {
+                selectConcepto.innerHTML = '<option value="" disabled selected>-- Selecciona un concepto --</option>';
+                data.forEach(permiso => {
+                    let option = document.createElement("option");
+                    option.value = permiso.codigo;
+                    option.innerText = `${permiso.codigo} - ${permiso.descripcion}`;
+                    selectConcepto.appendChild(option);
+                });
+            })
+            .catch(err => {
+                selectConcepto.innerHTML = '<option value="" disabled>Error al cargar permisos de pre-nómina</option>';
+                console.error(err);
+            });
+
+        selectConcepto.addEventListener("change", function() {
+            document.querySelectorAll(".seccion-dinamica").forEach(div => div.style.display = "none");
+
+            const valor = selectConcepto.value;
+            if (valor === "V") {
+                document.getElementById("seccion-vacaciones").style.display = "block";
+            } else if (valor === "TXT") {
+                document.getElementById("seccion-txt").style.display = "block";
+                // Limpieza de estados al conmutar a la sección TXT
+                const modTxt = document.getElementById("txtModalidad");
+                if(modTxt) {
+                    modTxt.value = "COMPLETO";
+                    document.getElementById("divTxtHorasPermiso").classList.add("d-none");
+                    document.getElementById("rowTxtTurnoFalta").classList.remove("d-none");
+                }
+            } else {
+                document.getElementById("seccion-rangos").style.display = "block";
+                document.getElementById("txtReglaDinamicaRango").innerText = "Usted está solicitando un permiso para: " + selectConcepto.options[selectConcepto.selectedIndex].text;
+                ejecutarCalculoRangos();
+            }
+        });
+
+        // 🌟 CONFIGURACIÓN CONDICIONAL DE MODALIDAD EXCLUSIVA PARA TXT
+        const txtModalidad = document.getElementById("txtModalidad");
+        const divTxtHorasPermiso = document.getElementById("divTxtHorasPermiso");
+        const rowTxtTurnoFalta = document.getElementById("rowTxtTurnoFalta");
+        const inputHorasPermiso = document.getElementById("txtHorasPermiso");
+
+        if (txtModalidad) {
+            txtModalidad.addEventListener("change", function() {
+                if (this.value === "PARCIAL") {
+                    divTxtHorasPermiso.classList.remove("d-none");
+                    if (rowTxtTurnoFalta) rowTxtTurnoFalta.classList.add("d-none");
+                    inputHorasPermiso.setAttribute("required", "required");
+                } else {
+                    divTxtHorasPermiso.classList.add("d-none");
+                    if (rowTxtTurnoFalta) rowTxtTurnoFalta.classList.remove("d-none");
+                    inputHorasPermiso.removeAttribute("required");
+                    inputHorasPermiso.value = "";
+                }
+            });
+        }
+
+        const fInicio = document.getElementById("fechaInicio");
+        const fFin = document.getElementById("fechaFin");
+        const selRol = document.getElementById("rolDescansoId");
+        const lblResultado = document.getElementById("lblDias");
+        const btnSubmitVacaciones = document.getElementById("btnEnviarVacaciones");
+        const divExtemporanea = document.getElementById("alertaExtemporanea");
+        const alertaProporcional = document.getElementById("alertaSaldoProporcional");
+
+        function ejecutarCalculoVacaciones() {
+            if (!fInicio.value || !fFin.value || !selRol.value) {
+                lblResultado.innerText = "0";
+                if(alertaProporcional) alertaProporcional.classList.add("d-none");
+                btnSubmitVacaciones.disabled = true;
+                return;
+            }
+
+            const dateI = new Date(fInicio.value + "T00:00:00");
+            const dateF = new Date(fFin.value + "T00:00:00");
+            const ahora = new Date();
+
+            if (dateF < dateI) {
+                lblResultado.innerText = "Error";
+                if(alertaProporcional) alertaProporcional.classList.add("d-none");
+                btnSubmitVacaciones.disabled = true;
+                return;
+            }
+
+            const rolActivo = catalogoRoles.find(r => r.id == selRol.value);
+            if (!rolActivo) return;
+
+            const mapaDias = ["DOMINGO", "LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO"];
+            const descansosSaneados = (rolActivo.diasDescanso || "DOMINGO").toUpperCase()
+                .replace(/Á/g, "A").replace(/É/g, "E").replace(/Í/g, "I").replace(/Ó/g, "O").replace(/Ú/g, "U")
+                .replace(/\s+/g, "");
+
+            let contadorFinal = 0;
+            let cursor = new Date(dateI);
+
+            while (cursor <= dateF) {
+                let diaSemNum = cursor.getDay();
+                let diaNombreTexto = mapaDias[diaSemNum];
+
+                let y = cursor.getFullYear();
+                let m = String(cursor.getMonth() + 1).padStart(2, '0');
+                let d = String(cursor.getDate()).padStart(2, '0');
+                let fechaTexto = `${y}-${m}-${d}`;
+
+                if (!descansosSaneados.includes(diaNombreTexto) && !listaFestivos.includes(fechaTexto)) {
+                    contadorFinal++;
+                }
+                cursor.setDate(cursor.getDate() + 1);
+            }
+
+            lblResultado.innerText = contadorFinal;
+            document.getElementById("hiddenDias").value = contadorFinal;
+
+            if (alertaProporcional) {
+                if (contadorFinal > 0 && (saldoDevengado <= 0 || contadorFinal > saldoDevengado)) {
+                    alertaProporcional.classList.remove("d-none");
+                } else {
+                    alertaProporcional.classList.add("d-none");
+                }
+            }
+
+            if (contadorFinal > saldoTotalDisponible) {
+                lblResultado.classList.add("text-danger");
+            } else {
+                lblResultado.classList.remove("text-danger");
+            }
+
+            const diffH = (dateI.getTime() - ahora.getTime()) / (1000 * 60 * 60);
+            const esExt = diffH < horasLimite;
+            document.getElementById("hiddenExtemporanea").value = esExt;
+
+            if (esExt) {
+                divExtemporanea.classList.remove("d-none");
+                divExtemporanea.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-2"></i><strong>Atención:</strong> Solicitud extemporánea.';
+            } else {
+                divExtemporanea.classList.add("d-none");
+            }
+
+            btnSubmitVacaciones.disabled = (contadorFinal === 0);
+        }
+
+        fInicio.addEventListener("change", () => ejecutarCalculoVacaciones());
+        fFin.addEventListener("change", () => ejecutarCalculoVacaciones());
+        selRol.addEventListener("change", () => ejecutarCalculoVacaciones());
+
+        let aceptoComercial = false;
+        const formVacaciones = document.getElementById("formVacaciones");
+
+        formVacaciones.addEventListener("submit", function(e) {
+            const diasPedidos = parseInt(document.getElementById("hiddenDias").value) || 0;
+
+            if (diasPedidos > saldoTotalDisponible) {
+                e.preventDefault();
+                document.getElementById("txtErrorModal").innerText = `Rechazado Contablemente: Solicitaste ${diasPedidos} días hábiles, pero tu Balance General Disponible es de únicamente ${saldoTotalDisponible} días (incluyendo proporcional devengado). Reduce el periodo de fechas.`;
+                new bootstrap.Modal(document.getElementById('modalError')).show();
+                return;
+            }
+
+            const esExt = document.getElementById("hiddenExtemporanea").value === "true";
+            if (esExt && !aceptoComercial) {
+                e.preventDefault();
+                new bootstrap.Modal(document.getElementById('modalComercial')).show();
+            } else {
+                btnSubmitVacaciones.disabled = true;
+                btnSubmitVacaciones.innerHTML = '<span>Procesando e Inyectando...</span> <div class="spinner-border spinner-border-sm" role="status"></div>';
+            }
+        });
+
+        document.getElementById("btnAceptarComercial").addEventListener("click", function() {
+            aceptoComercial = true;
+            this.disabled = true;
+            this.innerHTML = 'Enviando...';
+            btnSubmitVacaciones.disabled = true;
+            btnSubmitVacaciones.innerHTML = '<span>Procesando...</span> <div class="spinner-border spinner-border-sm" role="status"></div>';
+            formVacaciones.submit();
+        });
+
+        const tbodyTXT = document.getElementById("tbodyTXT");
+        const btnAgregarPago = document.getElementById("btnAgregarPago");
+
+        function crearFilaPagoTXT() {
+            const rowCount = tbodyTXT.children.length;
+            if (rowCount >= 2) {
+                document.getElementById("txtErrorModal").innerText = "Restricción de pre-nómina: No puedes fragmentar el pago en más de 2 exhibiciones.";
+                new bootstrap.Modal(document.getElementById('modalError')).show();
+                return;
+            }
+
+            let tr = document.createElement("tr");
+            tr.innerHTML = `
+                <td><input type="date" class="form-control form-control-sm input-txt-fecha-pago" required></td>
+                <td><input type="number" class="form-control form-control-sm input-txt-horas-pago" step="0.1" min="0.5" max="24" placeholder="Horas" required></td>
+                <td class="text-center"><button type="button" class="btn btn-sm btn-link text-danger btn-eliminar-pago"><i class="bi bi-trash3-fill"></i></button></td>
+            `;
+
+            tr.querySelector(".btn-eliminar-pago").addEventListener("click", function() {
+                tr.remove();
+                if (tbodyTXT.children.length === 0) {
+                    crearFilaPagoTXT();
+                }
+            });
+
+            tbodyTXT.appendChild(tr);
+        }
+
+        btnAgregarPago.addEventListener("click", crearFilaPagoTXT);
+        crearFilaPagoTXT();
+
+        const rInicio = document.getElementById("rangoFechaInicio");
+        const rFin = document.getElementById("rangoFechaFin");
+        const rRol = document.getElementById("rangoRolDescansoId");
+        const rJefe = document.getElementById("rangoJefeAutorizadorNomina");
+        const rFile = document.getElementById("fileComprobante");
+        const lblDiasRango = document.getElementById("lblDiasRango");
+        const btnEnviarRangos = document.getElementById("btnEnviarRangos");
+        const helpEvidencia = document.getElementById("helpEvidencia");
+        const contEvidencia = document.getElementById("contenedorEvidenciaRango");
+
+        function ejecutarCalculoRangos() {
+            if (esSindicalizado) {
+                if (contEvidencia) contEvidencia.classList.add("d-none");
+                helpEvidencia.classList.add("d-none");
+            } else {
+                let requiereEvidencia = (rJefe.value === "NULL" || rJefe.value === "");
+                if (requiereEvidencia) {
+                    if (contEvidencia) contEvidencia.classList.remove("d-none");
+                    helpEvidencia.classList.remove("d-none");
+                } else {
+                    if (contEvidencia) contEvidencia.classList.add("d-none");
+                    helpEvidencia.classList.add("d-none");
+                }
+            }
+
+            if (!rInicio.value || !rFin.value || !rRol.value) {
+                lblDiasRango.innerText = "0";
+                btnEnviarRangos.disabled = true;
+                return;
+            }
+
+            const dateI = new Date(rInicio.value + "T00:00:00");
+            const dateF = new Date(rFin.value + "T00:00:00");
+
+            if (dateF < dateI) {
+                lblDiasRango.innerText = "Error de rango";
+                btnEnviarRangos.disabled = true;
+                return;
+            }
+
+            const rolActivo = catalogoRoles.find(r => r.id == rRol.value);
+            if (!rolActivo) return;
+
+            const mapaDias = ["DOMINGO", "LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO"];
+            const descansosSaneadosRango = (rolActivo.diasDescanso || "DOMINGO").toUpperCase()
+                .replace(/Á/g, "A").replace(/É/g, "E").replace(/Í/g, "I").replace(/Ó/g, "O").replace(/Ú/g, "U")
+                .replace(/\s+/g, "");
+
+            let contadorHabiles = 0;
+            let cursor = new Date(dateI);
+
+            while (cursor <= dateF) {
+                let diaSemNum = cursor.getDay();
+                let diaNombreTexto = mapaDias[diaSemNum];
+                let y = cursor.getFullYear();
+                let m = String(cursor.getMonth() + 1).padStart(2, '0');
+                let d = String(cursor.getDate()).padStart(2, '0');
+                let fechaTexto = `${y}-${m}-${d}`;
+
+                if (!descansosSaneadosRango.includes(diaNombreTexto) && !listaFestivos.includes(fechaTexto)) {
+                    contadorHabiles++;
+                }
+                cursor.setDate(cursor.getDate() + 1);
+            }
+
+            lblDiasRango.innerText = contadorHabiles;
+
+            let formValido = (contadorHabiles > 0);
+
+            if (!esSindicalizado) {
+                let sinJefeSeleccionado = (rJefe.value === "");
+                let jefeNullManual = (rJefe.value === "NULL");
+
+                if (jefeNullManual || sinJefeSeleccionado) {
+                    if (!rFile || !rFile.files || rFile.files.length === 0) {
+                        formValido = false;
+                    }
+                }
+            }
+
+            btnEnviarRangos.disabled = !formValido;
+        }
+
+        if (rFile) {
+            rFile.addEventListener("change", function() {
+                if (rFile.files.length > 0) {
+                    const pesoArchivo = rFile.files[0].size / 1024 / 1024;
+                    if (pesoArchivo > 2) {
+                        document.getElementById("txtErrorModal").innerText = "El archivo excede el límite de 2MB.";
+                        new bootstrap.Modal(document.getElementById('modalError')).show();
+                        rFile.value = "";
+                    }
+                }
+                ejecutarCalculoRangos();
+            });
+        }
+
+        rInicio.addEventListener("change", ejecutarCalculoRangos);
+        rFin.addEventListener("change", ejecutarCalculoRangos);
+        rRol.addEventListener("change", ejecutarCalculoRangos);
+        rJefe.addEventListener("change", ejecutarCalculoRangos);
+
+        // 🌟 LISTENER DE GUARDADO BLINDADO CONTRA DOMINGOS Y TURNOS INNECESARIOS
+        document.getElementById("btnEnviarTXT").addEventListener("click", function() {
+            const fechaFalta = document.getElementById("txtFechaFalta").value;
+            const justif = document.getElementById("txtJustificacion").value;
+            const turnoFalta = document.getElementById("txtTurnoFalta").value;
+            const jefeTXT = document.getElementById("txtJefeAutorizadorNomina").value;
+            const esPorHoras = document.getElementById("txtModalidad").value === "PARCIAL";
+            const horasPermisoInput = document.getElementById("txtHorasPermiso").value;
+
+            if (!fechaFalta) {
+                document.getElementById("txtErrorModal").innerText = "Por favor especifica la fecha en la que ocurrió o se programará la falta.";
+                new bootstrap.Modal(document.getElementById('modalError')).show();
+                return;
+            }
+
+            // El turno de la falta es obligatorio ÚNICAMENTE en Día Completo
+            if (!esPorHoras && !turnoFalta) {
+                document.getElementById("txtErrorModal").innerText = "Por favor selecciona el turno correspondiente a la falta.";
+                new bootstrap.Modal(document.getElementById('modalError')).show();
+                return;
+            }
+
+            if (!jefeTXT) {
+                document.getElementById("txtErrorModal").innerText = "Por favor selecciona al jefe que autorizará tu Tiempo por Tiempo.";
+                new bootstrap.Modal(document.getElementById('modalError')).show();
+                return;
+            }
+
+            let desgloses = [];
+            let inputsFecha = tbodyTXT.querySelectorAll(".input-txt-fecha-pago");
+            let inputsHoras = tbodyTXT.querySelectorAll(".input-txt-horas-pago");
+            let validacionInputs = true;
+            let contieneDomingo = false;
+
+            for (let i = 0; i < inputsFecha.length; i++) {
+                if (!inputsFecha[i].value || !inputsHoras[i].value) {
+                    validacionInputs = false;
+                    break;
+                }
+
+                // 🔒 CANDADO CONTABLE INTERACTIVO DE DOMINGOS EN FILAS DE PAGO PARCIAL
+                if (esPorHoras) {
+                    const partesFecha = inputsFecha[i].value.split('-');
+                    const dateCheck = new Date(parseInt(partesFecha[0]), parseInt(partesFecha[1]) - 1, parseInt(partesFecha[2]));
+                    if (dateCheck.getDay() === 0) { // 0 = Domingo
+                        contieneDomingo = true;
+                    }
+                }
+
+                desgloses.push({
+                    fechaPago: inputsFecha[i].value,
+                    horasPago: parseFloat(inputsHoras[i].value)
+                });
+            }
+
+            if (!validacionInputs || desgloses.length === 0) {
+                document.getElementById("txtErrorModal").innerText = "Debes completar las fechas y horas en el desglose de pagos.";
+                new bootstrap.Modal(document.getElementById('modalError')).show();
+                return;
+            }
+
+            if (contieneDomingo) {
+                document.getElementById("txtErrorModal").innerText = "Restricción de Pre-nómina: No está permitido programar reposiciones parciales de horas los días domingo.";
+                new bootstrap.Modal(document.getElementById('modalError')).show();
+                return;
+            }
+
+            if (esPorHoras && (!horasPermisoInput || parseFloat(horasPermisoInput) <= 0)) {
+                document.getElementById("txtErrorModal").innerText = "Por favor especifica la cantidad de horas del permiso parcial.";
+                new bootstrap.Modal(document.getElementById('modalError')).show();
+                return;
+            }
+
+            const payload = {
+                empleadoNomina: nominaFinal,
+                codigoPermiso: "TXT",
+                fechaIncidencia: fechaFalta,
+                justificacionSupervisor: justif,
+                nombreTurno: esPorHoras ? null : turnoFalta, // Pasa null si es parcial por horas
+                jefeAutorizadorNomina: parseInt(jefeTXT),
+                desglosesPago: desgloses,
+                esPorHoras: esPorHoras,
+                horasPermiso: esPorHoras ? parseFloat(horasPermisoInput) : 0
+            };
+
+            dispararFetchPermiso(payload);
+        });
+
+        document.getElementById("btnEnviarRangos").addEventListener("click", function() {
+            const btn = this;
+            const fechaI = rInicio.value;
+            const fechaF = rFin.value;
+            const jefeSeleccionado = rJefe.value;
+
+            if (!fechaI || !fechaF) {
+                document.getElementById("txtErrorModal").innerText = "Debe capturar el rango completo (Inicio y Fin) para el permiso.";
+                new bootstrap.Modal(document.getElementById('modalError')).show();
+                return;
+            }
+
+            const textoOriginal = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span>Transmitiendo...</span> <div class="spinner-border spinner-border-sm" role="status"></div>';
+
+            const formData = new FormData();
+            formData.append("empleadoNomina", nominaFinal);
+            formData.append("codigoPermiso", selectConcepto.value);
+            formData.append("fechaInicio", fechaI);
+            formData.append("fechaFin", fechaF);
+            formData.append("rolDescansoId", rRol.value);
+            formData.append("comentarios", document.getElementById("rangoComentarios").value || "");
+
+            if (jefeSeleccionado && jefeSeleccionado !== "NULL" && jefeSeleccionado !== "") {
+                formData.append("jefeAutorizadorNomina", jefeSeleccionado);
+            }
+
+            if (!esSindicalizado && rFile && rFile.files.length > 0) {
+                formData.append("comprobante", rFile.files[0]);
+            }
+
+            fetch('/api/permisos/solicitar-rango', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === "SUCCESS") {
+                    document.getElementById("txtExitoModal").innerText = data.message;
+                    new bootstrap.Modal(document.getElementById('modalExito')).show();
+                    if (document.getElementById("formRangos")) document.getElementById("formRangos").reset();
+                } else {
+                    document.getElementById("txtErrorModal").innerText = data.message;
+                    new bootstrap.Modal(document.getElementById('modalError')).show();
+                    btn.disabled = false;
+                    btn.innerHTML = textoOriginal;
+                }
+            })
+            .catch(err => {
+                document.getElementById("txtErrorModal").innerText = "Fallo de comunicación contable al inyectar el rango.";
+                new bootstrap.Modal(document.getElementById('modalError')).show();
+                console.error(err);
+                btn.disabled = false;
+                btn.innerHTML = textoOriginal;
+            });
+        });
+
+        function dispararFetchPermiso(payload) {
+            const btnTXT = document.getElementById("btnEnviarTXT");
+            const textoOriginalTXT = btnTXT.innerHTML;
+
+            btnTXT.disabled = true;
+            btnTXT.innerHTML = '<span>Guardando en Servidor...</span> <div class="spinner-border spinner-border-sm" role="status"></div>';
+
+            fetch('/api/permisos/solicitar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === "SUCCESS") {
+                    document.getElementById("txtExitoModal").innerText = data.message;
+                    new bootstrap.Modal(document.getElementById('modalExito')).show();
+                    if (document.getElementById("formTXT")) document.getElementById("formTXT").reset();
+                } else {
+                    document.getElementById("txtErrorModal").innerText = data.message;
+                    new bootstrap.Modal(document.getElementById('modalError')).show();
+                    btnTXT.disabled = false;
+                    btnTXT.innerHTML = textoOriginalTXT;
+                }
+            })
+            .catch(err => {
+                document.getElementById("txtErrorModal").innerText = "Fallo de comunicación contable con el servidor de planta.";
+                new bootstrap.Modal(document.getElementById('modalError')).show();
+                console.error(err);
+                btnTXT.disabled = false;
+                btnTXT.innerHTML = textoOriginalTXT;
+            });
+        }
+    });
+</script>
+
+</body>
+</html>

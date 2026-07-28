@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Torre de Control RH - Grammer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link rel="stylesheet" th:href="@{/css/estilos-grammer.css}">
+</head>
+<body>
+
+<div th:replace="~{fragments/navbar :: menuPlanta}"></div>
+
+<div style="height: 85px;"></div>
+
+<main class="container pb-5">
+
+    <div id="contenedorAlertas" class="mb-4"></div>
+
+    <ul class="nav nav-pills nav-fill bg-white shadow-sm rounded-4 p-2 mb-4" id="pills-tab" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active rounded-3" id="pills-incidencias-tab" data-bs-toggle="pill" data-bs-target="#pills-incidencias" type="button" role="tab">
+                <i class="bi bi-card-checklist me-2"></i>Incidencias
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-3" id="pills-festivos-tab" data-bs-toggle="pill" data-bs-target="#pills-festivos" type="button" role="tab">
+                <i class="bi bi-calendar-event me-2"></i>Días Festivos
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-3" id="pills-turnos-tab" data-bs-toggle="pill" data-bs-target="#pills-turnos" type="button" role="tab">
+                <i class="bi bi-clock-history me-2"></i>Catálogo Turnos
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-3" id="pills-nomina-tab" data-bs-toggle="pill" data-bs-target="#pills-nomina" type="button" role="tab">
+                <i class="bi bi-gear-wide-connected me-2"></i>Reglas Nómina
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-3" id="pills-importaciones-tab" data-bs-toggle="pill" data-bs-target="#pills-importaciones" type="button" role="tab">
+                <i class="bi bi-cloud-arrow-up me-2"></i>Importaciones Masivas
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="pills-tabContent">
+
+        <div class="tab-pane fade show active" id="pills-incidencias" role="tabpanel">
+            <div class="row g-4">
+                <div class="col-12 col-md-4">
+                    <div class="card card-flotante p-4 h-100">
+                        <h5 class="text-corporativo fw-bold mb-4"><i class="bi bi-plus-circle me-2"></i>Nueva Incidencia</h5>
+                        <form th:action="@{/admin/incidencias/guardar}" method="post">
+                            <input type="hidden" name="nominaUsuario" th:value="${session.usuarioLogueado}">
+                            <div class="mb-3">
+                                <label class="form-label text-muted fw-bold small">Código (Abreviatura)</label>
+                                <input type="text" class="form-control bg-light fw-bold text-uppercase" name="codigo" placeholder="Ej. PT" maxlength="10" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-muted fw-bold small">Descripción de Incidencia</label>
+                                <input type="text" class="form-control bg-light" name="descripcion" placeholder="Ej. Paro Técnico" required>
+                            </div>
+                            <div class="mb-4">
+                                <label class="form-label text-muted fw-bold small">Aplica Para (Segmentación)</label>
+                                <select class="form-select bg-light" name="aplicaA">
+                                    <option value="TODOS">Toda la Planta (SIND y ADMIN)</option>
+                                    <option value="SIND">Solo Sindicalizados (SIND)</option>
+                                    <option value="ADMIN">Solo Administrativos (ADMIN)</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-corporativo w-100 shadow-sm fw-bold">
+                                <i class="bi bi-save me-2"></i>Crear Incidencia
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                <div class="col-12 col-md-8">
+                    <div class="card card-flotante p-4 h-100">
+                        <h5 class="text-corporativo fw-bold mb-4"><i class="bi bi-list-check me-2"></i>Catálogo de Permisos Indexados</h5>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead class="table-light">
+                                <tr>
+                                    <th>Código</th>
+                                    <th>Descripción de Incidencia</th>
+                                    <th style="min-width: 220px;">Aplica A (Cambiar en caliente)</th>
+                                    <th>Estado</th>
+                                    <th class="text-center">Acción</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr th:each="incidencia : ${listaIncidencias}">
+                                    <td>
+                                        <span class="badge bg-primary bg-opacity-10 text-primary border border-primary fw-bold font-monospace" th:text="${incidencia.codigo}">PT</span>
+                                    </td>
+                                    <td class="fw-bold text-secondary" th:text="${incidencia.descripcion}">Paro Técnico</td>
+                                    <td>
+                                        <form th:action="@{/admin/incidencias/actualizar-cobertura/{id}(id=${incidencia.id})}" method="post" class="d-flex align-items-center gap-2">
+                                            <input type="hidden" name="nominaUsuario" th:value="${session.usuarioLogueado}">
+                                            <select class="form-select form-select-sm bg-white border shadow-sm fw-bold" name="aplicaA">
+                                                <option value="TODOS" th:selected="${incidencia.aplicaA == 'TODOS'}">TODOS</option>
+                                                <option value="SIND" th:selected="${incidencia.aplicaA == 'SIND'}">SINDICALIZADOS</option>
+                                                <option value="ADMIN" th:selected="${incidencia.aplicaA == 'ADMIN'}">ADMINISTRATIVOS</option>
+                                            </select>
+                                            <button type="submit" class="btn btn-sm btn-dark" title="Guardar Cobertura"><i class="bi bi-check-lg"></i></button>
+                                        </form>
+                                    </td>
+                                    <td>
+                                        <span th:if="${incidencia.activo}" class="badge bg-success bg-opacity-10 text-success border border-success">Activo</span>
+                                        <span th:unless="${incidencia.activo}" class="badge bg-danger bg-opacity-10 text-danger border border-danger">Inactivo</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <form th:if="${incidencia.activo}" th:action="@{/admin/incidencias/desactivar/{id}(id=${incidencia.id})}" method="post" class="d-inline">
+                                            <input type="hidden" name="nominaUsuario" th:value="${session.usuarioLogueado}">
+                                            <button type="submit" class="btn btn-outline-danger btn-sm rounded-circle" title="Inactivar Incidencia"><i class="bi bi-slash-circle"></i></button>
+                                        </form>
+                                        <form th:unless="${incidencia.activo}" th:action="@{/admin/incidencias/activar/{id}(id=${incidencia.id})}" method="post" class="d-inline">
+                                            <input type="hidden" name="nominaUsuario" th:value="${session.usuarioLogueado}">
+                                            <button type="submit" class="btn btn-outline-success btn-sm rounded-circle" title="Reactivar Incidencia"><i class="bi bi-check-circle"></i></button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-4 mt-4 border-top pt-4">
+                <div class="col-12">
+                    <div class="d-flex align-items-center gap-3 mb-2">
+                        <div class="p-2 bg-danger bg-opacity-10 rounded-3 text-danger">
+                            <i class="bi bi-shield-x fs-3"></i>
+                        </div>
+                        <div>
+                            <h5 class="text-corporativo fw-bold mb-0">Estandarización de Motivos de Rechazo (Mundo Jefaturas)</h5>
+                            <p class="text-muted small mb-0">Crea y parametriza las opciones fijas que verán los Supervisores y Shifts. Evita el texto libre para permitir analíticos precisos en RH.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 col-md-4">
+                    <div class="card bg-light p-4 rounded-4 border shadow-sm h-100">
+                        <h6 class="text-secondary fw-bold mb-3">
+                            <i class="bi bi-plus-circle-fill text-danger me-1"></i> Fijar Motivo de Rechazo
+                        </h6>
+
+                        <div th:if="${mensajeExitoMotivo}" class="alert alert-success border-0 shadow-sm py-2 px-3 rounded-3 small mb-3">
+                            <i class="bi bi-check-circle-fill me-1"></i> <span th:text="${mensajeExitoMotivo}"></span>
+                        </div>
+
+                        <div th:if="${mensajeErrorMotivo}" class="alert alert-danger border-start border-danger border-4 shadow-sm py-2 small mb-3" role="alert">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="bi bi-exclamation-octagon-fill text-danger"></i>
+                                <div th:text="${mensajeErrorMotivo}"></div>
+                            </div>
+                        </div>
+
+                        <form th:action="@{/admin/motivos-rechazo/guardar}" method="post">
+                            <div class="mb-3">
+                                <label class="form-label text-muted small fw-bold mb-1">Módulo / Universo</label>
+                                <select class="form-select bg-white fw-bold" name="modulo" required>
+                                    <option value="VACACIONES">VACACIONES (Saldos de Ley)</option>
+                                    <option value="PERMISOS">PERMISOS (TXT, HO, PT, etc.)</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-muted small fw-bold mb-1">Código de Reporte</label>
+                                <input type="text" class="form-control bg-white fw-bold text-uppercase" name="codigo" placeholder="Ej. V_HEADCOUNT" maxlength="50" required>
+                            </div>
+                            <div class="mb-4">
+                                <label class="form-label text-muted small fw-bold mb-1">Frase Descriptiva Oficial</label>
+                                <input type="text" class="form-control bg-white" name="descripcion" placeholder="Ej. Denegado por falta de cobertura en línea" maxlength="150" required>
+                            </div>
+                            <button type="submit" class="btn btn-danger w-100 fw-bold text-white shadow-sm">
+                                <i class="bi bi-save me-1"></i> Cargar a Catálogo
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="col-12 col-md-8">
+                    <div class="card p-3 rounded-4 border bg-white shadow-sm h-100">
+                        <h6 class="text-corporativo fw-bold mb-3"><i class="bi bi-layers-half me-1"></i> Diccionario de Excepciones de Planta</h6>
+                        <div class="table-responsive" style="max-height: 330px;">
+                            <table class="table table-sm table-hover align-middle border text-center">
+                                <thead class="table-dark small">
+                                <tr>
+                                    <th>Universo</th>
+                                    <th>Código</th>
+                                    <th class="text-start" style="min-width: 250px;">Descripción (Texto que lee el Operador)</th>
+                                    <th>Estado</th>
+                                    <th>Acción</th>
+                                </tr>
+                                </thead>
+                                <tbody class="small font-monospace">
+                                <tr th:each="motivo : ${listaMotivosRechazo}">
+                                    <td>
+                                        <span th:if="${motivo.modulo == 'VACACIONES'}" class="badge bg-success bg-opacity-10 text-success border border-success px-2 fw-bold">VACACIONES</span>
+                                        <span th:unless="${motivo.modulo == 'VACACIONES'}" class="badge bg-warning bg-opacity-10 text-warning border border-warning px-2 fw-bold">PERMISOS</span>
+                                    </td>
+                                    <td class="fw-bold text-dark text-uppercase" th:text="${motivo.codigo}">V_HEADCOUNT</td>
+
+                                    <form th:id="'form-master-motivo-' + ${motivo.id}" th:action="@{/admin/motivos-rechazo/actualizar-datos/{id}(id=${motivo.id})}" method="post" class="d-none">
+                                        <input type="hidden" name="nominaUsuario" th:value="${session.usuarioLogueado}">
+                                    </form>
+
+                                    <td>
+                                        <input type="text" class="form-control form-control-sm bg-white border fw-bold text-secondary font-sans-serif" name="descripcion" th:value="${motivo.descripcion}" th:form="'form-master-motivo-' + ${motivo.id}" required maxlength="150">
+                                    </td>
+                                    <td>
+                                        <span th:if="${motivo.activo}" class="badge bg-success bg-opacity-10 text-success border border-success">Activo</span>
+                                        <span th:unless="${motivo.activo}" class="badge bg-danger bg-opacity-10 text-danger border border-danger">Inactivo</span>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex gap-1 justify-content-center align-items-center">
+                                            <button type="submit" class="btn btn-sm btn-primary rounded-circle" th:form="'form-master-motivo-' + ${motivo.id}" title="Guardar Cambios"><i class="bi bi-save"></i></button>
+
+                                            <form th:if="${motivo.activo}" th:action="@{/admin/motivos-rechazo/desactivar/{id}(id=${motivo.id})}" method="post" class="d-inline">
+                                                <button type="submit" class="btn btn-link text-danger p-0" title="Inhabilitar Motivo"><i class="bi bi-slash-circle-fill fs-6"></i></button>
+                                            </form>
+                                            <form th:unless="${motivo.activo}" th:action="@{/admin/motivos-rechazo/activar/{id}(id=${motivo.id})}" method="post" class="d-inline">
+                                                <button type="submit" class="btn btn-link text-success p-0" title="Reactivar Motivo"><i class="bi bi-check-circle-fill fs-6"></i></button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr th:if="${#lists.isEmpty(listaMotivosRechazo)}">
+                                    <td colspan="5" class="text-muted py-3">Sin respuestas estandarizadas guardadas. El portal usará entrada manual libre.</td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="pills-festivos" th:classappend="${#strings.equals(param.tab, 'festivos')} ? 'show active' : ''" role="tabpanel">
+            <div class="row g-4">
+                <div class="col-12 col-md-4">
+                    <div class="card card-flotante p-4">
+                        <h5 class="text-corporativo fw-bold mb-4"><i class="bi bi-plus-circle me-2"></i>Nuevo Festivo Manual</h5>
+                        <form th:action="@{/admin/festivos/guardar}" method="post">
+                            <input type="hidden" name="nominaUsuario" th:value="${session.usuarioLogueado}">
+                            <div class="mb-3">
+                                <label class="form-label text-muted fw-bold small">Fecha</label>
+                                <input type="date" class="form-control form-control-lg bg-light" name="fecha" required>
+                            </div>
+                            <div class="mb-4">
+                                <label class="form-label text-muted fw-bold small">Descripción</label>
+                                <input type="text" class="form-control form-control-lg bg-light" name="descripcion" placeholder="Ej. Día del Trabajo" required>
+                            </div>
+                            <button type="submit" class="btn btn-corporativo btn-lg w-100 shadow-sm">
+                                <i class="bi bi-save me-2"></i>Guardar Feriado
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                <div class="col-12 col-md-8">
+                    <div class="card card-flotante p-4">
+                        <h5 class="text-corporativo fw-bold mb-4"><i class="bi bi-calendar-check me-2"></i>Calendario de Feriados Activos</h5>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead class="table-light">
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Descripción</th>
+                                    <th>Ley</th>
+                                    <th>Contrato</th>
+                                    <th class="text-center">Acción</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr th:each="festivo : ${listaFestivos}">
+                                    <td class="fw-bold text-secondary" th:text="${festivo.fecha}">2026-01-01</td>
+                                    <td th:text="${festivo.descripcion}">Año Nuevo</td>
+                                    <td th:text="${festivo.porLey}">SI</td>
+                                    <td th:text="${festivo.porContrato}">NO</td>
+                                    <td class="text-center">
+                                        <form th:action="@{/admin/festivos/desactivar/{id}(id=${festivo.id})}" method="post">
+                                            <input type="hidden" name="nominaUsuario" th:value="${session.usuarioLogueado}">
+                                            <button type="submit" class="btn btn-outline-danger btn-sm rounded-circle" title="Eliminar Feriado"><i class="bi bi-trash3"></i></button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="pills-turnos" th:classappend="${#strings.equals(param.tab, 'turnos')} ? 'show active' : ''" role="tabpanel">
+            <div class="row g-4 mb-5">
+                <div class="col-12 col-xl-4">
+                    <div class="card card-flotante p-4 bg-light border-start border-4 border-primary shadow-sm h-100">
+                        <h5 class="text-corporativo fw-bold mb-3"><i class="bi bi-clock-history me-2"></i>Turno Maestro Global</h5>
+                        <p class="text-muted small">Registra turnos unificados fusionando las horas contables de pre-nómina y los días de descanso automáticos para vacaciones en una sola tabla atómica.</p>
+                        <form th:action="@{/admin/turnos/guardar}" method="post" class="mt-2">
+                            <input type="hidden" name="nominaUsuario" th:value="${session.usuarioLogueado}">
+                            <div class="mb-3">
+                                <label class="form-label text-muted fw-bold small">Nombre / Descripción</label>
+                                <input type="text" class="form-control bg-white fw-bold" name="nombreTurno" placeholder="Ej. 1ro Central, 2do Fijo, Mixto" required>
+                            </div>
+                            <div class="row g-2 mb-3">
+                                <div class="col-6">
+                                    <label class="form-label text-muted fw-bold small">Horas Jornada</label>
+                                    <input type="number" step="0.01" class="form-control bg-white font-monospace fw-bold" name="horasJornada" placeholder="8.0" required>
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label text-muted fw-bold small">Mundo (Segmento)</label>
+                                    <select class="form-select bg-white fw-bold" name="mundo">
+                                        <option value="SIND">SINDICALIZADO</option>
+                                        <option value="ADMIN">ADMINISTRATIVO</option>
+                                        <option value="TODOS">TODOS</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label text-muted fw-bold small d-block mb-2">Días de Descanso Oficiales</label>
+                                <div class="p-3 bg-white rounded-3 border shadow-sm">
+                                    <div class="row g-2">
+                                        <div class="col-6 col-sm-4"><div class="form-check"><input class="form-check-input" type="checkbox" name="diasDescanso" value="LUNES" id="chkLunes"><label class="form-check-label small fw-bold text-secondary" for="chkLunes">Lunes</label></div></div>
+                                        <div class="col-6 col-sm-4"><div class="form-check"><input class="form-check-input" type="checkbox" name="diasDescanso" value="MARTES" id="chkMartes"><label class="form-check-label small fw-bold text-secondary" for="chkMartes">Martes</label></div></div>
+                                        <div class="col-6 col-sm-4"><div class="form-check"><input class="form-check-input" type="checkbox" name="diasDescanso" value="MIERCOLES" id="chkMiercoles"><label class="form-check-label small fw-bold text-secondary" for="chkMiercoles">Miércoles</label></div></div>
+                                        <div class="col-6 col-sm-4"><div class="form-check"><input class="form-check-input" type="checkbox" name="diasDescanso" value="JUEVES" id="chkJueves"><label class="form-check-label small fw-bold text-secondary" for="chkJueves">Jueves</label></div></div>
+                                        <div class="col-6 col-sm-4"><div class="form-check"><input class="form-check-input" type="checkbox" name="diasDescanso" value="VIERNES" id="chkViernes"><label class="form-check-label small fw-bold text-secondary" for="chkViernes">Viernes</label></div></div>
+                                        <div class="col-6 col-sm-4"><div class="form-check"><input class="form-check-input" type="checkbox" name="diasDescanso" value="SABADO" id="chkSabado"><label class="form-check-label small fw-bold text-secondary" for="chkSabado">Sábado</label></div></div>
+                                        <div class="col-12 col-sm-4"><div class="form-check"><input class="form-check-input" type="checkbox" name="diasDescanso" value="DOMINGO" id="chkDomingo" checked><label class="form-check-label small fw-bold text-primary" for="chkDomingo">Domingo</label></div></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row g-2 mb-4 align-items-center pt-2">
+                                <div class="col-6">
+                                    <label class="form-label text-muted fw-bold small">Peso Sugerido Base</label>
+                                    <input type="number" min="1" max="5" class="form-control bg-white text-center fw-bold" name="peso" value="3" required>
+                                </div>
+                                <div class="col-6 text-center">
+                                    <div class="form-check form-switch d-inline-block text-start">
+                                        <input class="form-switch-input" type="checkbox" id="checkDefecto" name="esPorDefecto" value="true">
+                                        <label class="form-check-label fw-bold small text-secondary" for="checkDefecto">Por Defecto</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-corporativo w-100 fw-bold shadow-sm">
+                                <i class="bi bi-plus-circle me-2"></i>Inyectar Turno Base
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                <div class="col-12 col-xl-8">
+                    <div class="card card-flotante p-4 h-100 shadow-sm">
+                        <h5 class="text-corporativo fw-bold mb-4"><i class="bi bi-grid-3x3-gap me-2"></i>Catálogo de Turnos Activos (`cat_turnos`)</h5>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle border">
+                                <thead class="table-dark">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Nombre del Turno</th>
+                                    <th>Horas</th>
+                                    <th>Mundo</th>
+                                    <th>Días Descanso</th>
+                                    <th class="text-center">Peso</th>
+                                    <th class="text-center">Defecto</th>
+                                    <th>Estado</th>
+                                    <th class="text-center">Acciones</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr th:each="tMaestro : ${listaTurnosMaestros}">
+                                    <td class="font-monospace text-muted fw-bold" th:text="${tMaestro.id}">1</td>
+                                    <td class="fw-bold text-secondary" th:text="${tMaestro.nombreTurno}">1ro</td>
+                                    <form th:id="'form-master-turno-' + ${tMaestro.id}" th:action="@{/admin/turnos/actualizar-datos/{id}(id=${tMaestro.id})}" method="post" class="d-none">
+                                        <input type="hidden" name="nominaUsuario" th:value="${session.usuarioLogueado}">
+                                    </form>
+                                    <td><input type="number" step="0.01" class="form-control form-control-sm bg-white font-monospace fw-bold text-center" style="width: 75px;" name="horasJornada" th:value="${tMaestro.horasJornada}" th:form="'form-master-turno-' + ${tMaestro.id}" required></td>
+                                    <td>
+                                        <select class="form-select form-select-sm bg-white border fw-bold" style="width: 100px;" name="mundo" th:form="'form-master-turno-' + ${tMaestro.id}">
+                                            <option value="SIND" th:selected="${tMaestro.mundo == 'SIND'}">SIND</option>
+                                            <option value="ADMIN" th:selected="${tMaestro.mundo == 'ADMIN'}">ADMIN</option>
+                                            <option value="TODOS" th:selected="${tMaestro.mundo == 'TODOS'}">TODOS</option>
+                                        </select>
+                                    </td>
+                                    <td><input type="text" class="form-control form-control-sm bg-white font-monospace text-uppercase" style="width: 160px;" name="diasDescanso" th:value="${tMaestro.diasDescanso}" th:form="'form-master-turno-' + ${tMaestro.id}" required></td>
+                                    <td><input type="number" min="1" max="5" class="form-control form-control-sm bg-white text-center" style="width: 55px;" name="peso" th:value="${tMaestro.peso}" th:form="'form-master-turno-' + ${tMaestro.id}" required></td>
+                                    <td class="text-center"><input type="checkbox" class="form-check-input" name="esPorDefecto" value="true" th:checked="${tMaestro.esPorDefecto}" th:form="'form-master-turno-' + ${tMaestro.id}"></td>
+                                    <td>
+                                        <span th:if="${tMaestro.activo}" class="badge bg-success bg-opacity-10 text-success border border-success">Activo</span>
+                                        <span th:unless="${tMaestro.activo}" class="badge bg-danger bg-opacity-10 text-danger border border-danger">Inactivo</span>
+                                    </td>
+                                    <td class="text-center">
+                                        <div class="d-flex gap-1 justify-content-center">
+                                            <button type="submit" class="btn btn-sm btn-primary rounded-circle" th:form="'form-master-turno-' + ${tMaestro.id}"><i class="bi bi-save"></i></button>
+                                            <form th:if="${tMaestro.activo}" th:action="@{/admin/turnos/desactivar/{id}(id=${tMaestro.id})}" method="post" class="d-inline"><input type="hidden" name="nominaUsuario" th:value="${session.usuarioLogueado}"><button type="submit" class="btn btn-outline-danger btn-sm rounded-circle"><i class="bi bi-slash-circle"></i></button></form>
+                                            <form th:unless="${tMaestro.activo}" th:action="@{/admin/turnos/activar/{id}(id=${tMaestro.id})}" method="post" class="d-inline"><input type="hidden" name="nominaUsuario" th:value="${session.usuarioLogueado}"><button type="submit" class="btn btn-outline-success btn-sm rounded-circle"><i class="bi bi-check-circle"></i></button></form>
+                                        </div>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-4 border-top pt-5">
+                <div class="col-12"><div class="d-flex align-items-center gap-3 mb-4"><div class="p-2 bg-info bg-opacity-10 rounded-3 text-info"><i class="bi bi-matrix fs-3"></i></div><div><h5 class="text-corporativo fw-bold mb-0">Tabla Maestra de Cobertura de Línea (Headcount Caps Dinámicos)</h5><p class="text-muted small mb-0">Parametrización dinámica global.</p></div></div></div>
+                <div class="col-12 col-md-4">
+                    <div class="card bg-light p-3 rounded-4 border mb-3 shadow-sm">
+                        <h6 class="text-secondary fw-bold mb-3"><i class="bi bi-plus-circle-fill me-1 text-info"></i> Inyectar Nueva Regla</h6>
+                        <form th:action="@{/admin/reglas-cobertura/guardar}" method="post">
+                            <div class="mb-2"><label class="form-label text-muted small fw-bold mb-1">Mínimo Operadores</label><input type="number" class="form-control form-control-sm text-center fw-bold" name="minOperadores" required></div>
+                            <div class="mb-2"><label class="form-label text-muted small fw-bold mb-1">Máximo Operadores</label><input type="number" class="form-control form-control-sm text-center fw-bold" name="maxOperadores" required></div>
+                            <div class="mb-3"><label class="form-label text-danger small fw-bold mb-1">Tope Máx Ausentes</label><input type="number" class="form-control form-control-sm text-center fw-bold border-danger text-danger" name="maxAusentesPorDia" required></div>
+                            <button type="submit" class="btn btn-info btn-sm text-white w-100 fw-bold"><i class="bi bi-save me-1"></i> Fijar Rango</button>
+                        </form>
+                    </div>
+                    <div class="card p-3 rounded-4 border border-warning bg-warning bg-opacity-5 shadow-sm">
+                        <form th:action="@{/admin/reglas-globales/guardar-ranking-default}" method="post">
+                            <div class="d-flex align-items-center gap-2 mb-2"><i class="bi bi-award-fill text-warning fs-5"></i><strong class="text-secondary small">Corte VIP de Rezago Base</strong></div>
+                            <div class="d-flex gap-2"><input type="number" class="form-control form-control-sm text-center fw-bold text-warning border-warning bg-white" name="rankingCorteDefault" th:value="${rankingCorteDefault}" required style="width: 70px;"><button type="submit" class="btn btn-sm btn-warning fw-bold flex-grow-1"><i class="bi bi-check-lg"></i> Actualizar</button></div>
+                        </form>
+                    </div>
+                </div>
+                <div class="col-12 col-md-8">
+                    <div class="card p-3 rounded-4 border bg-white shadow-sm h-100">
+                        <h6 class="text-corporativo fw-bold mb-3"><i class="bi bi-list-stars me-1"></i> Límites de Densidad de Estaciones Activas</h6>
+                        <div class="table-responsive" style="max-height: 310px;">
+                            <table class="table table-sm table-hover align-middle border text-center">
+                                <thead class="table-dark small"><tr><th>Rango Operadores</th><th>Tope Ausencia</th><th>Acción</th></tr></thead>
+                                <tbody class="small font-monospace">
+                                <tr th:each="regla : ${listaReglasTope}"><td class="fw-bold text-secondary" th:text="'De ' + ${regla.minOperadores} + ' a ' + ${regla.maxOperadores} + ' ops'">De 1 a 3 ops</td><td><span class="badge bg-danger bg-opacity-10 text-danger border border-danger px-2" th:text="${regla.maxAusentesPorDia} + ' por día'">1 por día</span></td><td><form th:action="@{/admin/reglas-cobertura/eliminar/{id}(id=${regla.id})}" method="post" class="d-inline"><button type="submit" class="btn btn-link btn-sm text-danger p-0"><i class="bi bi-trash3-fill"></i></button></form></td></tr>
+                                <tr th:if="${#lists.isEmpty(listaReglasTope)}"><td colspan="3" class="text-muted py-3">Sin reglas de estación registradas.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="pills-nomina" role="tabpanel">
+            <div class="card card-flotante p-4 p-md-5">
+                <div class="row g-4">
+                    <div class="col-12 col-lg-6 border-end">
+                        <form th:action="@{/admin/nomina/guardar-sind}" method="post" class="p-3 border rounded-4 bg-white shadow-sm">
+                            <input type="hidden" name="nominaUsuario" th:value="${session.usuarioLogueado}">
+                            <h6 class="fw-bold text-primary mb-3"><i class="bi bi-people-fill me-2"></i>Mundo Sindicalizado Obrero</h6>
+                            <div class="mb-3"><label class="form-label text-muted small fw-bold">Día de Corte</label><select class="form-select" name="corteSind"><option value="1" th:selected="${corteSind == 1}">Lunes</option><option value="2" th:selected="${corteSind == 2}">Martes</option><option value="3" th:selected="${corteSind == 3}">Miércoles</option><option value="4" th:selected="${corteSind == 4}">Jueves</option><option value="5" th:selected="${corteSind == 5}">Viernes</option><option value="6" th:selected="${corteSind == 6}">Sábado</option><option value="7" th:selected="${corteSind == 7}">Domingo</option></select></div>
+                            <div class="mb-3"><label class="form-label text-muted small fw-bold">Hora Límite</label><input type="time" class="form-control" name="horaCorte" th:value="${horaCorteSind}" required></div>
+                            <div class="mb-3"><label class="form-label text-muted small fw-bold">Anticipación Requerida (Horas)</label><input type="number" class="form-control" name="horasAntSind" th:value="${horasAntSind}" required></div>
+                            <button type="submit" class="btn btn-primary w-100">Fijar Candado Sindicalizado</button>
+                        </form>
+                    </div>
+                    <div class="col-12 col-lg-6">
+                        <form th:action="@{/admin/nomina/guardar-admin}" method="post" class="p-3 border rounded-4 bg-white shadow-sm">
+                            <input type="hidden" name="nominaUsuario" th:value="${session.usuarioLogueado}">
+                            <h6 class="fw-bold text-secondary mb-3"><i class="bi bi-person-badge-fill me-2"></i>Mundo Administrativo Empleados</h6>
+                            <div class="mb-3"><label class="form-label text-muted small fw-bold">Día de Corte</label><select class="form-select" name="corteAdmin"><option value="1" th:selected="${corteAdmin == 1}">Lunes</option><option value="2" th:selected="${corteAdmin == 2}">Martes</option><option value="3" th:selected="${corteAdmin == 3}">Miércoles</option><option value="4" th:selected="${corteAdmin == 4}">Jueves</option><option value="5" th:selected="${corteAdmin == 5}">Viernes</option><option value="6" th:selected="${corteAdmin == 6}">Sábado</option><option value="7" th:selected="${corteAdmin == 7}">Domingo</option></select></div>
+                            <div class="mb-3"><label class="form-label text-muted small fw-bold">Hora Límite</label><input type="time" class="form-control" name="horaCorteAdmin" th:value="${horaCorteAdmin}" required></div>
+                            <div class="mb-3"><label class="form-label text-muted small fw-bold">Anticipación Requerida (Horas)</label><input type="number" class="form-control" name="horasAntAdmin" th:value="${horasAntAdmin}" required></div>
+                            <button type="submit" class="btn btn-secondary w-100">Fijar Candado Administrativo</button>
+                        </form>
+                    </div>
+                </div>
+                <div class="mt-5 pt-4 border-top">
+                    <h5 class="fw-bold text-corporativo mb-4"><i class="bi bi-shield-lock-fill me-2"></i>Llaves Divinas y Asignación de Roles de Planta</h5>
+                    <form th:action="@{/admin/nomina/guardar-roles}" method="post" class="row g-3 p-4 bg-light rounded-4 border shadow-sm">
+                        <input type="hidden" name="nominaUsuario" th:value="${session.usuarioLogueado}">
+                        <div class="col-md-4"><label class="form-label text-muted small fw-bold">Responsable SIND</label><input type="number" class="form-control" name="respSind" th:value="${respSind}"></div>
+                        <div class="col-md-4"><label class="form-label text-muted small fw-bold">Responsable ADMIN</label><input type="number" class="form-control" name="respAdmin" th:value="${respAdmin}"></div>
+                        <div class="col-md-4"><label class="form-label text-muted small fw-bold">Jefa de Nómina</label><input type="number" class="form-control" name="jefaNomina" th:value="${jefaNomina}"></div>
+                        <div class="col-md-6 mt-3"><label class="form-label text-danger fw-bold small">Programador Master Primario <i class="bi bi-key-fill"></i></label><input type="number" class="form-control border-danger text-danger fw-bold" name="progMaster" th:value="${progMaster}" required></div>
+                        <div class="col-md-6 mt-3"><label class="form-label text-warning fw-bold small">Programador de Respaldo Auxiliar <i class="bi bi-shield-fill-check"></i></label><input type="number" class="form-control border-warning text-warning fw-bold" name="progBackup" th:value="${progBackup}" required></div>
+                        <div class="col-12 text-end mt-4"><button type="submit" class="btn btn-dark btn-lg px-4 shadow-sm fw-bold">Guardar Súper Roles de Planta</button></div>
+                    </form>
+                </div>
+                <div class="mt-5 pt-4 border-top">
+                    <h5 class="fw-bold text-danger mb-4"><i class="bi bi-stopwatch-fill me-2"></i>Tiempo de Gracia para Respuesta (SLA)</h5>
+                    <form th:action="@{/admin/nomina/guardar-sla}" method="post" class="p-4 bg-white rounded-4 border border-danger shadow-sm">
+                        <input type="hidden" name="nominaUsuario" th:value="${session.usuarioLogueado}">
+                        <div class="row g-3 align-items-center">
+                            <div class="col-md-8">
+                                <label class="form-label text-muted small fw-bold mb-1">Horas máximas para que el Jefe dé respuesta antes del Escalamiento o Auto-Aprobación</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-danger bg-opacity-10 text-danger border-danger"><i class="bi bi-hourglass-split"></i></span>
+                                    <input type="number" class="form-control fw-bold text-danger border-danger" name="horasSlaJefe" th:value="${horasSlaJefe}" min="1" required>
+                                    <span class="input-group-text bg-light border-danger text-muted fw-bold">Horas</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4 text-end mt-4 mt-md-0 pt-md-3">
+                                <button type="submit" class="btn btn-outline-danger w-100 shadow-sm fw-bold"><i class="bi bi-save me-2"></i>Guardar Tiempo SLA</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="pills-importaciones" role="tabpanel">
+            <div class="row g-4">
+                <div class="col-12 col-md-6"><div class="card card-flotante p-4 border-top border-primary border-4 h-100 d-flex flex-column"><h5 class="fw-bold text-primary mb-2"><i class="bi bi-person-lines-fill me-2"></i>1. Estructura de Personal Activo</h5><form data-tipo="importador" action="/api/import/empleados" method="post" enctype="multipart/form-data" class="mt-auto"><input class="form-control mb-3" type="file" name="file" accept=".xlsx, .xls" required><button type="submit" class="btn btn-primary w-100 fw-bold"><i class="bi bi-upload me-2"></i>Actualizar Base Personal</button></form></div></div>
+                <div class="col-12 col-md-6"><div class="card card-flotante p-4 border-top border-info border-4 h-100 d-flex flex-column"><h5 class="fw-bold text-info mb-2"><i class="bi bi-diagram-3-fill me-2"></i>2. Estructura de Organigrama y Jefes</h5><form data-tipo="importador" action="/api/import/jefes" method="post" enctype="multipart/form-data" class="mt-auto"><input class="form-control mb-3" type="file" name="file" accept=".xlsx, .xls" required><button type="submit" class="btn btn-info text-white w-100 fw-bold"><i class="bi bi-diagram-2 me-2"></i>Tejer Estructura Jefaturas</button></form></div></div>
+                <div class="col-12 col-md-6"><div class="card card-flotante p-4 border-top border-success border-4 h-100 d-flex flex-column"><h5 class="fw-bold text-success mb-2"><i class="bi bi-boxes me-2"></i>3. Catálogo de Áreas (CC y WC)</h5><form data-tipo="importador" action="/api/import/catalogo" method="post" enctype="multipart/form-data" class="mt-auto"><input class="form-control mb-3" type="file" name="file" accept=".xlsx, .xls" required><button type="submit" class="btn btn-success w-100 fw-bold"><i class="bi bi-database-fill-add me-2"></i>Cargar Mapeo CC/WC</button></form></div></div>
+                <div class="col-12 col-md-6"><div class="card card-flotante p-4 border-top border-warning border-4 h-100 d-flex flex-column"><h5 class="fw-bold text-warning mb-2"><i class="bi bi-calendar2-plus-fill me-2"></i>4. Calendario Masivo de Días Festivos</h5><form data-tipo="importador" action="/api/import/festivos-masivos" method="post" enctype="multipart/form-data" class="mt-auto"><input class="form-control mb-3" type="file" name="file" accept=".xlsx, .xls" required><button type="submit" class="btn btn-warning text-dark w-100 fw-bold"><i class="bi bi-calendar-check-fill me-2"></i>Inyectar Feriados Oficiales</button></form></div></div>
+                <div class="col-12"><div class="card card-flotante p-4 border-top border-4 border-danger bg-danger bg-opacity-10 h-100 d-flex flex-column"><h5 class="fw-bold text-danger mb-1"><i class="bi bi-exclamation-triangle-fill me-2"></i>5. Semillero de Saldos Iniciales</h5><form data-tipo="importador" action="/api/import/saldos-iniciales" method="post" enctype="multipart/form-data" class="mt-auto"><input class="form-control mb-3 border-danger" type="file" name="file" accept=".xlsx, .xls" required><button type="submit" class="btn btn-danger w-100 fw-bold"><i class="bi bi-lightning-charge-fill me-2"></i>Congelar Historial e Iniciar Semillero</button></form></div></div>
+            </div>
+        </div>
+
+    </div>
+</main>
+
+<div class="modal" id="modalProcesando" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-white border-0 rounded-4 shadow-lg">
+            <div class="modal-body text-center p-5">
+                <div class="spinner-border text-info mb-4" style="width: 3.5rem; height: 3.5rem;" role="status"><span class="visually-hidden">Procesando...</span></div>
+                <h5 class="fw-bold mb-2">Procesando Archivo de Planta</h5>
+                <p class="text-muted small mb-0">El motor Apache POI está validando las cabeceras...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        console.log("🚀 Torre de Control: Script cargado con éxito.");
+        try {
+            const urlParams = new URLSearchParams(window.location.search);
+            const tabActivaId = urlParams.get('tab');
+            if (tabActivaId) {
+                const botonTab = document.querySelector('#pills-' + tabActivaId + '-tab');
+                if (botonTab && typeof bootstrap !== 'undefined') {
+                    var instTab = new bootstrap.Tab(botonTab);
+                    instTab.show();
+                }
+            }
+        } catch (err) { console.error(err); }
+
+        let modalSpinner = null;
+        const elementoModal = document.getElementById('modalProcesando');
+        const contenedorAlertas = document.getElementById('contenedorAlertas');
+        const formulariosImportacion = document.querySelectorAll('form[data-tipo="importador"]');
+
+        if (elementoModal && typeof bootstrap !== 'undefined') {
+            try { modalSpinner = new bootstrap.Modal(elementoModal); } catch (e) {}
+        }
+
+        formulariosImportacion.forEach(form => {
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                if (modalSpinner) { try { modalSpinner.show(); } catch(err){} }
+                const formData = new FormData(this);
+                const urlEndpoint = this.getAttribute('action');
+
+                fetch(urlEndpoint, { method: 'POST', body: formData })
+                .then(async response => {
+                    const textoRespuesta = await response.text();
+                    if (modalSpinner) { try { modalSpinner.hide(); } catch(err){} }
+                    document.body.classList.remove('modal-open');
+                    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+
+                    if (response.ok) {
+                        contenedorAlertas.innerHTML = `
+                            <div class="alert alert-success alert-dismissible fade show border-start border-success border-4 shadow-sm rounded-3" role="alert">
+                                <strong class="fw-bold">¡Layout Procesado Correctamente!</strong> ${textoRespuesta || 'Información indexada.'}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>`;
+                        form.reset();
+                    } else {
+                        contenedorAlertas.innerHTML = `
+                            <div class="alert alert-danger alert-dismissible fade show border-start border-danger border-4 shadow-sm rounded-3" role="alert">
+                                <strong class="fw-bold">Error de Validación:</strong> ${textoRespuesta || 'Estructura no legible.'}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>`;
+                    }
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                })
+                .catch(error => {
+                    if (modalSpinner) { try { modalSpinner.hide(); } catch(err){} }
+                    contenedorAlertas.innerHTML = `<div class="alert alert-danger alert-dismissible fade show border-start border-danger border-4 shadow-sm rounded-3" role="alert"><strong>Falla de Red.</strong></div>`;
+                });
+            });
+        });
+    });
+</script>
+</body>
+</html>

@@ -1,0 +1,1375 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Gestión de Saldos - Auditoría</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+
+    <link rel="stylesheet" th:href="@{/css/gestion-saldo.css}">
+    <link rel="stylesheet" th:href="@{/css/estilos-grammer.css}">
+</head>
+<body class="bg-light pb-5">
+<div th:replace="~{fragments/navbar :: menuPlanta}"></div>
+
+<div style="height: 40px;"></div>
+
+<main class="container mx-auto px-3">
+
+    <div class="alert alert-success d-flex align-items-center gap-3 custom-card mb-4 border-0 p-3 shadow-sm" th:if="${mensajeExito}" style="background-color: #d4edda; color: #155724; border-left: 5px solid #28a745 !important;">
+        <i class="bi bi-check-circle-fill text-success fs-3"></i>
+        <div class="fw-medium text-break" th:text="${mensajeExito}">Operación Exitosa</div>
+    </div>
+    <div class="alert alert-danger d-flex align-items-center gap-3 custom-card mb-4 border-0 p-3 shadow-sm" th:if="${mensajeError}" style="background-color: #f8d7da; color: #721c24; border-left: 5px solid #dc3545 !important;">
+        <i class="bi bi-exclamation-triangle-fill text-danger fs-3"></i>
+        <div class="fw-medium text-break" th:text="${mensajeError}">Ocurrió un error</div>
+    </div>
+
+    <ul class="nav nav-pills nav-fill bg-white shadow-sm rounded-4 p-2 mb-4" id="pills-tab" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active rounded-3 fw-bold py-2" id="pills-individual-tab" data-bs-toggle="pill" data-bs-target="#pills-individual" type="button" role="tab" aria-controls="pills-individual" aria-selected="true">
+                <i class="bi bi-person-bounding-box me-2"></i>Ajustes Individuales y Fichas
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-3 fw-bold py-2" id="pills-recuperaciones-tab" data-bs-toggle="pill" data-bs-target="#pills-recuperaciones" type="button" role="tab" aria-controls="pills-recuperaciones" aria-selected="false">
+                <i class="bi bi-clock-history me-2"></i>Bandeja e Historial de Recuperaciones
+                <span th:if="${recuperacionesPendientes != null and !recuperacionesPendientes.isEmpty()}" class="badge bg-danger ms-2 rounded-pill" th:text="${recuperacionesPendientes.size()}">0</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-3 fw-bold py-2" id="pills-plantilla-tab" data-bs-toggle="pill" data-bs-target="#pills-plantilla" type="button" role="tab" aria-controls="pills-plantilla" aria-selected="false">
+                <i class="bi bi-people-fill me-2"></i>Mi Plantilla General
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-3 fw-bold py-2" id="pills-depuracion-tab" data-bs-toggle="pill" data-bs-target="#pills-depuracion" type="button" role="tab" aria-controls="pills-depuracion" aria-selected="false">
+                <i class="bi bi-shield-slash-fill me-2 text-danger"></i>Depuración de Saldos Vencidos
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-3 fw-bold py-2" id="pills-exportador-tab" data-bs-toggle="pill" data-bs-target="#pills-exportador" type="button" role="tab" aria-controls="pills-exportador" aria-selected="false">
+                <i class="bi bi-file-earmark-excel-fill me-2 text-success"></i>Exportador de Prenómina
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="pills-tabContent">
+
+        <div class="tab-pane fade show active" id="pills-individual" role="tabpanel" aria-labelledby="pills-individual-tab">
+            <section class="custom-card p-4 mb-4 bg-white shadow-sm rounded-3">
+                <form action="/pantallas/gestion-saldos" method="GET" class="row g-3 align-items-end">
+                    <div class="col-md-9">
+                        <label for="buscarNomina" class="form-label fw-semibold text-secondary" style="font-size: 0.9rem;">ID Nómina del Colaborador</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-white border-end-0"><i class="bi bi-id-card text-muted"></i></span>
+                            <input type="number" class="form-control form-control-lg bg-light border-start-0 ps-1"
+                                   id="buscarNomina" name="buscarNomina" placeholder="Ingrese número de nómina..." required
+                                   th:value="${empleadoEncontrado != null ? empleadoEncontrado.nomina : ''}">
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <button type="submit" class="btn btn-lg w-100 text-white d-flex align-items-center justify-content-center gap-2 fw-semibold shadow-sm rounded-3" style="background-color: #002f6c; height: 48px;">
+                            <i class="bi bi-search"></i> Buscar Ficha
+                        </button>
+                    </div>
+                </form>
+            </section>
+
+            <section th:if="${empleadoEncontrado != null}">
+                <div class="row g-4 mb-4">
+                    <div class="col-lg-5">
+                        <div class="custom-card h-100 d-flex flex-column overflow-hidden bg-white shadow-sm rounded-3 border">
+                            <div class="profile-banner"></div>
+                            <div class="px-4 pb-4 flex-grow-1 d-flex flex-column align-items-center text-center" style="margin-top: -35px;">
+                                <div class="profile-avatar bg-white shadow-sm rounded-circle d-flex align-items-center justify-content-center border" style="width: 74px; height: 74px; z-index: 1;">
+                                    <i class="bi bi-person-fill text-secondary" style="font-size: 38px;"></i>
+                                </div>
+                                <h3 class="h4 fw-bold mb-1 text-dark mt-2" th:text="${empleadoEncontrado.nombreCompleto}">Nombre Completo</h3>
+
+                                <div class="d-flex gap-2 justify-content-center mb-4 align-items-center">
+                                    <span class="badge bg-light text-secondary border px-3 py-2 rounded-pill">Nómina: <span class="fw-bold text-dark" th:text="${empleadoEncontrado.nomina}"></span></span>
+                                    <span class="badge border px-3 py-2 rounded-pill text-white bg-primary" th:text="${empleadoEncontrado.tipoEmpleado}">ADMINISTRATIVO</span>
+                                    <span th:if="${empleadoEncontrado.estatus == 'ACTIVO' or empleadoEncontrado.estatus == null}" class="badge bg-success px-3 py-2 rounded-pill text-white fw-bold">ACTIVO</span>
+                                    <span th:if="${empleadoEncontrado.estatus == 'BAJA'}" class="badge bg-danger px-3 py-2 rounded-pill text-white fw-bold">BAJA</span>
+                                </div>
+
+                                <div class="row g-2 w-100 mt-auto">
+                                    <div class="col-6">
+                                        <div class="balance-box w-100 bg-light p-3 rounded-3 border position-relative overflow-hidden">
+                                            <p class="text-secondary text-uppercase tracking-wider fw-bold mb-1" style="font-size: 0.72rem;">Saldo de Ley</p>
+                                            <div class="d-flex justify-content-center align-items-baseline gap-1">
+                                                <span class="fs-2 fw-bold" th:classappend="${empleadoEncontrado.saldoVacacionesActual != null and empleadoEncontrado.saldoVacacionesActual < 0} ? 'text-danger' : 'text-success'" th:text="${empleadoEncontrado.saldoVacacionesActual}">0.0</span>
+                                                <span class="text-muted fw-bold small">días</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="balance-box w-100 bg-light p-3 rounded-3 border position-relative overflow-hidden">
+                                            <p class="text-secondary text-uppercase tracking-wider fw-bold mb-1" style="font-size: 0.72rem;">Proporcional</p>
+                                            <div class="d-flex justify-content-center align-items-baseline gap-1">
+                                                <span class="fs-2 fw-bold" th:text="${empleadoEncontrado.saldoProporcional != null ? empleadoEncontrado.saldoProporcional : '0.0'}">0.0</span>
+                                                <span class="text-muted fw-bold small">días</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-7">
+                        <div class="custom-card p-4 h-100 bg-white shadow-sm rounded-3 border">
+                            <form action="/pantallas/gestion-saldos/guardar" method="POST" class="row g-3">
+                                <input type="hidden" name="empleadoId" th:value="${empleadoEncontrado.nomina}">
+                                <div class="col-12 mb-2">
+                                    <label class="form-label fw-bold text-secondary" style="font-size: 0.85rem;">Operación a Ejecutar</label>
+                                    <div class="row g-2">
+                                        <div class="col-6">
+                                            <input type="radio" class="btn-check" name="accionTipo" id="radioReembolso" value="REEMBOLSO" checked onclick="conmutarCamposAjuste()">
+                                            <label class="btn btn-outline-success w-100 d-flex align-items-center justify-content-center gap-1 py-2 fw-bold rounded-3" for="radioReembolso">Reembolsar (Suma)</label>
+                                        </div>
+                                        <div class="col-6">
+                                            <input type="radio" class="btn-check" name="accionTipo" id="radioDescuento" value="DESCUENTO" onclick="conmutarCamposAjuste()">
+                                            <label class="btn btn-outline-danger w-100 d-flex align-items-center justify-content-center gap-1 py-2 fw-bold rounded-3" for="radioDescuento">Recuperar Falta (Resta)</label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-12" id="boxSelectorSolicitud">
+                                    <label for="solicitudId" class="form-label fw-semibold text-secondary">Vincular a Tarjeta Origen</label>
+                                    <select class="form-select bg-light text-dark" id="solicitudId" name="solicitudId">
+                                        <option value="0">-- Selecciona la tarjeta --</option>
+                                        <option th:each="sol : ${solicitudesEmpleado}" th:value="${sol.id}" th:text="'Folio #' + ${sol.id} + ' | Del ' + ${sol.fechaInicio} + ' al ' + ${sol.fechaFin}"></option>
+                                    </select>
+                                </div>
+                                <div class="col-12 d-none" id="boxSelectorFecha">
+                                    <label for="fechaDescuento" class="form-label fw-semibold text-secondary">Fechas Exactas a Descontar</label>
+                                    <input type="text" class="form-control bg-light" id="fechaDescuento" name="fechaDescuento">
+                                </div>
+                                <div class="col-12">
+                                    <label for="diasAjuste" class="form-label fw-semibold text-secondary">Días Oficiales</label>
+                                    <input type="number" step="0.5" class="form-control bg-light" id="diasAjuste" name="diasAjuste" required>
+                                </div>
+                                <div class="col-12">
+                                    <label for="justificacion" class="form-label fw-semibold text-secondary">Justificación de Auditoría *</label>
+                                    <textarea class="form-control bg-light" id="justificacion" name="justificacion" rows="2" required></textarea>
+                                </div>
+                                <div class="col-12 d-flex justify-content-end">
+                                    <button type="submit" class="btn text-white" style="background-color: #002f6c; height: 38px;">Procesar Ajuste Manual</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="custom-card p-4 mb-4 bg-white shadow-sm rounded-3 border-top border-4 border-primary">
+                    <div class="d-flex align-items-center gap-2 border-bottom pb-3 mb-3">
+                        <div class="rounded p-2 d-flex align-items-center" style="background-color: #f1f5f9; color: #002f6c;">
+                            <i class="bi bi-person-gear fs-4"></i>
+                        </div>
+                        <h4 class="h5 mb-0 fw-bold text-dark">Configuración y Reglas de la Ficha Individual</h4>
+                    </div>
+                    <form action="/pantallas/gestion-saldos/actualizar-perfil" method="POST" class="row g-3">
+                        <input type="hidden" name="empleadoId" th:value="${empleadoEncontrado.nomina}">
+
+                        <div class="col-md-6">
+                            <label for="jefeNomina" class="form-label fw-semibold text-secondary" style="font-size: 0.85rem;">Cambiar Jefe Autorizador (Nómina)</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white"><i class="bi bi-person-badge text-muted" style="font-size: 18px;"></i></span>
+                                <input type="number" class="form-control bg-light" id="jefeNomina" name="jefeNomina" placeholder="Dejar vacío si no tiene jefe directo" th:value="${empleadoEncontrado.jefeDirectoNomina}">
+                            </div>
+                            <div class="form-text text-muted">Ajusta el aprobador directo. Puede quedar en blanco para personal extranjero.</div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="tipoEmpleado" class="form-label fw-semibold text-secondary" style="font-size: 0.85rem;">Esquema Operativo de Reglas</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white"><i class="bi bi-gavel text-muted" style="font-size: 18px;"></i></span>
+                                <select class="form-select bg-light text-dark" id="tipoEmpleado" name="tipoEmpleado" required onchange="conmutarCamposExtranjero()">
+                                    <option value="SINDICALIZADO" th:selected="${empleadoEncontrado.tipoEmpleado != null && #strings.equalsIgnoreCase(empleadoEncontrado.tipoEmpleado, 'SINDICALIZADO')}">Sindicalizado (Tope estricto de negativos .9)</option>
+                                    <option value="ADMINISTRATIVO" th:selected="${empleadoEncontrado.tipoEmpleado != null && #strings.equalsIgnoreCase(empleadoEncontrado.tipoEmpleado, 'ADMINISTRATIVO')}">Administrativo (Barra Libre)</option>
+                                    <option value="EXTRANJERO" th:selected="${empleadoEncontrado.tipoEmpleado != null && #strings.equalsIgnoreCase(empleadoEncontrado.tipoEmpleado, 'EXTRANJERO')}">Extranjero (Contrato Especial / Visa)</option>
+                                </select>
+                            </div>
+                            <div class="form-text text-muted">Establece el comportamiento de validación del saldo para este colaborador.</div>
+                        </div>
+
+                        <div id="boxCamposExtranjero" class="col-12 d-none">
+                            <div class="row g-3 p-3 rounded-3 mb-2" style="background-color: #f8f9fa; border: 1px dashed #cbd5e1;">
+                                <div class="col-md-6">
+                                    <label for="diasBaseManual" class="form-label fw-semibold text-secondary" style="font-size: 0.85rem;">Días Base Especiales por Contrato</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-white"><i class="bi bi-calendar-event text-muted" style="font-size: 18px;"></i></span>
+                                        <input type="number" class="form-control bg-light" id="diasBaseManual" name="diasBaseManual" placeholder="Ej. 16 o 18" th:value="${empleadoEncontrado.diasBaseManual}">
+                                    </div>
+                                    <div class="form-text text-muted">Establece los días fijos o el piso mínimo de arranque de la visa.</div>
+                                </div>
+                                <div class="col-md-6 d-flex align-items-center pt-3">
+                                    <div class="form-check form-switch bg-white p-3 rounded-3 border w-100 shadow-sm" style="padding-left: 3.5rem !important;">
+                                        <input class="form-check-input fs-5" type="checkbox" id="esSaldoCongelado" name="esSaldoCongelado" value="true" th:checked="${empleadoEncontrado.esSaldoCongelado}">
+                                        <label class="form-check-label fw-bold text-dark ms-2" for="esSaldoCongelado" style="font-size: 0.85rem; cursor: pointer;">Congelar Escalación Anual (Bloquear Tabulador)</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 d-flex justify-content-end mt-2">
+                            <button type="submit" class="btn text-white fw-semibold d-inline-flex align-items-center gap-2 px-4 shadow-sm" style="background-color: #002f6c; height: 42px; border-radius: 8px;">
+                                <i class="bi bi-floppy-fill" style="font-size: 16px;"></i> Guardar Cambios de Ficha
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="custom-card p-4 mb-4 bg-white shadow-sm rounded-3 border-top border-4 border-warning shadow-sm" id="seccionTablaAuditoria" th:if="${historialAuditoria != null}">
+                    <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 border-bottom pb-3 mb-4">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="rounded p-2 d-flex align-items-center" style="background-color: #fef3c7; color: #d97706;">
+                                <i class="bi bi-gavel fs-4"></i>
+                            </div>
+                            <h3 class="h5 mb-0 fw-bold text-dark">Historial de Auditoría de Ajustes Manuales</h3>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <select id="limiteExportar" class="form-select form-select-sm" style="width: 140px;">
+                                <option value="todos">Todos los registros</option>
+                                <option value="10">Últimos 10</option>
+                                <option value="50">Últimos 50</option>
+                            </select>
+                            <button type="button" class="btn btn-warning fw-bold text-dark text-nowrap" onclick="exportarTableAExcel()">
+                                <i class="bi bi-file-earmark-excel-fill"></i> Exportar Auditoría
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped align-middle border text-start" id="tablaAuditoria">
+                            <thead class="table-light text-secondary" style="font-size: 0.85rem;">
+                            <tr>
+                                <th class="px-3 py-2">Fecha y Hora</th>
+                                <th>Operación</th>
+                                <th>Días Ofic.</th>
+                                <th>Justificación Contable / Responsable</th>
+                            </tr>
+                            </thead>
+                            <tbody style="font-size: 0.88rem;">
+                            <tr th:each="audit : ${historialAuditoria}">
+                                <td class="px-3 font-monospace fw-bold text-dark" th:text="${audit.fechaMovimiento != null ? #temporals.format(audit.fechaMovimiento, 'dd/MM/yyyy HH:mm:ss') : 'N/A'}"></td>
+
+                                <td>
+                                    <span class="badge rounded-2 px-3 py-1"
+                                          th:classappend="${audit.diasAjustados >= 0} ? 'bg-success' : 'bg-danger'"
+                                          th:text="${audit.diasAjustados >= 0 ? 'REEMBOLSO' : 'DESCUENTO'}"></span>
+                                </td>
+
+                                <td class="fw-bold text-center"
+                                    th:classappend="${audit.diasAjustados >= 0} ? 'text-success' : 'text-danger'"
+                                    th:text="${audit.diasAjustados >= 0 ? '+' + audit.diasAjustados : audit.diasAjustados}"></td>
+
+                                <td class="text-muted style-mini" th:text="${audit.justificacion}"></td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <section class="custom-card p-4 mb-4 border-top border-4 border-primary shadow-sm" th:if="${historialGeneral != null}">
+                    <div class="d-flex align-items-center gap-2 border-bottom pb-3 mb-4">
+                        <div class="rounded p-2 d-flex align-items-center" style="background-color: #e0e7ff; color: #3b82f6;">
+                            <i class="bi bi-clock-history fs-4"></i>
+                        </div>
+                        <h3 class="h5 mb-0 fw-bold text-dark">Línea de Timeline del Colaborador (Vista Espejo)</h3>
+                    </div>
+
+                    <div class="text-center mt-4 text-muted" th:if="${historialGeneral.isEmpty()}">
+                        <i class="bi bi-inbox fs-1 opacity-50"></i>
+                        <p class="mb-0 fw-medium mt-1">El colaborador aún no tiene solicitudes ni movimientos de vacaciones registrados.</p>
+                    </div>
+
+                    <div class="d-flex flex-column gap-3" style="max-height: 500px; overflow-y: auto; padding-right: 10px;" th:if="${!historialGeneral.isEmpty()}">
+                        <div class="card p-3 mb-2 border-0 shadow-sm" th:each="solicitud : ${historialGeneral}" style="background-color: #f8f9fa;">
+                            <div class="mb-2 d-flex justify-content-between align-items-center">
+                                <span class="badge bg-info text-dark small fw-bold" th:text="${solicitud.tipoSolicitud}">AJUSTE</span>
+                                <span class="badge rounded-pill px-3 py-2" th:classappend="${solicitud.estatus == 'Aprobado' ? 'bg-success' : 'bg-danger'}" th:text="${solicitud.estatus}">Aprobado</span>
+                            </div>
+                            <div class="fw-bold text-dark" th:text="${solicitud.fechaInicio} + ' al ' + ${solicitud.fechaFin}"></div>
+                            <div class="small text-muted" th:text="${solicitud.diasTotalesCalculados} + ' días calculados'"></div>
+                        </div>
+                    </div>
+                </section>
+            </section>
+        </div>
+
+        <div class="tab-pane fade" id="pills-recuperaciones" role="tabpanel" aria-labelledby="pills-recuperaciones-tab">
+            <section class="custom-card p-4 mb-4 bg-white shadow-sm rounded-3 border-top border-4 border-primary">
+
+                <div id="bulkActionsBarRecuperaciones" class="d-none sticky-top bg-dark text-white p-3 shadow-lg mb-4" style="top: 80px; z-index: 1020; border-radius: 12px;">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="badge bg-warning text-dark px-3 py-2 rounded-pill fw-bold"><span id="selectedCountRecuperaciones">0</span> Seleccionados</span>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-success btn-sm px-3 fw-bold" onclick="abrirModalMasivo('APROBADO')">Aplicar Lote</button>
+                            <button type="button" class="btn btn-outline-light btn-sm px-3 fw-bold" onclick="abrirModalMasivo('RECHAZADO')">Rechazar Lote</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-center justify-content-between border-bottom pb-3 mb-4">
+                    <div>
+                        <h3 class="h5 mb-1 fw-bold text-dark"><i class="bi bi-mailbox2 text-primary me-2"></i>Bandeja de Pendientes Actuales</h3>
+                        <p class="text-muted mb-0 small">Muestra solicitudes semanales enviadas por supervisores a cuenta de vacaciones.</p>
+                    </div>
+                </div>
+
+                <div th:if="${recuperacionesPendientes != null and !recuperacionesPendientes.isEmpty()}" class="table-responsive">
+                    <table class="table table-hover align-middle border text-start" id="tablaRecuperacionesNomina">
+                        <thead class="table-light text-secondary" style="font-size: 0.85rem;">
+                        <tr>
+                            <th class="text-center" style="width: 50px;"><input class="form-check-input fs-5" type="checkbox" id="selectAllRecuperaciones" onclick="toggleAllRecuperaciones(this)"></th>
+                            <th>Folio</th>
+                            <th>Colaborador</th>
+                            <th>Fecha Falta</th>
+                            <th>Tipo / Notas del Supervisor</th>
+                            <th>Ingresada El</th>
+                            <th>Reportado Por</th>
+                            <th class="text-end px-3">Acciones</th>
+                        </tr>
+                        </thead>
+                        <tbody style="font-size: 0.9rem;">
+                        <tr th:each="pendiente : ${recuperacionesPendientes}">
+                            <td class="text-center"><input class="form-check-input fs-5 recuperacion-check" type="checkbox" th:value="${pendiente.id}" onclick="updateSelectedCountRecuperaciones()"></td>
+                            <td class="fw-bold text-dark" th:text="'#' + ${pendiente.id}"></td>
+                            <td>
+                                <div class="fw-bold text-dark" th:text="${pendiente.empleado != null ? pendiente.empleado.nombreCompleto : 'Sin Asignar'}"></div>
+                                <small class="text-muted font-monospace" th:text="'Nómina: #' + ${pendiente.empleado != null ? pendiente.empleado.nomina : '0'}"></small>
+                            </td>
+                            <td><span class="badge bg-danger bg-opacity-10 text-danger rounded-pill px-3 py-1 fw-semibold" th:text="${pendiente.fechaInicio}"></span></td>
+
+                            <td>
+                                <div class="d-flex flex-column gap-1">
+                                    <span th:if="${pendiente.comentarioJefe != null and #strings.contains(pendiente.comentarioJefe, '[TXT]')}" class="badge bg-warning text-dark rounded-pill px-2 py-1 align-self-start fw-bold" style="font-size: 0.72rem;"><i class="bi bi-stopwatch-fill me-1"></i>TXT (Tiempo por Tiempo)</span>
+                                    <span th:if="${pendiente.comentarioJefe != null and #strings.contains(pendiente.comentarioJefe, '[HO]')}" class="badge bg-info text-dark rounded-pill px-2 py-1 align-self-start fw-bold" style="font-size: 0.72rem;"><i class="bi bi-house-fill me-1"></i>Home Office (HO)</span>
+                                    <span th:if="${pendiente.comentarioJefe != null and #strings.contains(pendiente.comentarioJefe, '[C]')}" class="badge bg-primary text-white rounded-pill px-2 py-1 align-self-start fw-bold" style="font-size: 0.72rem;"><i class="bi bi-building-fill me-1"></i>Visita Cliente</span>
+                                    <span th:if="${pendiente.comentarioJefe != null and #strings.contains(pendiente.comentarioJefe, '[P]')}" class="badge bg-secondary text-white rounded-pill px-2 py-1 align-self-start fw-bold" style="font-size: 0.72rem;"><i class="bi bi-truck me-1"></i>Visita Proveedor</span>
+                                    <span th:if="${pendiente.comentarioJefe != null and #strings.contains(pendiente.comentarioJefe, '[TET]')}" class="badge bg-dark text-white rounded-pill px-2 py-1 align-self-start fw-bold" style="font-size: 0.72rem;"><i class="bi bi-geo-alt-fill me-1"></i>Planta Tetla</span>
+
+                                    <span th:if="${pendiente.comentarioJefe == null or (!#strings.contains(pendiente.comentarioJefe, '[TXT]') and !#strings.contains(pendiente.comentarioJefe, '[HO]') and !#strings.contains(pendiente.comentarioJefe, '[C]') and !#strings.contains(pendiente.comentarioJefe, '[P]') and !#strings.contains(pendiente.comentarioJefe, '[TET]'))}" class="badge bg-success text-white rounded-pill px-2 py-1 align-self-start fw-bold" style="font-size: 0.72rem;"><i class="bi bi-calendar-check-fill me-1"></i>A Cuenta Vacaciones</span>
+
+                                    <small class="text-secondary text-wrap fw-medium" style="max-width: 320px; font-size: 0.8rem;" th:text="${pendiente.comentarioJefe ?: 'Sin comentarios registrados'}"></small>
+                                </div>
+                            </td>
+
+                            <td th:text="${pendiente.fechaCreacion != null ? #temporals.format(pendiente.fechaCreacion, 'dd/MM/yyyy HH:mm') : 'N/A'}"></td>
+                            <td th:text="${pendiente.creadaPor != null ? pendiente.creadaPor.nombreCompleto : 'Sistema'}"></td>
+                            <td class="text-end px-3">
+                                <button type="button" class="btn btn-sm btn-success fw-bold px-3 rounded-pill"
+                                        th:data-id="${pendiente.id}"
+                                        th:data-nombre="${pendiente.empleado?.nombreCompleto}"
+                                        th:data-justificacion="${pendiente.comentarioJefe != null ? pendiente.comentarioJefe : 'Sin comentarios registrados'}"
+                                        onclick="abrirModalIndividual(this.getAttribute('data-id'), true, this.getAttribute('data-nombre'), 'Corte Semanal', this.getAttribute('data-justificacion'))">Aplicar</button>
+
+                                <button type="button" class="btn btn-sm btn-outline-danger fw-bold px-3 rounded-pill ms-1"
+                                        th:data-id="${pendiente.id}"
+                                        th:data-nombre="${pendiente.empleado?.nombreCompleto}"
+                                        th:data-justificacion="${pendiente.comentarioJefe != null ? pendiente.comentarioJefe : 'Sin comentarios registrados'}"
+                                        onclick="abrirModalIndividual(this.getAttribute('data-id'), false, this.getAttribute('data-nombre'), 'Corte Semanal', this.getAttribute('data-justificacion'))">Rechazar</button>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="custom-card p-4 mb-4 bg-white shadow-sm rounded-3 border-top border-4 border-secondary">
+                <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 border-bottom pb-3 mb-4">
+                    <h3 class="h5 mb-1 fw-bold text-dark"><i class="bi bi-archive-fill text-secondary me-2"></i>Historial e Índices de Aplicación de la Planta</h3>
+                    <div class="d-flex align-items-center gap-2">
+                        <input type="date" id="filtroRecupDesde" class="form-control form-control-sm">
+                        <span class="text-muted small fw-bold">a</span>
+                        <input type="date" id="filtroRecupHasta" class="form-control form-control-sm">
+                        <button type="button" class="btn btn-sm btn-outline-secondary fw-bold px-3" onclick="filtrarHistorialRecuperaciones()"><i class="bi bi-filter"></i> Filtrar</button>
+
+                        <button type="button" class="btn btn-sm btn-success fw-bold text-white text-nowrap shadow-sm" onclick="exportarHistorialRecuperacionesAExcel()">
+                            <i class="bi bi-file-earmark-excel-fill"></i> Exportar Historial
+                        </button>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped align-middle border text-start" id="tablaHistorialRecuperaciones">
+                        <thead class="table-light text-secondary" style="font-size: 0.85rem;">
+                        <tr>
+                            <th>Folio</th>
+                            <th>Colaborador</th>
+                            <th>Fecha Falta</th>
+                            <th>Supervisor Emisor</th>
+                            <th>Tipo / Justificación de Origen</th>
+                            <th>Estatus Final</th>
+                        </tr>
+                        </thead>
+                        <tbody style="font-size: 0.88rem;">
+                        <tr th:each="sol : ${historialRecuperacionesGlobal}">
+                            <td class="fw-bold" th:text="'#' + ${sol.id}"></td>
+                            <td>
+                                <div class="fw-bold text-dark" th:text="${sol.empleado != null ? sol.empleado.nombreCompleto : 'Sin Asignar'}"></div>
+                                <small class="text-muted font-monospace" th:text="'Nómina: #' + ${sol.empleado != null ? sol.empleado.nomina : '0'}"></small>
+                            </td>
+                            <td class="fecha-falta-registro"><span class="badge bg-danger bg-opacity-10 text-danger rounded-pill px-3 py-1 fw-semibold" th:text="${sol.fechaInicio}"></span></td>
+                            <td th:text="${sol.creadaPor != null ? sol.creadaPor.nombreCompleto : 'Sistema Automático'}"></td>
+
+                            <td>
+                                <div class="d-flex flex-column gap-1">
+                                    <span th:if="${sol.comentarioJefe != null and #strings.contains(sol.comentarioJefe, '[TXT]')}" class="badge bg-warning text-dark rounded-pill px-2 py-0.5 align-self-start fw-bold" style="font-size: 0.68rem;"><i class="bi bi-stopwatch-fill me-1"></i>TXT (Tiempo x Tiempo)</span>
+                                    <span th:if="${sol.comentarioJefe != null and #strings.contains(sol.comentarioJefe, '[HO]')}" class="badge bg-info text-dark rounded-pill px-2 py-0.5 align-self-start fw-bold" style="font-size: 0.68rem;"><i class="bi bi-house-fill me-1"></i>Home Office</span>
+                                    <span th:if="${sol.comentarioJefe != null and #strings.contains(sol.comentarioJefe, '[C]')}" class="badge bg-primary text-white rounded-pill px-2 py-0.5 align-self-start fw-bold" style="font-size: 0.68rem;"><i class="bi bi-building-fill me-1"></i>Visita Cliente</span>
+                                    <span th:if="${sol.comentarioJefe != null and #strings.contains(sol.comentarioJefe, '[P]')}" class="badge bg-secondary text-white rounded-pill px-2 py-0.5 align-self-start fw-bold" style="font-size: 0.68rem;"><i class="bi bi-truck me-1"></i>Proveedor</span>
+                                    <span th:if="${sol.comentarioJefe != null and #strings.contains(sol.comentarioJefe, '[TET]')}" class="badge bg-dark text-white rounded-pill px-2 py-0.5 align-self-start fw-bold" style="font-size: 0.68rem;"><i class="bi bi-geo-alt-fill me-1"></i>Planta Tetla</span>
+
+                                    <span th:if="${sol.comentarioJefe == null or (!#strings.contains(sol.comentarioJefe, '[TXT]') and !#strings.contains(sol.comentarioJefe, '[HO]') and !#strings.contains(sol.comentarioJefe, '[C]') and !#strings.contains(sol.comentarioJefe, '[P]') and !#strings.contains(sol.comentarioJefe, '[TET]'))}" class="badge bg-success text-white rounded-pill px-2 py-0.5 align-self-start fw-bold" style="font-size: 0.68rem;"><i class="bi bi-calendar-check-fill me-1"></i>A Cuenta Vacaciones</span>
+
+                                    <small class="text-muted text-wrap text-break italic" style="max-width: 300px; font-size: 0.78rem;" th:text="${sol.comentarioJefe ?: 'Sin notas de supervisor'}"></small>
+                                </div>
+                            </td>
+
+                            <td><span th:classappend="${sol.estatus == 'Aprobado'} ? 'badge bg-success' : 'badge bg-danger'" th:text="${sol.estatus}"></span></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <div class="tab-pane fade" id="pills-plantilla" role="tabpanel" aria-labelledby="pills-plantilla-tab">
+
+            <div class="card bg-light border-warning shadow-sm mb-4 rounded-3">
+                <div class="card-body py-3 px-3 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+                    <div>
+                        <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-lightning-charge-fill text-warning me-1"></i> Súper Barredora de Aniversarios Automática</h6>
+                        <small class="text-muted" style="font-size: 0.75rem;">Fuerza la actualización de saldos anuales si el servidor estuvo apagado durante días de cumpleaños.</small>
+                    </div>
+                    <form th:with="ahora=${T(java.time.LocalDate).now()}" th:action="@{/pantallas/admin/forzar-aniversarios}" method="get" class="d-flex align-items-center gap-2">
+                        <input type="date" name="fechaInicio" th:value="${ahora}" class="form-control form-control-sm border-warning rounded-2" required>
+                        <span class="text-muted fw-bold small">al</span>
+                        <input type="date" name="fechaFin" th:value="${ahora}" class="form-control form-control-sm border-warning rounded-2" required>
+                        <button type="submit" class="btn btn-sm btn-warning fw-bold text-dark text-nowrap shadow-sm rounded-2">Ejecutar Barredora</button>
+                    </form>
+                </div>
+            </div>
+
+            <section class="custom-card p-4 mb-4 bg-white shadow-sm rounded-3 border-top border-4 border-primary shadow-sm">
+                <div class="row g-3 mb-4 align-items-end">
+                    <div class="col-md-7">
+                        <label class="form-label fw-semibold text-secondary" style="font-size: 0.9rem;">Filtrado de Personal Planta / Oficina</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-white border-end-0"><i class="bi bi-search"></i></span>
+                            <input type="text" id="buscadorPlantilla" class="form-control bg-light border-start-0 ps-1" placeholder="Buscar por Nombre, Nómina, Puesto, CC o WC..." onkeydown="if(event.key === 'Enter') ejecutarBuscarPlantilla()">
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <button type="button" class="btn text-white w-100 d-flex align-items-center justify-content-center gap-2 fw-semibold shadow-sm rounded-3" style="background-color: #002f6c; height: 38px;" onclick="ejecutarBuscarPlantilla()">
+                            Buscar
+                        </button>
+                    </div>
+                    <div class="col-md-3 text-end">
+                        <button type="button" class="btn btn-success fw-bold px-4 d-inline-flex align-items-center gap-2 shadow-sm rounded-pill" style="height: 38px;" onclick="exportarPlantillaGeneralAExcel()">
+                            <i class="bi bi-file-earmark-excel-fill fs-5"></i> Exportar Roster (.CSV)
+                        </button>
+                    </div>
+                </div>
+
+                <ul class="nav nav-tabs mb-3" id="subTabPlantilla" role="tablist">
+                    <li class="nav-item"><button class="nav-link active fw-bold text-success" id="activos-tab" data-bs-toggle="tab" data-bs-target="#plantilla-activos" type="button" role="tab">Personal Activo</button></li>
+                    <li class="nav-item"><button class="nav-link fw-bold text-danger" id="bajas-tab" data-bs-toggle="tab" data-bs-target="#plantilla-bajas" type="button" role="tab">Historial de Bajas</button></li>
+                </ul>
+
+                <div class="tab-content" id="subTabPlantillaContent">
+                    <div class="tab-pane fade show active" id="plantilla-activos" role="tabpanel">
+                        <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                            <table class="table table-hover align-middle border text-start" id="tablaPlantillaActivos">
+                                <thead class="table-light text-secondary sticky-top" style="font-size: 0.85rem; top: 0; z-index: 5;">
+                                <tr>
+                                    <th style="cursor: pointer;" onclick="ordenarPorColumna('tablaPlantillaActivos', 0, 'int')">Nómina <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                                    <th style="cursor: pointer;" onclick="ordenarPorColumna('tablaPlantillaActivos', 1, 'str')">Nombre Completo <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                                    <th style="cursor: pointer;" onclick="ordenarPorColumna('tablaPlantillaActivos', 2, 'int')">CC <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                                    <th style="cursor: pointer;" onclick="ordenarPorColumna('tablaPlantillaActivos', 3, 'str')">Nombre CC <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                                    <th style="cursor: pointer;" onclick="ordenarPorColumna('tablaPlantillaActivos', 4, 'int')">WC <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                                    <th style="cursor: pointer;" onclick="ordenarPorColumna('tablaPlantillaActivos', 5, 'str')">Nombre WC <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                                    <th style="cursor: pointer;" class="text-center" onclick="ordenarPorColumna('tablaPlantillaActivos', 6, 'date')">Fecha Ingreso <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                                    <th style="cursor: pointer;" class="text-center" onclick="ordenarPorColumna('tablaPlantillaActivos', 7, 'float')">Saldo Devengado <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                                    <th style="cursor: pointer;" class="text-center" onclick="ordenarPorColumna('tablaPlantillaActivos', 8, 'float')">Saldo Proporcional <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                                    <th style="cursor: pointer;" class="text-center" onclick="ordenarPorColumna('tablaPlantillaActivos', 9, 'float')">Saldo Acumulado <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                                    <th class="text-center" style="width: 130px;">Auditoría LFT</th>
+                                </tr>
+                                </thead>
+                                <tbody style="font-size: 0.88rem;">
+                                <tr th:each="emp : ${plantillaCompleta}" th:if="${emp.estatus == 'ACTIVO' or emp.estatus == null}">
+                                    <td class="fw-bold text-dark" th:text="${emp.nomina}"></td>
+                                    <td class="fw-semibold" th:text="${emp.nombreCompleto}"></td>
+                                    <td th:text="${emp.centroCosto != null ? emp.centroCosto.id : 'N/A'}"></td>
+                                    <td th:text="${emp.centroCosto != null ? emp.centroCosto.nombre : 'N/A'}"></td>
+                                    <td th:text="${emp.workCenter != null ? emp.workCenter.id : 'N/A'}"></td>
+                                    <td th:text="${emp.workCenter != null ? emp.workCenter.nombre : 'N/A'}"></td>
+                                    <td class="text-center font-monospace" th:text="${emp.fechaIngreso != null ? #temporals.format(emp.fechaIngreso, 'dd/MM/yyyy') : 'N/A'}"></td>
+                                    <td class="text-center fw-bold" th:classappend="${emp.saldoVacacionesActual != null and emp.saldoVacacionesActual < 0} ? 'text-danger' : 'text-success'" th:text="${emp.saldoVacacionesActual}"></td>
+                                    <td class="text-center fw-bold" th:classappend="${emp.saldoProporcional != null and emp.saldoProporcional < 0} ? 'text-danger' : 'text-info'" th:text="${emp.saldoProporcional != null ? emp.saldoProporcional : '0.0'}"></td>
+                                    <td class="text-center fw-bold"
+                                        th:with="acumulado=${(emp.saldoVacacionesActual ?: 0.0) + (emp.saldoProporcional ?: 0.0)}"
+                                        th:classappend="${acumulado < 0} ? 'text-danger' : 'text-dark'"
+                                        th:text="${acumulado}">0.0</td>
+                                    <td class="text-center">
+                                        <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 py-1 fw-bold d-inline-flex align-items-center gap-1"
+                                                th:data-nomina="${emp.nomina}"
+                                                th:data-nombre="${emp.nombreCompleto}"
+                                                th:data-tipo="${emp.tipoEmpleado}"
+                                                th:data-ingreso="${emp.fechaIngreso != null ? #temporals.format(emp.fechaIngreso, 'yyyy-MM-dd') : ''}"
+                                                th:data-ingresoview="${emp.fechaIngreso != null ? #temporals.format(emp.fechaIngreso, 'dd/MM/yyyy') : 'N/A'}"
+                                                th:data-base="${emp.diasBaseManual}"
+                                                th:data-congelado="${emp.esSaldoCongelado}"
+                                                onclick="abrirAuditorMatematico(this)">
+                                            <i class="bi bi-calculator"></i> Validar
+                                        </button>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <div class="tab-pane fade" id="pills-depuracion" role="tabpanel" aria-labelledby="pills-depuracion-tab">
+            <section class="custom-card p-4 mb-4 bg-white shadow-sm rounded-3 border-top border-4 border-danger">
+                <div class="row g-3 mb-4 align-items-end">
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold text-secondary" style="font-size: 0.9rem;">Buscador Rápido de Rezagos (Pasivos Administrativos/Planta)</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-danger"></i></span>
+                            <input type="text" id="buscadorDepuracion" class="form-control bg-light border-start-0 ps-1" placeholder="Buscar por Nombre, Nómina, CC, WC o Puesto..." onkeydown="if(event.key === 'Enter') ejecutarBuscarDepuracion()">
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <button type="button" class="btn text-white w-100 d-flex align-items-center justify-content-center gap-2 fw-semibold shadow-sm rounded-3" style="background-color: #002f6c; height: 38px;" onclick="ejecutarBuscarDepuracion()">
+                            Filtrar
+                        </button>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <button type="button" class="btn btn-outline-danger fw-bold px-4 d-inline-flex align-items-center gap-2 shadow-sm rounded-pill" style="height: 38px;" onclick="exportarSaldosVencidosAExcel()">
+                            <i class="bi bi-file-earmark-excel-fill fs-5 text-success"></i> Exportar Saldos Atrasados
+                        </button>
+                    </div>
+                </div>
+
+                <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                    <table class="table table-hover align-middle border text-start" id="tablaDepuracionSaldos">
+                        <thead class="table-light text-secondary sticky-top" style="font-size: 0.85rem; top: 0; z-index: 5;">
+                        <tr>
+                            <th style="cursor: pointer;" onclick="ordenarPorColumna('tablaDepuracionSaldos', 0, 'int')">Nómina <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                            <th style="cursor: pointer;" onclick="ordenarPorColumna('tablaDepuracionSaldos', 1, 'str')">Colaborador <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                            <th style="cursor: pointer;" onclick="ordenarPorColumna('tablaDepuracionSaldos', 2, 'str')">Esquema Operativo <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                            <th style="cursor: pointer;" onclick="ordenarPorColumna('tablaDepuracionSaldos', 3, 'str')">Ubicación Planta <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                            <th style="cursor: pointer;" class="text-center" onclick="ordenarPorColumna('tablaDepuracionSaldos', 4, 'date')">Fecha Ingreso <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                            <th style="cursor: pointer; width: 130px; color: #9b1c1c;" class="text-center bg-danger bg-opacity-10 fw-bold" onclick="ordenarPorColumna('tablaDepuracionSaldos', 5, 'float')">Saldo Atrasado <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                            <th style="cursor: pointer; width: 120px;" class="text-center fw-bold" onclick="ordenarPorColumna('tablaDepuracionSaldos', 6, 'float')">Saldo Período <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                            <th style="cursor: pointer; width: 130px;" class="text-center fw-bold text-dark table-secondary" onclick="ordenarPorColumna('tablaDepuracionSaldos', 7, 'float')">Total Ciclos (Atrasado + Período) <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                            <th style="cursor: pointer; width: 120px;" class="text-center fw-bold" onclick="ordenarPorColumna('tablaDepuracionSaldos', 8, 'float')">Saldo Proporcional <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                            <th style="cursor: pointer; width: 140px;" class="text-center font-monospace" onclick="ordenarPorColumna('tablaDepuracionSaldos', 9, 'date')">Fecha Límite Gracia <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                            <th class="text-end px-3" style="width: 180px;">Acción de Control</th>
+                        </tr>
+                        </thead>
+                        <tbody style="font-size: 0.88rem;">
+                        <tr th:each="emp : ${plantillaCompleta}" th:if="${emp.estatus == 'ACTIVO' or emp.estatus == null}">
+                            <td class="fw-bold text-dark" th:text="${emp.nomina}"></td>
+                            <td class="fw-semibold" th:text="${emp.nombreCompleto}"></td>
+                            <td><span class="badge bg-light text-dark border px-2 py-1" th:text="${emp.tipoEmpleado}">ADMINISTRATIVO</span></td>
+                            <td th:text="'CC: ' + ${emp.centroCosto != null ? emp.centroCosto.id : 'N/A'} + ' / WC: ' + ${emp.workCenter != null ? emp.workCenter.id : 'N/A'}"></td>
+                            <td class="text-center font-monospace" th:text="${emp.fechaIngreso != null ? #temporals.format(emp.fechaIngreso, 'dd/MM/yyyy') : 'N/A'}"></td>
+
+                            <td class="text-center fw-bold fs-6" th:classappend="${emp.getSaldoCiclosAnteriores() != null and emp.getSaldoCiclosAnteriores().doubleValue() > 0} ? 'text-danger bg-danger bg-opacity-10' : 'text-muted'" th:text="${emp.getSaldoCiclosAnteriores()}">0.00</td>
+                            <td class="text-center fw-bold text-success" th:text="${emp.getSaldoPeriodoActual()}">0.00</td>
+                            <td class="text-center fw-bold text-dark bg-light font-monospace"
+                                th:with="sumaCiclos=${(emp.getSaldoCiclosAnteriores() != null ? emp.getSaldoCiclosAnteriores().doubleValue() : 0.0) + (emp.getSaldoPeriodoActual() != null ? emp.getSaldoPeriodoActual().doubleValue() : 0.0)}"
+                                th:text="${#numbers.formatDecimal(sumaCiclos, 1, 'COMMA', 2, 'POINT')}">0.00</td>
+                            <td class="text-center fw-bold text-info" th:text="${emp.saldoProporcional != null ? emp.saldoProporcional : '0.00'}">0.00</td>
+
+                            <td class="text-center font-monospace fw-bold"
+                                th:classappend="${emp.getFechaLimiteExpiracion() != null and T(java.time.LocalDate).now().isAfter(emp.getFechaLimiteExpiracion()) and emp.getSaldoCiclosAnteriores() != null and emp.getSaldoCiclosAnteriores().doubleValue() > 0} ? 'text-danger fw-bolder' : 'text-secondary'"
+                                th:text="${emp.getFechaLimiteExpiracion() != null ? #temporals.format(emp.getFechaLimiteExpiracion(), 'dd/MM/yyyy') : 'N/A'}"></td>
+
+                            <td class="text-end px-3">
+                                <button th:if="${emp.getSaldoCiclosAnteriores() != null and emp.getSaldoCiclosAnteriores().doubleValue() > 0}" type="button" class="btn btn-sm btn-danger fw-bold px-3 rounded-pill"
+                                        th:data-id="${emp.nomina}"
+                                        th:data-nombre="${emp.nombreCompleto}"
+                                        th:data-vencido="${emp.getSaldoCiclosAnteriores()}"
+                                        onclick="abrirModalDepurarVencido(this)">
+                                    <i class="bi bi-trash3-fill me-1"></i> Borrar Atrasado
+                                </button>
+                                <span th:if="${emp.getSaldoCiclosAnteriores() == null or emp.getSaldoCiclosAnteriores().doubleValue() <= 0}" class="badge bg-light text-muted border rounded-pill px-3 py-1.5 fw-semibold"><i class="bi bi-shield-check text-success me-1"></i> Sin Riesgo</span>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <section class="mt-5 pt-4 border-top border-2 border-light">
+                    <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+                        <div>
+                            <h5 class="h6 fw-bold text-dark mb-1"><i class="bi bi-archive-fill text-danger me-2"></i>Historial de Pasivos Removidos (Libro de Auditoría RH)</h5>
+                            <p class="text-muted mb-0 small">Registro permanente de todas las depuraciones manuales de saldos caídos ejecutadas en la planta.</p>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-danger fw-bold text-nowrap shadow-sm" onclick="exportarHistorialDepuracionesAExcel()">
+                            <i class="bi bi-file-earmark-excel-fill me-1 text-success"></i> Exportar Historial Depuraciones
+                        </button>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped align-middle border text-start" id="tablaHistorialDepuraciones">
+                            <thead class="table-light text-secondary" style="font-size: 0.85rem;">
+                            <tr>
+                                <th class="px-3 py-2">Folio / Fecha Servidor</th>
+                                <th>Colaborador</th>
+                                <th>Ubicación Planta</th>
+                                <th class="text-center text-danger fw-bold bg-danger bg-opacity-10" style="width: 130px;">Días Rasurados</th>
+                                <th>Justificación de Auditoría Obligatoria / Operador RH</th>
+                            </tr>
+                            </thead>
+                            <tbody style="font-size: 0.88rem;">
+                            <tr th:each="depura : ${historialDepuracionesGlobal}">
+                                <td class="px-3 font-monospace fw-bold text-dark" th:text="${depura.fechaCreacion != null ? #temporals.format(depura.fechaCreacion, 'dd/MM/yyyy HH:mm') : 'N/A'}"></td>
+                                <td>
+                                    <div class="fw-bold text-dark" th:text="${depura.empleado != null ? depura.empleado.nombreCompleto : 'Sin Asignar'}"></div>
+                                    <small class="text-muted font-monospace" th:text="'Nómina: #' + ${depura.empleado != null ? depura.empleado.nomina : '0'}"></small>
+                                </td>
+                                <td th:text="${depura.empleado?.centroCosto != null ? 'CC: ' + depura.empleado.centroCosto.id : 'N/A'}"></td>
+                                <td class="text-center fw-bold text-danger bg-danger bg-opacity-10" th:text="'-' + ${depura.diasTotalesCalculados}">-0.00</td>
+                                <td>
+                                    <div class="text-dark fw-medium" th:text="${depura.comentarioJefe ?: 'Sin notas registradas'}"></div>
+                                    <small class="text-muted" th:text="'Removido por: ' + ${depura.aprobadoPor != null ? depura.aprobadoPor.nombreCompleto : 'Sistema'}"></small>
+                                </td>
+                            </tr>
+                            <tr th:if="${historialDepuracionesGlobal == null or historialDepuracionesGlobal.isEmpty()}">
+                                <td colspan="5" class="text-center py-3 text-muted italic">
+                                    <i class="bi bi-shield-check text-success me-1"></i> No se han registrado depuraciones coactivas de saldos en este periodo contable.
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </section>
+        </div>
+
+        <div class="tab-pane fade" id="pills-exportador" role="tabpanel" aria-labelledby="pills-exportador-tab">
+            <section class="custom-card p-4 mb-4 bg-white shadow-sm rounded-3 border-top border-4 border-success">
+                <div class="border-bottom pb-2 mb-4">
+                    <h4 class="h5 mb-1 fw-bold text-dark"><i class="bi bi-download text-success me-2"></i>Descarga de Reportes de Incidencias Semanales</h4>
+                    <p class="text-muted mb-0 small">Filtra y extrae los archivos CSV optimizados para confrontar contra checadas en el área de Nóminas.</p>
+                </div>
+
+                <div class="row g-4">
+                    <div class="col-lg-6 border-end">
+                        <div class="p-3 rounded-3 bg-light border h-100">
+                            <h5 class="h6 fw-bold text-secondary mb-3"><i class="bi bi-calendar3 me-1"></i> Opción A: Filtrar por Semana Calendar</h5>
+                            <div class="row g-2">
+                                <div class="col-md-7">
+                                    <label for="expSemana" class="form-label small fw-semibold text-muted">Número de Semana</label>
+                                    <input type="number" class="form-control" id="expSemana" placeholder="Ej. 24" min="1" max="53">
+                                </div>
+                                <div class="col-md-5">
+                                    <label for="expAnio" class="form-label small fw-semibold text-muted">Año</label>
+                                    <input type="number" class="form-control" id="expAnio" value="2026">
+                                </div>
+                            </div>
+                            <div class="form-text mt-2 text-muted">Calcula automáticamente el bloque de lunes a domingo de esa semana nominal.</div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-6">
+                        <div class="p-3 rounded-3 bg-light border h-100">
+                            <h5 class="h6 fw-bold text-secondary mb-3"><i class="bi bi-calendar-range me-1"></i> Opción B: Rango Libre de Fechas</h5>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <label for="expFechaInicio" class="form-label small fw-semibold text-muted">Fecha Inicio</label>
+                                    <input type="date" class="form-control" id="expFechaInicio">
+                                </div>
+                                <div class="col-6">
+                                    <label for="expFechaFin" class="form-label small fw-semibold text-muted">Fecha Fin</label>
+                                    <input type="date" class="form-control" id="expFechaFin">
+                                </div>
+                            </div>
+                            <div class="form-text mt-2 text-muted">Ideal para cierres de mes extemporáneos o auditorías cruzadas específicas.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex flex-column flex-sm-row justify-content-end gap-3 mt-4 pt-3 border-top">
+                    <button type="button" class="btn btn-outline-success fw-bold px-4 py-2 rounded-3 d-inline-flex align-items-center gap-2 shadow-sm" onclick="dispararDescarga('prenomina')">
+                        <i class="bi bi-file-earmark-spreadsheet-fill fs-5"></i> 1. Descargar Prenómina (.CSV)
+                    </button>
+                    <button type="button" class="btn btn-success text-white fw-bold px-4 py-2 rounded-3 d-inline-flex align-items-center gap-2 shadow-sm" onclick="dispararDescarga('recuperaciones')">
+                        <i class="bi bi-file-earmark-arrow-down-fill fs-5"></i> 2. Descargar Recuperaciones (.CSV)
+                    </button>
+                </div>
+            </section>
+        </div>
+
+    </div>
+</main>
+
+<div class="modal fade" id="modalAuditorMatematico" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content rounded-4 overflow-hidden border-0 shadow-lg">
+            <div class="modal-header text-white px-4 py-3" style="background: linear-gradient(135deg, #002f6c, #004b93);">
+                <h5 class="modal-title fw-bold d-flex align-items-center gap-2">
+                    <i class="bi bi-cpu-fill"></i> Auditor Contable del Motor de Vacaciones
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4 bg-white" style="font-size: 0.92rem;">
+                <div class="alert alert-primary d-flex align-items-center gap-2 py-2 border-0 mb-4" style="background-color: #f0f7ff; color: #004b93;">
+                    <i class="bi bi-info-circle-fill"></i>
+                    <span>Este panel desglosa el algoritmo en tiempo real para el colaborador seleccionado.</span>
+                </div>
+                <h6 class="fw-bold text-dark border-bottom pb-2 mb-3"><i class="bi bi-person-lines-fill me-1"></i> Parámetros de Ficha Encontrados</h6>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6"><strong>Colaborador:</strong> <span id="auditNombre" class="text-primary fw-bold"></span> (<span id="auditNomina"></span>)</div>
+                    <div class="col-md-6"><strong>Régimen Asignado:</strong> <span id="auditTipo" class="badge bg-secondary"></span></div>
+                    <div class="col-md-6"><strong>Fecha Ingreso Oficial:</strong> <span id="auditIngreso" class="font-monospace fw-bold"></span></div>
+                    <div class="col-md-6"><strong>Años Cumplidos Históricos:</strong> <span id="auditAnos" class="fw-bold text-dark"></span> años</div>
+                </div>
+                <h6 class="fw-bold text-dark border-bottom pb-2 mb-3"><i class="bi bi-diagram-3-fill me-1"></i> Paso 1: Derecho Anual Base (`calcularDiasDerecho`)</h6>
+                <div class="p-3 bg-light rounded-3 mb-4 border font-monospace mini-text" id="desglosePaso1"></div>
+                <h6 class="fw-bold text-dark border-bottom pb-2 mb-3"><i class="bi bi-calendar-range me-1"></i> Paso 2: Acumulación Diaria Proporcional (`getSaldoProporcional`)</h6>
+                <div class="p-3 bg-light rounded-3 border font-monospace mini-text" id="desglosePaso2"></div>
+            </div>
+            <div class="modal-footer bg-light border-top px-4 py-2">
+                <button type="button" class="btn text-white fw-bold shadow-sm px-4" style="background-color: #002f6c;" data-bs-dismiss="modal">Entendido, Roster Validado</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalConfirmacionNomina" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 overflow-hidden border-0">
+            <div class="modal-header text-white px-4 py-3" id="modalHeaderStyle">
+                <h5 class="modal-title fw-bold" id="modalTitulo">Procesar Incidencia</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4 bg-white">
+                <div class="card p-3 mb-3 border-0 bg-light rounded-3" id="modalDetalleCard">
+                    <div class="small text-muted mb-1 fw-medium">CONTEXTO DE LA OPERACIÓN</div>
+                    <div class="fw-bold text-dark" id="modalDetalleTexto"></div>
+                </div>
+                <p class="text-secondary mb-3" id="modalMensaje"></p>
+                <div class="col-12" id="boxMotivoRechazo">
+                    <label for="modalComentarioTexto" class="form-label fw-bold text-danger" style="font-size: 0.85rem;">Justificación Contable Obligatoria *</label>
+                    <textarea class="form-control bg-light border-danger" id="modalComentarioTexto" rows="2" placeholder="Escribe al menos 5 letras detallando el motivo..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer bg-light border-top px-4 py-2">
+                <button type="button" class="btn btn-secondary btn-sm rounded-pill px-3" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-dark btn-sm rounded-pill px-4 text-white" onclick="ejecutarSubmitConfirmado()">Confirmar Decisión</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalDepurarSaldoVencido" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 overflow-hidden border-0 shadow-lg">
+            <div class="modal-header bg-danger text-white px-4 py-3">
+                <h5 class="modal-title fw-bold"><i class="bi bi-shield-exclamation me-2"></i> Confirmación de Depuración Caduca</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form th:action="@{/pantallas/gestion-saldos/depurar-vencido}" method="POST">
+                <div class="modal-body p-4 bg-white">
+                    <input type="hidden" name="empleadoId" id="depurarEmpleadoId">
+                    <div class="alert alert-danger d-flex align-items-center gap-2 py-2 border-0 mb-3" style="background-color: #fdf2f2; color: #9b1c1c; font-size: 0.88rem;">
+                        <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+                        <strong>¡Acción Definitiva! Al confirmar, se removerá el remanente atrasado de forma permanente en Base de Datos.</strong>
+                    </div>
+
+                    <div class="card p-3 mb-3 border bg-light rounded-3">
+                        <div class="small text-secondary mb-1 fw-bold">FICHA OPERATIVA DEL COLABORADOR</div>
+                        <div class="fw-medium text-dark" id="depurarContextoTexto" style="font-size: 0.9rem; line-height: 1.5;"></div>
+                    </div>
+
+                    <div class="col-12">
+                        <label for="justificacionDepurar" class="form-label fw-bold text-dark" style="font-size: 0.85rem;">Justificación de Auditoría Obligatoria *</label>
+                        <textarea class="form-control bg-light" id="justificacionDepurar" name="justificacionDepurar" rows="3" placeholder="Escribe al menos 10 letras detallando motivos o folios de correo para remover este pasivo... " required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light border-top px-4 py-2">
+                    <button type="button" class="btn btn-secondary btn-sm rounded-pill px-3" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger btn-sm rounded-pill px-4 text-white" onclick="return validarTapaBocasDepuracion()">Depurar Saldo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<form id="individualFormRecuperacion" action="/pantallas/gestion-saldos/resolver-recuperacion" method="POST" class="d-none">
+    <input type="hidden" name="solicitudId" id="indivSolicitudId">
+    <input type="hidden" name="aprobado" id="indivAprobado">
+</form>
+<form id="bulkFormRecuperaciones" action="/pantallas/gestion-saldos/resolver-recuperacion-masiva" method="POST" class="d-none">
+    <input type="hidden" name="ids" id="bulkIdsRecuperaciones">
+    <input type="hidden" name="status" id="bulkStatusRecuperaciones">
+    <input type="hidden" name="comentario" id="bulkComentarioRecuperaciones">
+</form>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://npmcdn.com/flatpickr/dist/l10n/es.js"></script>
+
+<script>
+    function ejecutarBuscarPlantilla() {
+        const query = document.getElementById("buscadorPlantilla").value.toLowerCase().trim();
+        const panelActivo = document.querySelector("#subTabPlantillaContent .tab-pane.active");
+        if (!panelActivo) return;
+        const filas = panelActivo.querySelectorAll("tbody tr");
+        filas.forEach(row => {
+            const textoNomina = row.cells[0].textContent.toLowerCase();
+            const textoNombre = row.cells[1].textContent.toLowerCase();
+            if (query === "" || textoNomina.includes(query) || textoNombre.includes(query)) {
+                row.style.display = "";
+            } else {
+                row.style.display = "none";
+            }
+        });
+    }
+
+    function ejecutarBuscarDepuracion() {
+        const query = document.getElementById("buscadorDepuracion").value.toLowerCase().trim();
+        const filas = document.querySelectorAll("#tablaDepuracionSaldos tbody tr");
+
+        filas.forEach(row => {
+            const textoNomina = row.cells[0].textContent.toLowerCase();
+            const textoNombre = row.cells[1].textContent.toLowerCase();
+            const textoDetalles = row.cells[3].textContent.toLowerCase();
+
+            if (query === "" || textoNomina.includes(query) || textoNombre.includes(query) || textoDetalles.includes(query)) {
+                row.style.display = "";
+            } else {
+                row.style.display = "none";
+            }
+        });
+    }
+
+    let directionsOrden = {};
+    function ordenarPorColumna(idTabla, indiceColumna, tipoDato) {
+        const tabla = document.getElementById(idTabla);
+        const tbody = tabla.querySelector("tbody");
+        const filas = Array.from(tbody.querySelectorAll("tr"));
+        let ordenAscendente = directionsOrden[idTabla + "_" + indiceColumna] !== true;
+        directionsOrden[idTabla + "_" + indiceColumna] = ordenAscendente;
+        filas.sort((a, b) => {
+            let textoA = a.cells[indiceColumna].textContent.trim();
+            let textoB = b.cells[indiceColumna].textContent.trim();
+            if (textoA === "N/A" || textoA === "") return 1;
+            if (textoB === "N/A" || textoB === "") return -1;
+            if (tipoDato === 'int' || tipoDato === 'float') {
+                let numA = parseFloat(textoA.replace(/[^0-9.-]/g, '')) || 0;
+                let numB = parseFloat(textoB.replace(/[^0-9.-]/g, '')) || 0;
+                return ordenAscendente ? numA - numB : numB - numA;
+            }
+            if (tipoDato === 'date') {
+                let partesA = textoA.split('/');
+                let partesB = textoB.split('/');
+                let fechaA = partesA.length === 3 ? new Date(partesA[2], partesA[1]-1, partesA[0]) : new Date(0);
+                let fechaB = partesB.length === 3 ? new Date(partesB[2], partesB[1]-1, partesB[0]) : new Date(0);
+                return ordenAscendente ? fechaA - fechaB : fechaB - fechaA;
+            }
+            return ordenAscendente ? textoA.localeCompare(textoB) : textoB.localeCompare(textoA);
+        });
+        filas.forEach(f => tbody.appendChild(f));
+    }
+
+    let elementoFecha = document.getElementById("fechaDescuento");
+    let calendarioFaltas = null;
+    if (elementoFecha) {
+        calendarioFaltas = flatpickr("#fechaDescuento", {
+            mode: "multiple",
+            dateFormat: "Y-m-d",
+            locale: "es",
+            onChange: function(selectedDates) {
+                let inputDias = document.getElementById('diasAjuste');
+                if(document.getElementById('radioDescuento') && document.getElementById('radioDescuento').checked) {
+                    inputDias.value = selectedDates.length;
+                }
+            }
+        });
+    }
+
+    function conmutarCamposAjuste() {
+        var radioReembolso = document.getElementById('radioReembolso');
+        if (!radioReembolso) return;
+        var esReembolso = radioReembolso.checked;
+        var boxSolicitud = document.getElementById('boxSelectorSolicitud');
+        var boxFecha = document.getElementById('boxSelectorFecha');
+        if (esReembolso) {
+            if (boxSolicitud) boxSolicitud.classList.remove('d-none');
+            if (boxFecha) boxFecha.classList.add('d-none');
+        } else {
+            if (boxSolicitud) boxSolicitud.classList.add('d-none');
+            if (boxFecha) boxFecha.classList.remove('d-none');
+        }
+    }
+
+    function conmutarCamposExtranjero() {
+        var tipoEmp = document.getElementById('tipoEmpleado');
+        var boxExtranjero = document.getElementById('boxCamposExtranjero');
+        if (tipoEmp && boxExtranjero) {
+            if (tipoEmp.value.toUpperCase() === 'EXTRANJERO') {
+                boxExtranjero.classList.remove('d-none');
+            } else {
+                boxExtranjero.classList.add('d-none');
+            }
+        }
+    }
+
+    function abrirModalDepurarVencido(btn) {
+        const id = btn.getAttribute('data-id');
+        const nombre = btn.getAttribute('data-nombre');
+        const vencido = btn.getAttribute('data-vencido');
+
+        document.getElementById('depurarEmpleadoId').value = id;
+        document.getElementById('depurarContextoTexto').innerHTML = `
+            <strong>Colaborador:</strong> ${nombre} <br>
+            <strong>ID Nómina:</strong> #${id} <br>
+            <strong>Días Caducados a Remover:</strong> <span class="badge bg-danger fs-6 px-2 mt-1">-${vencido} días</span>
+        `;
+        document.getElementById('justificacionDepurar').value = "";
+
+        new bootstrap.Modal(document.getElementById('modalDepurarSaldoVencido')).show();
+    }
+
+    function validarTapaBocasDepuracion() {
+        const txt = document.getElementById('justificacionDepurar').value.trim();
+        if (txt.length < 10) {
+            alert("⚠️ ¡EL TAPA-BOCAS DE AUDIT RH EXIGE DETALLES! La justificación contable obligatoria debe contener al menos 10 caracteres.");
+            return false;
+        }
+        return true;
+    }
+
+    function abrirModalIndividual(id, aprobado, nombreEmp, semana, justificacion) {
+        modoEnvioModal = "INDIVIDUAL";
+        idIndividualTarget = id;
+        statusTarget = aprobado ? "APROBADO" : "RECHAZADO";
+
+        let tipoIncidencia = "A Cuenta de Vacaciones (Ordinaria)";
+        let mensajeAprobacion = "Se procederá a aplicar el descuento de 1 día del <strong>Saldo de Vacaciones</strong> corriente al operador.";
+
+        if (justificacion && justificacion.includes("[TXT]")) {
+            tipoIncidencia = "Tiempo por Tiempo (TXT)";
+            mensajeAprobacion = "Se autorizará la recuperación de la falta vía <strong>Tiempo por Tiempo (TXT)</strong>. Esta acción NO restará días de sus vacaciones de Ley.";
+        } else if (justificacion && justificacion.includes("[HO]")) {
+            tipoIncidencia = "Home Office (HO)";
+            mensajeAprobacion = "Se autorizará la justificación de la falta bajo el esquema de <strong>Home Office (HO)</strong> administrado. Esta acción NO restará días de sus vacaciones.";
+        } else if (justificacion && justificacion.includes("[C]")) {
+            tipoIncidencia = "Visita Cliente";
+            mensajeAprobacion = "Se autorizará la incidencia como comisión externa por <strong>Visita Cliente</strong>. Esta acción NO restará días de sus vacaciones.";
+        } else if (justificacion && justificacion.includes("[P]")) {
+            tipoIncidencia = "Visita Proveedor";
+            mensajeAprobacion = "Se autorizará la incidencia como comisión externa por <strong>Visita Proveedor</strong>. Esta acción NO restará días de sus vacaciones.";
+        } else if (justificacion && justificacion.includes("[TET]")) {
+            tipoIncidencia = "Visita Planta Tetla";
+            mensajeAprobacion = "Se autorizará la incidencia como comisión por viaje a <strong>Planta Hermana Tetla</strong>. Esta acción NO restará días de sus vacaciones.";
+        }
+
+        document.getElementById('modalDetalleCard').classList.remove('d-none');
+        document.getElementById('modalDetalleTexto').innerHTML = `
+            <strong>Colaborador:</strong> ${nombreEmp} <br>
+            <strong>Contexto:</strong> ${semana} <br>
+            <strong>Esquema Aplicado:</strong> <span class="badge bg-dark text-white fw-bold mt-1">${tipoIncidencia}</span>
+            <div class="mt-2 p-2 rounded bg-white border text-secondary" style="font-size: 0.82rem; line-height: 1.4;">
+                <strong><i class="bi bi-chat-left-quote-fill text-primary"></i> Justificación del Supervisor:</strong><br>
+                <span>${justificacion}</span>
+            </div>
+        `;
+
+        document.getElementById('modalComentarioTexto').value = "";
+
+        if(aprobado) {
+            document.getElementById('modalHeaderStyle').style.background = "linear-gradient(135deg, #1e7e34, #28a745)";
+            document.getElementById('modalTitulo').innerText = "Autorizar Incidencia";
+            document.getElementById('modalMensaje').innerHTML = mensajeAprobacion;
+            document.getElementById('boxMotivoRechazo').classList.add('d-none');
+        } else {
+            document.getElementById('modalHeaderStyle').style.background = "linear-gradient(135deg, #bd2130, #dc3545)";
+            document.getElementById('modalTitulo').innerText = "Rechazar Incidencia";
+            document.getElementById('modalMensaje').innerText = "La incidencia será rebotada al portal de origen del supervisor.";
+            document.getElementById('boxMotivoRechazo').classList.remove('d-none');
+        }
+        new bootstrap.Modal(document.getElementById('modalConfirmacionNomina')).show();
+    }
+
+    function abrirModalMasivo(status) {
+        modoEnvioModal = "MASIVO";
+        statusTarget = status;
+        const checkedBoxes = document.querySelectorAll('.recuperacion-check:checked');
+        document.getElementById('modalDetalleCard').classList.remove('d-none');
+        document.getElementById('modalDetalleTexto').innerText = "Procesando un lote masivo de " + checkedBoxes.length + " incidencias.";
+        document.getElementById('modalComentarioTexto').value = "";
+        if(status === 'APROBADO') {
+            document.getElementById('modalHeaderStyle').style.background = "linear-gradient(135deg, #1e7e34, #28a745)";
+            document.getElementById('modalTitulo').innerText = "Autorizar Lote Masivo";
+            document.getElementById('modalMensaje').innerText = "Se aplicarán descuentos en lote a los saldos de todos los operadores seleccionados.";
+            document.getElementById('boxMotivoRechazo').classList.add('d-none');
+        } else {
+            document.getElementById('modalHeaderStyle').style.background = "linear-gradient(135deg, #bd2130, #dc3545)";
+            document.getElementById('modalTitulo').innerText = "Rechazar Lote Masivo";
+            document.getElementById('modalMensaje').innerText = "Se rebotarán todas las incidencias seleccionadas de forma masiva.";
+            document.getElementById('boxMotivoRechazo').classList.remove('d-none');
+        }
+        new bootstrap.Modal(document.getElementById('modalConfirmacionNomina')).show();
+    }
+
+    function ejecutarSubmitConfirmado() {
+        const comentario = document.getElementById('modalComentarioTexto').value.trim();
+        if (statusTarget === 'RECHAZADO' && comentario.length < 5) {
+            alert("⚠️ Por favor ingresa una justificación contable para el rechazo.");
+            return;
+        }
+        if (modoEnvioModal === "INDIVIDUAL") {
+            if(statusTarget === "RECHAZADO") {
+                document.getElementById('bulkIdsRecuperaciones').value = idIndividualTarget;
+                document.getElementById('bulkStatusRecuperaciones').value = "RECHAZADO";
+                document.getElementById('bulkComentarioRecuperaciones').value = comentario;
+                document.getElementById('bulkFormRecuperaciones').submit();
+            } else {
+                document.getElementById('indivSolicitudId').value = idIndividualTarget;
+                document.getElementById('indivAprobado').value = true;
+                document.getElementById('individualFormRecuperacion').submit();
+            }
+        } else if (modoEnvioModal === "MASIVO") {
+            const checkedBoxes = document.querySelectorAll('.recuperacion-check:checked');
+            const ids = Array.from(checkedBoxes).map(cb => cb.value).join(',');
+            document.getElementById('bulkIdsRecuperaciones').value = ids;
+            document.getElementById('bulkStatusRecuperaciones').value = statusTarget;
+            document.getElementById('bulkComentarioRecuperaciones').value = comentario;
+            document.getElementById('bulkFormRecuperaciones').submit();
+        }
+    }
+
+    function toggleAllRecuperaciones(source) {
+        const checkboxes = document.querySelectorAll('.recuperacion-check');
+        checkboxes.forEach(cb => { cb.checked = source.checked; });
+        updateSelectedCountRecuperaciones();
+    }
+
+    function updateSelectedCountRecuperaciones() {
+        const selected = document.querySelectorAll('.recuperacion-check:checked');
+        const bar = document.getElementById('bulkActionsBarRecuperaciones');
+        const countLabel = document.getElementById('selectedCountRecuperaciones');
+        if (countLabel) countLabel.innerText = selected.length;
+        if (bar) bar.classList.toggle('d-none', selected.length === 0);
+    }
+
+    function filtrarHistorialRecuperaciones() {
+        const desdeVal = document.getElementById('filtroRecupDesde').value;
+        const hastaVal = document.getElementById('filtroRecupHasta').value;
+        const filas = document.querySelectorAll('#tablaHistorialRecuperaciones tbody tr');
+        filas.forEach(fila => {
+            const el = fila.querySelector('.fecha-falta-registro');
+            if (!el) return;
+            const fechaFila = new Date(el.textContent.trim() + 'T00:00:00');
+            let visible = true;
+            if (desdeVal && fechaFila < new Date(desdeVal + 'T00:00:00')) visible = false;
+            if (hastaVal && fechaFila > new Date(hastaVal + 'T00:00:00')) visible = false;
+            fila.classList.toggle('d-none', !visible);
+        });
+    }
+
+    function exportarTableAExcel() {
+        var tabla = document.getElementById("tablaAuditoria");
+        if (!tabla) return;
+        var csv = "\uFEFF";
+        csv += '"Fecha","Operación","Días","Justificación"\n';
+        tabla.querySelectorAll("tbody tr").forEach(r => {
+            var c = r.querySelectorAll("td");
+            if(c.length >= 4) csv += '"'+c[0].textContent+'","'+c[1].textContent+'","'+c[2].textContent+'","'+c[3].textContent+'"\n';
+        });
+        descargarCSV(csv, "Auditoria_Ajustes");
+    }
+
+    function exportarPlantillaGeneralAExcel() {
+        var csv = "\uFEFF";
+        csv += '"Nómina","Nombre Completo","CC","Nombre CC","WC","Nombre WC","Fecha Ingreso","Saldo Devengado","Saldo Proporcional","Saldo Acumulado","Estatus"\n';
+        document.querySelectorAll("#tablaPlantillaActivos tbody tr").forEach(f => {
+            var c = f.querySelectorAll("td");
+            if (c.length >= 10) {
+                var d = [];
+                c.forEach((cell, idx) => { if(idx < 10) d.push('="' + cell.textContent.trim() + '"'); });
+                d.push('"ACTIVO"');
+                csv += d.join(",") + "\n";
+            }
+        });
+        descargarCSV(csv, "Roster_Saldos_RH_Completo");
+    }
+
+    function exportarHistorialRecuperacionesAExcel() {
+        var tabla = document.getElementById("tablaHistorialRecuperaciones");
+        if (!tabla) return;
+        var csv = "\uFEFF";
+        csv += '"Folio","Colaborador y Nómina","Fecha Falta","Supervisor Emisor","Tipo / Justificación de Origen","Estatus Final"\n';
+        tabla.querySelectorAll("tbody tr").forEach(r => {
+            if (r.style.display !== "none" && !r.classList.contains("d-none")) {
+                var c = r.querySelectorAll("td");
+                if (c.length >= 6) {
+                    var folio = c[0].textContent.trim().replace(/"/g, '""');
+                    var colaborador = c[1].textContent.trim().replace(/\n/g, ' ').replace(/"/g, '""');
+                    var fechaFalta = c[2].textContent.trim().replace(/"/g, '""');
+                    var supervisor = c[3].textContent.trim().replace(/"/g, '""');
+                    var justificacion = c[4].textContent.trim().replace(/\n/g, ' — ').replace(/"/g, '""');
+                    var estatus = c[5].textContent.trim().replace(/"/g, '""');
+                    csv += '"' + folio + '","' + colaborador + '","' + fechaFalta + '","' + supervisor + '","' + justificacion + '","' + estatus + '"\n';
+                }
+            }
+        });
+        descargarCSV(csv, "Historial_Recuperaciones_Nomina");
+    }
+
+    function exportarSaldosVencidosAExcel() {
+        var csv = "\uFEFF";
+        csv += '"Nómina","Colaborador","Esquema Operativo","Ubicación Planta","Fecha Ingreso","Saldo Atrasado","Saldo Período","Total Ciclos (Atrasado + Período)","Saldo Proporcional","Fecha Límite Gracia"\n';
+
+        document.querySelectorAll("#tablaDepuracionSaldos tbody tr").forEach(f => {
+            if (f.style.display !== "none" && !f.classList.contains("d-none")) {
+                var c = f.querySelectorAll("td");
+                if (c.length >= 10) {
+                    var d = [];
+                    c.forEach((cell, idx) => {
+                        if(idx < 10) {
+                            var txt = cell.textContent.trim().replace(/\n/g, ' ').replace(/"/g, '""');
+                            d.push('="' + txt + '"');
+                        }
+                    });
+                    csv += d.join(",") + "\n";
+                }
+            }
+        });
+        descargarCSV(csv, "Reporte_Saldos_Vencidos_Atrasados");
+    }
+
+    function exportarHistorialDepuracionesAExcel() {
+        var csv = "\uFEFF";
+        csv += '"Fecha y Hora","Colaborador","ID Nómina","Ubicación Planta","Días Removidos","Justificación Contable","Operador RH"\n';
+
+        var tabla = document.getElementById("tablaHistorialDepuraciones");
+        if (!tabla) return;
+
+        tabla.querySelectorAll("tbody tr").forEach(r => {
+            var c = r.querySelectorAll("td");
+            if (c.length >= 5 && !r.cells[0].classList.contains('text-center')) {
+                var fecha = c[0].textContent.trim().replace(/"/g, '""');
+                var colaborador = c[1].querySelector("div") ? c[1].querySelector("div").textContent.trim().replace(/"/g, '""') : "";
+                var nomina = c[1].querySelector("small") ? c[1].querySelector("small").textContent.trim().replace(/[^0-9]/g, '') : "";
+                var ubicacion = c[2].textContent.trim().replace(/"/g, '""');
+                var dias = c[3].textContent.trim().replace(/"/g, '""');
+
+                var justificacion = c[4].querySelector("div") ? c[4].querySelector("div").textContent.trim().replace(/\n/g, ' — ').replace(/"/g, '""') : "";
+                // ✨ Lee de forma limpia el "Removido por: [Nombre]" generado por la corrección relacional
+                var operadorRH = c[4].querySelector("small") ? c[4].querySelector("small").textContent.trim().replace("Removido por: ", "").replace(/"/g, '""') : "";
+
+                csv += '"' + fecha + '","' + colaborador + '","' + nomina + '","' + ubicacion + '","' + dias + '","' + justificacion + '","' + operadorRH + '"\n';
+            }
+        });
+        descargarCSV(csv, "Historial_Depuraciones_Saldos_Vencidos");
+    }
+
+    function descargarCSV(csvContent, fileNamePrefix) {
+        var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        var url = URL.createObjectURL(blob);
+        var link = document.createElement("a");
+        var fechaHoy = new Date().toISOString().split('T')[0];
+        link.setAttribute("href", url);
+        link.setAttribute("download", fileNamePrefix + "_" + fechaHoy + ".csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    function dispararDescarga(tipoReporte) {
+        const semana = document.getElementById("expSemana").value.trim();
+        const anio = document.getElementById("expAnio").value.trim();
+        const fInicio = document.getElementById("expFechaInicio").value;
+        const fFin = document.getElementById("expFechaFin").value;
+
+        let urlBase = (tipoReporte === 'prenomina')
+            ? "/pantallas/gestion-saldos/exportar-prenomina"
+            : "/pantallas/gestion-saldos/exportar-recuperaciones";
+
+        let params = new URLSearchParams();
+
+        if (semana !== "") {
+            params.append("semana", semana);
+            if (anio !== "") params.append("anio", anio);
+        } else if (fInicio !== "" && fFin !== "") {
+            params.append("fechaInicio", fInicio);
+            params.append("fechaFin", fFin);
+        } else {
+            alert("⚠️ Por favor, define un criterio: ingresa una Semana o selecciona un Rango de fechas válido.");
+            return;
+        }
+        window.location.href = urlBase + "?" + params.toString();
+    }
+
+    function abrirAuditorMatematico(element) {
+        const nomina = element.getAttribute('data-nomina');
+        const nombre = element.getAttribute('data-nombre');
+        const tipo = (element.getAttribute('data-tipo') || 'SINDICALIZADO').toUpperCase();
+        const ingresoRaw = element.getAttribute('data-ingreso');
+        const ingresoView = element.getAttribute('data-ingresoview');
+        const baseManual = parseFloat(element.getAttribute('data-base')) || 0;
+        const esCongelado = element.getAttribute('data-congelado') === 'true';
+
+        document.getElementById('auditNombre').innerText = nombre;
+        document.getElementById('auditNomina').innerText = nomina;
+        document.getElementById('auditTipo').innerText = tipo;
+        document.getElementById('auditIngreso').innerText = ingresoView;
+
+        if (!ingresoRaw) {
+            alert("⚠️ El colaborador no tiene una Fecha de Ingreso oficial registrada.");
+            return;
+        }
+
+        const fechaIngreso = new Date(ingresoRaw + "T00:00:00");
+        const hoy = new Date();
+        let realAnos = hoy.getFullYear() - fechaIngreso.getFullYear();
+        let m = hoy.getMonth() - fechaIngreso.getMonth();
+        if (m < 0 || (m === 0 && hoy.getDate() < fechaIngreso.getDate())) {
+            realAnos--;
+        }
+        const anosCumplidos = realAnos < 0 ? 0 : realAnos;
+        document.getElementById('auditAnos').innerText = anosCumplidos;
+
+        let diasLey = 12;
+        if (anosCumplidos === 2) diasLey = 14;
+        else if (anosCumplidos === 3) diasLey = 16;
+        else if (anosCumplidos === 4) diasLey = 18;
+        else if (anosCumplidos === 5) diasLey = 20;
+        else if (anosCumplidos >= 6 && anosCumplidos <= 10) diasLey = 22;
+        else if (anosCumplidos >= 11 && anosCumplidos <= 15) diasLey = 24;
+        else if (anosCumplidos >= 16 && anosCumplidos <= 20) diasLey = 26;
+        else if (anosCumplidos >= 21 && anosCumplidos <= 25) diasLey = 28;
+        else if (anosCumplidos > 25) diasLey = 30;
+
+        let derechoAnualBase = diasLey;
+        let desglosePaso1Html = "";
+
+        if (tipo === 'EXTRANJERO') {
+            let baseOrigen = baseManual > 0 ? baseManual : 12;
+            if (esCongelado) {
+                derechoAnualBase = baseOrigen;
+                desglosePaso1Html = `<strong>Régimen:</strong> Extranjero Especial. <br>Escalación bloqueada por contrato/visa: <strong>${derechoAnualBase} días</strong> fijos anuales.`;
+            } else {
+                let beneficioAdicional = baseOrigen - 12;
+                derechoAnualBase = diasLey + beneficioAdicional;
+                desglosePaso1Html = `
+                    <strong>Régimen:</strong> Extranjero Evolutivo (Mantiene beneficio de contrato).<br>
+                    <div class="p-2 rounded bg-white border text-secondary font-monospace mt-1" style="font-size: 0.85rem; line-height: 1.5;">
+                        • Días por Ley Actual LFT (${anosCumplidos} años): ${diasLey} días.<br>
+                        • Beneficio Adicional por Contrato: +${beneficioAdicional} días.<br>
+                        <strong>Fórmula Simple:</strong> Ley Actual (${diasLey}) + Beneficio Contrato (+${beneficioAdicional}) = <strong class="text-success">${derechoAnualBase} días</strong> Derecho Anual Base.
+                    </div>
+                `;
+            }
+        } else if (tipo === 'ADMINISTRATIVO') {
+            derechoAnualBase = diasLey + 2.0;
+            desglosePaso1Html = `<strong>Régimen:</strong> Administrativo / Confianza. <br>Fórmula Core: Ley LFT (${diasLey}) + Bono Corporativo Oficina (+2.0) = <strong class="text-success">${derechoAnualBase} días</strong> Derecho Base.`;
+        } else {
+            desglosePaso1Html = `<strong>Régimen:</strong> Sindicalizado / Personal Operativo. <br>Tabulador de Ley LFT estricto: <strong>${derechoAnualBase} días</strong> base por antigüedad de ${anosCumplidos} años.`;
+        }
+
+        document.getElementById('desglosePaso1').innerHTML = desglosePaso1Html;
+
+        let ultimoAniversario = new Date(hoy.getFullYear(), fechaIngreso.getMonth(), fechaIngreso.getDate());
+        if (ultimoAniversario > hoy) {
+            ultimoAniversario = new Date(hoy.getFullYear() - 1, fechaIngreso.getMonth(), fechaIngreso.getDate());
+        }
+
+        const diferenciaTiempo = hoy.getTime() - ultimoAniversario.getTime();
+        const diasTranscurridos = Math.floor(diferenciaTiempo / (1000 * 60 * 60 * 24));
+        const factorDiario = (derechoAnualBase / 365);
+        const totalProporcionalCalculado = (factorDiario * diasTranscurridos).toFixed(2);
+
+        let desglosePaso2Html = `
+            <div class="mb-2">
+                <strong>Aniversario Laboral Reciente:</strong> ${ultimoAniversario.toLocaleDateString('es-MX', {day: '2-digit', month: '2-digit', year: 'numeric'})} <br>
+                <strong>Días Transcurridos:</strong> ${diasTranscurridos} días naturales acumulados a la fecha.
+            </div>
+            <div class="p-2 rounded bg-white border text-secondary font-monospace mb-3" style="line-height: 1.5; font-size: 0.85rem;">
+                • Factor de Acumulación Diario: ${derechoAnualBase} / 365 = <strong>${factorDiario.toFixed(4)} días/día</strong>.<br>
+                • Acumulación Proporcional Calculada: Factor × ${diasTranscurridos} días = <strong>${totalProporcionalCalculado} días</strong>.
+            </div>
+        `;
+
+        const row = element.closest('tr');
+        let tableId = row && row.closest('table') ? row.closest('table').id : '';
+
+        let saldoPeriodoActual = 0;
+        let saldoProporcionalDOM = 0;
+        let sumaTotalNeto = 0;
+
+        if (row) {
+            if (tableId === 'tablaDepuracionSaldos') {
+                saldoPeriodoActual = parseFloat(row.cells[6]?.textContent.replace(/[^0-9.-]/g, '')) || 0;
+                saldoProporcionalDOM = parseFloat(row.cells[8]?.textContent.replace(/[^0-9.-]/g, '')) || 0;
+            } else {
+                saldoPeriodoActual = parseFloat(row.cells[7]?.textContent.replace(/[^0-9.-]/g, '')) || 0;
+                saldoProporcionalDOM = parseFloat(row.cells[8]?.textContent.replace(/[^0-9.-]/g, '')) || 0;
+            }
+            sumaTotalNeto = saldoPeriodoActual + saldoProporcionalDOM;
+        }
+
+        desglosePaso2Html += `
+            <div class="mt-3 pt-3 border-top">
+                <h6 class="fw-bold text-dark mb-2"><i class="bi bi-wallet2 me-1"></i> Resumen de Saldos Disponibles para Solicitud</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered bg-white text-center mb-0" style="font-size: 0.85rem;">
+                        <thead class="table-light text-secondary">
+                            <tr>
+                                <th>Saldo Ley (Devengado)</th>
+                                <th>Saldo Proporcional</th>
+                                <th class="table-primary fw-bold text-primary">Suma Final Neto</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="${saldoPeriodoActual < 0 ? 'text-danger fw-bold' : 'text-success fw-bold'}">${saldoPeriodoActual.toFixed(2)}</td>
+                                <td class="text-info fw-bold">${saldoProporcionalDOM.toFixed(2)}</td>
+                                <td class="table-primary fw-bold ${sumaTotalNeto < 0 ? 'text-danger' : 'text-dark'}">${sumaTotalNeto.toFixed(2)} días</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('desglosePaso2').innerHTML = desglosePaso2Html;
+
+        new bootstrap.Modal(document.getElementById('modalAuditorMatematico')).show();
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+        conmutarCamposAjuste();
+        conmutarCamposExtranjero();
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const activeTab = urlParams.get('tab');
+        if (activeTab === 'depuracion') {
+            const tabBtn = document.querySelector('#pills-depuracion-tab');
+            if (tabBtn) {
+                bootstrap.Tab.getOrCreateInstance(tabBtn).show();
+            }
+        }
+    });
+</script>
+</body>
+</html>

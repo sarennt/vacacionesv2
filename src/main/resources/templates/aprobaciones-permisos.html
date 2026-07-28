@@ -1,0 +1,1417 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal de Jefes - Permisos y TXT</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link rel="stylesheet" th:href="@{/css/estilos-grammer.css}">
+</head>
+<body class="bg-light">
+
+<div th:replace="~{fragments/navbar :: menuPlanta}"></div>
+
+<div style="height: 80px;"></div>
+
+<main class="container px-3 pb-5">
+
+    <div th:if="${mensajeExito}" class="alert alert-success alert-dismissible fade show rounded-3 shadow-sm mb-4" role="alert">
+        <i class="bi bi-check-circle-fill me-2"></i> <span th:text="${mensajeExito}">Operación Exitosa</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    <div th:if="${mensajeError}" class="alert alert-danger alert-dismissible fade show rounded-3 shadow-sm mb-4" role="alert">
+        <i class="bi bi-exclamation-octagon-fill me-2"></i> <span th:text="${mensajeError}">Ocurrió un error</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+
+    <ul class="nav nav-pills nav-fill bg-white shadow-sm rounded-4 p-2 mb-4" id="pills-tab" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active rounded-3 fw-bold" id="pills-pendientes-tab" data-bs-toggle="pill" data-bs-target="#pills-pendientes" type="button" role="tab">
+                <i class="bi bi-ui-checks me-2"></i>Solicitudes
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-3 fw-bold" id="pills-plantilla-tab" data-bs-toggle="pill" data-bs-target="#pills-plantilla" type="button" role="tab">
+                <i class="bi bi-people-fill me-2"></i>Mi Plantilla
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-3 fw-bold text-dark bg-warning bg-opacity-10 border border-warning border-opacity-25" id="pills-txt-col-tab" data-bs-toggle="pill" data-bs-target="#pills-txt-col" type="button" role="tab">
+                <i class="bi bi-stopwatch-fill me-2 text-warning"></i>TXT Colectivo
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-3 fw-bold" id="pills-calendario-tab" data-bs-toggle="pill" data-bs-target="#pills-calendario" type="button" role="tab">
+                <i class="bi bi-calendar-week me-2"></i>Calendario
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="pills-tabContent">
+
+        <div class="tab-pane fade show active" id="pills-pendientes" role="tabpanel">
+
+            <div class="alert d-flex align-items-center mb-4 border-0 rounded-3 shadow-sm bg-white p-3" style="border-left: 5px solid #002f6c !important;">
+                <div class="flex-grow-1">
+                    <h5 class="fw-bold text-dark mb-0">Bandeja Unificada de Incidencias Pendientes
+                        <span class="badge bg-dark ms-2" th:text="${(permisosPendientes != null ? permisosPendientes.size() : 0) + (rangosDinamicosPendientes != null ? rangosDinamicosPendientes.size() : 0)}">0</span>
+                    </h5>
+                    <small class="text-muted">Revisa, autoriza o rechaza los permisos individuales, Tiempos por Tiempo (TXT), Home Office (HO) y Paros Técnicos (PT) de tu equipo.</small>
+                </div>
+            </div>
+
+            <div th:if="${(permisosPendientes != null and !permisosPendientes.isEmpty()) or (rangosDinamicosPendientes != null and !rangosDinamicosPendientes.isEmpty())}" class="d-flex align-items-center mb-3 bg-white p-2 px-3 rounded-3 shadow-sm border">
+                <div class="form-check m-0">
+                    <input class="form-check-input fs-5 shadow-sm border-secondary" type="checkbox" id="masterCheckSolicitudes" onclick="toggleAllSolicitudesCheck(this)">
+                    <label class="form-check-label fw-bold text-dark small ms-2 align-middle" for="masterCheckSolicitudes" style="cursor:pointer; user-select:none;">Seleccionar Todas las Solicitudes</label>
+                </div>
+            </div>
+
+            <div class="row g-4">
+                <div class="col-12 col-lg-8">
+
+                    <div th:each="solicitud : ${permisosPendientes}" class="card mb-3 border-0 border-start border-5 border-warning shadow-sm">
+                        <div class="card-body p-3">
+                            <div class="d-flex align-items-start gap-3">
+                                <div class="pt-1">
+                                    <input class="form-check-input check-solicitud-masiva fs-4 shadow-sm border-secondary" type="checkbox" th:value="'permiso-' + ${solicitud.id}" onclick="updateSelectedCount()">
+                                </div>
+                                <div class="flex-grow-1">
+                                    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                                        <div class="flex-grow-1">
+                                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                                <div>
+                                                    <h5 class="fw-bold mb-0 text-dark" th:text="${solicitud.empleado.nombreCompleto}">Nombre</h5>
+                                                    <p class="text-muted small mb-0"><i class="bi bi-person-badge me-1"></i> Nómina: #<span th:text="${solicitud.empleado.nomina}"></span></p>
+                                                </div>
+                                                <span class="badge bg-warning bg-opacity-10 text-warning border border-warning rounded-pill px-3 py-2 d-flex align-items-center gap-1 fw-bold">
+                                                    <i class="bi bi-stopwatch-fill"></i>
+                                                    <span th:text="${solicitud.esPorHoras} ? 'TXT (' + ${solicitud.horasPermiso} + ' hrs)' : 'TXT Full'">TXT</span>
+                                                </span>
+                                            </div>
+                                            <hr class="text-muted opacity-25">
+                                            <div class="row g-3">
+                                                <div class="col-12 col-md-5">
+                                                    <p class="text-muted fw-bold small mb-1">Fecha de Incidencia</p>
+                                                    <p class="mb-0 fw-medium text-dark"><i class="bi bi-calendar-x text-danger me-1"></i>
+                                                        <span th:text="${#temporals.format(solicitud.fechaIncidencia, 'dd MMM yyyy')}"></span>
+                                                    </p>
+                                                    <div class="mt-2">
+                                                        <small class="text-muted fw-bold d-block mb-1" style="font-size: 0.72rem;">Plan de Reposición:</small>
+                                                        <div th:each="pago : ${solicitud.desglosesPago}" class="mb-1" style="font-size: 0.75rem;">
+                                                            <i class="bi bi-calendar-check text-success me-1"></i>
+                                                            <span th:text="${pago.fechaPago}"></span>
+                                                            <span class="badge bg-secondary rounded-pill" th:text="${pago.horasPago} + ' hrs'"></span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-6 col-md-3 border-start">
+                                                    <p class="text-muted fw-bold small mb-1">Turno</p>
+                                                    <p class="mb-0 fw-medium text-dark"><i class="bi bi-clock-history text-info me-1"></i>
+                                                        <span th:text="${solicitud.turno != null ? solicitud.turno.nombreTurno : 'No especificado'}"></span>
+                                                    </p>
+                                                </div>
+                                                <div class="col-6 col-md-4 border-start">
+                                                    <p class="text-muted fw-bold small mb-1">Motivo / Notas</p>
+                                                    <p class="mb-0 fw-medium text-dark italic small" th:text="${solicitud.justificacionSupervisor ?: 'Sin comentarios registrados'}"></p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="d-flex gap-2 mt-3 mt-md-0">
+                                            <form th:action="@{/jefe/permisos/responder}" method="post" class="flex-grow-1">
+                                                <input type="hidden" name="idSolicitud" th:value="${solicitud.id}" />
+                                                <input type="hidden" name="aprobado" value="true" />
+                                                <input type="hidden" name="nominaJefe" th:value="${jefe.nomina}" />
+                                                <button type="submit" class="btn btn-success w-100 shadow-sm py-2"><i class="bi bi-check-circle"></i></button>
+                                            </form>
+                                            <button type="button" class="btn btn-slate" th:attr="onclick=|abrirModalRechazo(${solicitud.id})|"><i class="bi bi-x-circle"></i></button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div th:each="rango : ${rangosDinamicosPendientes}" class="card mb-3 border-0 border-start border-5 shadow-sm"
+                         th:classappend="${rango.tipoSolicitud == 'PT' or rango.tipoSolicitud == 'Paro Técnico'} ? 'border-danger' : 'border-info'">
+                        <div class="card-body p-3">
+                            <div class="d-flex align-items-start gap-3">
+                                <div class="pt-1">
+                                    <input class="form-check-input check-solicitud-masiva fs-4 shadow-sm border-secondary" type="checkbox" th:value="'rango-' + ${rango.id}" onclick="updateSelectedCount()">
+                                </div>
+                                <div class="flex-grow-1">
+                                    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                                        <div class="flex-grow-1">
+                                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                                <div>
+                                                    <h5 class="fw-bold mb-0 text-dark" th:text="${rango.empleado.nombreCompleto}">Nombre Colaborador</h5>
+                                                    <p class="text-muted small mb-0"><i class="bi bi-person-badge me-1"></i> Nómina: #<span th:text="${rango.empleado.nomina}"></span></p>
+                                                </div>
+                                                <span class="badge rounded-pill px-3 py-2 fw-bold"
+                                                      th:classappend="${rango.tipoSolicitud == 'PT' or rango.tipoSolicitud == 'Paro Técnico'} ? 'bg-danger bg-opacity-10 text-danger border border-danger' : 'bg-info bg-opacity-10 text-info border border-info'"
+                                                      th:text="${rango.tipoSolicitud}">PT</span>
+                                            </div>
+                                            <hr class="text-muted opacity-25">
+                                            <div class="row g-3">
+                                                <div class="col-12 col-md-4">
+                                                    <p class="text-muted fw-bold small mb-1">Periodo del Permiso</p>
+                                                    <p class="mb-0 fw-medium text-dark" style="font-size:0.9rem;"><i class="bi bi-calendar-range text-corporativo me-1"></i>
+                                                        <span th:text="${#temporals.format(rango.fechaInicio, 'dd/MM/yyyy')}"></span> al <span th:text="${#temporals.format(rango.fechaFin, 'dd/MM/yyyy')}"></span>
+                                                    </p>
+                                                </div>
+                                                <div class="col-6 col-md-2 border-start">
+                                                    <p class="text-muted fw-bold small mb-1">Turno</p>
+                                                    <p class="mb-0 fw-medium text-dark"><i class="bi bi-clock-history text-info me-1"></i>
+                                                        <span th:text="${rango.turno != null ? rango.turno.nombreTurno : 'N/A'}"></span>
+                                                    </p>
+                                                </div>
+                                                <div class="col-6 col-md-2 border-start">
+                                                    <p class="text-muted fw-bold small mb-1">Días Hábiles</p>
+                                                    <p class="mb-0 fw-bold text-dark"><i class="bi bi-sun-fill text-warning me-1"></i> <span th:text="${rango.diasTotalesCalculados}"></span> días</p>
+                                                </div>
+                                                <div class="col-12 col-md-4 border-start mt-3 mt-md-0">
+                                                    <p class="text-muted fw-bold small mb-1">Evidencia / Justificación</p>
+                                                    <p class="mb-0 fw-medium text-dark italic small text-truncate" th:text="${rango.comentarioJefe ?: 'Sin notas registradas'}"></p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="d-flex gap-2 mt-3 mt-md-0 align-items-center">
+                                            <form th:action="@{/jefe/permisos/responder-rango}" method="post">
+                                                <input type="hidden" name="nominaJefe" th:value="${jefe.nomina}" />
+                                                <input type="hidden" name="idSolicitud" th:value="${rango.id}" />
+                                                <input type="hidden" name="aprobado" value="true" />
+                                                <button type="submit" class="btn btn-success btn-sm px-3 py-2 shadow-sm fw-bold d-flex align-items-center gap-1">
+                                                    <i class="bi bi-check-circle-fill"></i> Aprobar
+                                                </button>
+                                            </form>
+                                            <form th:action="@{/jefe/permisos/responder-rango}" method="post">
+                                                <input type="hidden" name="nominaJefe" th:value="${jefe.nomina}" />
+                                                <input type="hidden" name="idSolicitud" th:value="${rango.id}" />
+                                                <input type="hidden" name="aprobado" value="false" />
+                                                <button type="submit" class="btn btn-outline-danger btn-sm px-3 py-2 fw-bold d-flex align-items-center gap-1">
+                                                    <i class="bi bi-x-circle-fill"></i> Rebotar
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div th:if="${(permisosPendientes == null or permisosPendientes.isEmpty()) and (rangosDinamicosPendientes == null or rangosDinamicosPendientes.isEmpty())}"
+                         class="text-center tragedies-box py-5 bg-white rounded-4 shadow-sm border border-dashed mb-4">
+                        <i class="bi bi-inbox-fill text-muted display-4"></i>
+                        <h5 class="fw-bold text-dark mt-3 mb-1">¡Bandeja Limpia!</h5>
+                        <p class="text-muted small mb-0">No tienes incidencias, TXT, ni paros técnicos pendientes de validación por el momento.</p>
+                    </div>
+                </div>
+
+                <div class="col-12 col-lg-4">
+                    <div class="card bg-dark text-white p-4 shadow-sm border-0 mb-4" style="border-radius: 1rem;">
+                        <h5 class="fw-bold mb-4">Métricas de Área</h5>
+                        <div class="mb-3">
+                            <p class="text-white-50 mb-1 fw-bold small">Permisos procesados (Mes)</p>
+                            <h2 class="display-6 fw-bold mb-0" th:text="${permisosAprobadosMes ?: 0}">0</h2>
+                        </div>
+                        <hr class="border-white opacity-25">
+                        <div class="mt-3">
+                            <p class="text-white-50 mb-1 fw-bold small">Ausencias por Permiso (Próximos 7 días)</p>
+                            <p class="fs-5 mb-0"><i class="bi bi-person-dash-fill me-2 text-warning"></i> <span th:text="${ausenciasPermisosManana ?: 0}">0</span> operadores</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="pills-plantilla" role="tabpanel">
+            <div class="card p-4 border-0 shadow-sm" style="border-radius: 1rem;">
+                <div class="sticky-top bg-white pt-2 pb-3 mb-4 border-bottom" style="top: 80px; z-index: 1010;">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="fw-bold text-dark mb-0">Directorio del Área <span class="badge bg-dark ms-2 rounded-pill" id="contadorPlantilla" th:text="${plantilla != null ? plantilla.size() : 0}">0</span></h5>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-md-5">
+                            <input type="text" id="buscadorPlantilla" class="form-control bg-light" placeholder="Buscar por Nombre, Nómina, Puesto, CC o WC...">
+                        </div>
+                        <div class="col-md-4">
+                            <select id="selectorOrdenamiento" class="form-select bg-light fw-bold" onchange="ordenarPlantillaLista()">
+                                <option value="nomina">Número de Nómina</option>
+                                <option value="puesto">Puesto / Posición</option>
+                                <option value="cc">Centro de Costo (CC)</option>
+                                <option value="wc">Work Center (WC)</option>
+                                <option value="antiguedad">Fecha de Antigüedad</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <select id="selectorDireccion" class="form-select bg-light fw-bold" onchange="ordenarPlantillaLista()">
+                                <option value="asc">Menor a Mayor (A-Z)</option>
+                                <option value="desc">Mayor a Menor (Z-A)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="list-group list-group-flush" id="listaPlantilla">
+                    <div th:each="miembro : ${plantilla}" class="list-group-item d-flex justify-content-between align-items-center py-3 px-0 border-bottom item-empleado">
+                        <div class="flex-grow-1">
+                            <h6 class="mb-0 fw-bold text-dark nombre-empleado" th:text="${miembro.nombreCompleto}">Nombre</h6>
+                            <small class="text-muted d-block mt-1">
+                                <span class="puesto-empleado fw-bold text-primary" th:text="${miembro.puesto ?: 'Operador'}">Puesto</span> | Nómina: #<span class="nomina-empleado" th:text="${miembro.nomina}"></span>
+                            </small>
+                            <small class="text-muted d-block mt-1" style="font-size:0.75rem;">
+                                CC: <span class="cc-empleado" th:text="${miembro.centroCosto != null ? miembro.centroCosto.id : 'N/A'}"></span> |
+                                WC: <span class="wc-empleado" th:text="${miembro.workCenter != null ? miembro.workCenter.id : 'Sin Asignar'}"></span>
+                            </small>
+                            <small class="text-muted d-block mt-1" style="font-size:0.72rem;">
+                                <i class="bi bi-clock-history me-1"></i> Antigüedad:
+                                <span class="antiguedad-date-val fw-bold text-dark" th:text="${miembro.fechaIngreso != null ? #temporals.format(miembro.fechaIngreso, 'dd/MM/yyyy') : '01/01/2000'}"></span>
+                            </small>
+                        </div>
+                        <div class="d-flex align-items-center gap-3">
+                            <div th:if="${jefe.rolJerarquico != null and jefe.rolJerarquico.trim().toUpperCase() == 'SUPERVISOR'}">
+                                <button type="button" class="btn btn-sm btn-outline-warning fw-bold rounded-pill px-3 shadow-sm d-flex align-items-center gap-1"
+                                        th:attr="onclick=|abrirModalRecuperacion('${miembro.nomina}', '${miembro.nombreCompleto}')|">
+                                    <i class="bi bi-calendar-x-fill"></i> Recuperar Falta Extraordinaria
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="pills-txt-col" role="tabpanel">
+            <div class="card p-4 border-0 shadow-sm" style="border-radius: 1rem;">
+                <div class="border-bottom pb-3 mb-4">
+                    <h5 class="fw-bold text-dark mb-1"><i class="bi bi-stopwatch-fill text-warning me-2"></i>Módulo de Tiempo por Tiempo (TXT) Colectivo</h5>
+                    <p class="text-muted small mb-0">Asigna permisos TXT de forma masiva a toda una línea operativa. El sistema validará colisiones automáticamente.</p>
+                </div>
+
+                <div class="mb-4 bg-light p-3 rounded-3 border shadow-sm mx-0">
+                    <label class="form-label fw-bold text-dark small mb-3 d-flex justify-content-between align-items-center">
+                        <span><span class="badge bg-dark me-1">Paso 1</span> Selecciona la Línea (WC) para cargar al personal</span>
+                        <div class="form-check form-switch m-0 fs-6">
+                            <input class="form-check-input" type="checkbox" id="masterCheckWcTxtCol" style="cursor: pointer;" onclick="toggleAllWcTxtCol(this)">
+                            <label class="form-check-label text-muted small fw-bold" for="masterCheckWcTxtCol" style="cursor: pointer; user-select: none;">Seleccionar Todos los WC</label>
+                        </div>
+                    </label>
+                    <div class="d-flex flex-wrap gap-2 bg-white p-3 rounded border shadow-sm" style="max-height: 120px; overflow-y: auto;">
+                        <div th:each="wc : ${workCentersACargo}" class="form-check form-check-inline m-0 bg-light px-3 py-2 rounded border border-secondary border-opacity-10">
+                            <input class="form-check-input checkbox-wc-txt-col ms-0 me-2 shadow-sm" type="checkbox" th:value="${wc.id}" th:id="'wc-txt-' + ${wc.id}" onchange="cargarOperadoresDesdeBackend()">
+                            <label class="form-check-label fw-bold text-dark small" style="cursor:pointer; user-select: none;" th:for="'wc-txt-' + ${wc.id}">
+                                WC <span th:text="${wc.id}"></span> (<span th:text="${headcountMap != null ? headcountMap.get(wc.id) ?: 0 : 0}">0</span> ops)
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-4 mb-4 bg-white p-3 rounded-3 border shadow-sm mx-0">
+                    <div class="col-md-6 border-end">
+                        <label class="form-label fw-bold text-dark small d-flex justify-content-between align-items-center mb-3">
+                            <span><span class="badge bg-dark me-1">Paso 2</span> Fechas de la Falta Masiva (Máx 6)</span>
+                            <button type="button" id="btnAgregarParoTxtCol" class="btn btn-sm btn-outline-danger fw-bold"><i class="bi bi-plus-lg me-1"></i>Añadir Día</button>
+                        </label>
+                        <div class="table-responsive bg-light rounded-3 shadow-sm border">
+                            <table class="table table-bordered align-middle mb-0" id="tablaParosTXTCol">
+                                <thead class="table-light">
+                                <tr class="small text-muted text-uppercase fw-bold">
+                                    <th>Fecha del Paro</th>
+                                    <th style="width: 60px;" class="text-center">Quitar</th>
+                                </tr>
+                                </thead>
+                                <tbody id="tbodyParosTXTCol">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold text-dark small d-flex justify-content-between align-items-center mb-3">
+                            <span><span class="badge bg-dark me-1">Paso 3</span> Fechas de Reposición (Pago)</span>
+                            <button type="button" id="btnAgregarPagoTxtCol" class="btn btn-sm btn-outline-success fw-bold"><i class="bi bi-plus-lg me-1"></i>Añadir Día</button>
+                        </label>
+                        <div class="alert bg-warning bg-opacity-10 text-dark small py-2 border-0 shadow-sm rounded-3">
+                            <i class="bi bi-info-circle-fill text-warning me-1"></i> El límite de pagos permitidos se calcula automáticamente (2 pagos máximos por cada día de paro).
+                        </div>
+                        <div class="table-responsive bg-white rounded-3 shadow-sm border">
+                            <table class="table table-bordered align-middle mb-0" id="tablaPagosTXTCol">
+                                <thead class="table-light">
+                                <tr class="small text-muted text-uppercase fw-bold">
+                                    <th>Fecha de Reposición</th>
+                                    <th style="width: 150px;">Horas a Pagar</th>
+                                    <th style="width: 60px;" class="text-center">Quitar</th>
+                                </tr>
+                                </thead>
+                                <tbody id="tbodyTXTCol">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="wrapperAsignadorTurnoTxt" class="d-none bg-dark text-white p-3 rounded-top-3 shadow-sm mt-4">
+                    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge bg-warning text-dark fs-6" id="badgeSeleccionadosTxtCol">0</span>
+                            <small class="fw-medium text-white-50"><span class="badge bg-light text-dark me-1">Paso 4</span> Operadores cargados. <br>Asigna el turno que le corresponde a cada quien:</small>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <select class="form-select form-select-sm bg-white text-dark fw-bold" id="selectorTurnoMasivoTxt" style="width: 180px;">
+                                <option value="">-- Asignar Turno --</option>
+                                <option th:each="turno : ${listaTurnosMaster}"
+                                        th:if="${turno.activo}"
+                                        th:value="${turno.nombreTurno}"
+                                        th:text="${turno.nombreTurno} + ' (' + ${turno.horasJornada} + ' hrs)'">
+                                </option>
+                            </select>
+                            <button type="button" class="btn btn-warning btn-sm fw-bold px-3 rounded-2 text-dark" onclick="aplicarTurnoMasivoTxt()">
+                                <i class="bi bi-lightning-fill"></i> Aplicar a Todos
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-responsive bg-white rounded-bottom-3 mb-4 d-none shadow-sm border border-top-0" id="boxTablaTxtCol">
+                    <table class="table table-sm align-middle mb-0 text-start table-hover">
+                        <thead class="table-light">
+                        <tr class="user-select-none text-dark" style="font-size: 0.88rem;">
+                            <th class="text-center" style="width: 50px;">
+                                <input class="form-check-input shadow-sm" type="checkbox" id="masterCheckTxtCol" checked onclick="toggleAllTxtColCheck(this)">
+                            </th>
+                            <th class="py-2">Nómina</th>
+                            <th>Colaborador</th>
+                            <th>Línea</th>
+                            <th style="width: 250px;" class="bg-warning bg-opacity-10 text-dark border-start border-warning"><i class="bi bi-clock-history me-1"></i> Selecciona el Turno</th>
+                        </tr>
+                        </thead>
+                        <tbody id="bodyTxtColInyeccion" style="font-size: 0.88rem;">
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mb-4 text-end">
+                    <button type="button" class="btn btn-dark btn-lg px-5 py-3 fw-bold shadow-sm d-none fs-5 w-100" id="btnSubmitTxtCol" onclick="prepararResumenTxtCol()">
+                        <i class="bi bi-send-fill me-2"></i> Procesar Lote TXT Masivo
+                    </button>
+                </div>
+
+                <div class="card p-4 border-0 shadow-sm mt-5 bg-white" style="border-radius: 1rem;">
+                    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center border-bottom pb-3 mb-4 gap-3">
+                        <div>
+                            <h5 class="fw-bold text-dark mb-1"><i class="bi bi-journal-text text-success me-2"></i>Bitácora de TXT Colectivo</h5>
+                            <p class="text-muted small mb-0">Historial completo de inyecciones masivas aplicadas directamente a tus líneas operativas.</p>
+                        </div>
+                        <a th:href="@{/jefe/permisos/exportar-txt-colectivo(nomina=${jefe.nomina})}" class="btn btn-success fw-bold shadow-sm btn-sm d-flex align-items-center gap-1 rounded-pill px-4 py-2">
+                            <i class="bi bi-file-earmark-excel-fill"></i> Exportar Bitácora a Excel
+                        </a>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle table-hover border mb-0 text-start" style="font-size: 0.85rem;">
+                            <thead class="table-light text-secondary">
+                            <tr>
+                                <th class="py-2 px-3">Colaborador</th>
+                                <th>Línea</th>
+                                <th>Fecha Paro</th>
+                                <th>Plan de Reposición (Fechas de Pago)</th>
+                                <th>Justificación de Planta</th>
+                                <th>Fecha Aplicación</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="hist : ${historialTxtColectivo}">
+                                <td class="py-2.5 px-3">
+                                    <span class="fw-bold text-dark d-block" th:text="${hist.empleado.nombreCompleto}">Nombre</span>
+                                    <small class="text-muted font-monospace">#<span th:text="${hist.empleado.nomina}"></span></small>
+                                </td>
+                                <td>
+                                    <span class="badge bg-light text-dark border fw-bold" th:text="'WC ' + ${hist.empleado.workCenter?.id ?: 'N/A'}">WC</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-danger bg-opacity-10 text-danger border border-danger font-monospace px-2 py-1 fw-bold th-fecha-paro" th:text="${hist.fechaIncidencia}">Fecha Paro</span>
+                                </td>
+                                <td>
+                                    <div class="d-flex flex-column gap-1">
+                                            <span th:each="pago : ${hist.desglosesPago}" class="text-dark fw-medium" style="font-size:0.8rem;">
+                                                <i class="bi bi-calendar-check text-success me-1"></i>
+                                                <span th:text="${pago.fechaPago}"></span>
+                                                <span class="badge bg-secondary rounded-pill ms-1" th:text="${pago.horasPago} + ' hrs'"></span>
+                                            </span>
+                                        <span th:if="${hist.desglosesPago == null or hist.desglosesPago.isEmpty()}" class="text-muted italic">Sin desglose</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <small class="text-dark fw-medium d-block text-truncate" style="max-width: 250px;" th:text="${hist.justificacionSupervisor}" th:title="${hist.justificacionSupervisor}"></small>
+                                </td>
+                                <td class="text-muted font-monospace" th:text="${hist.fechaSolicitud != null ? #temporals.format(hist.fechaSolicitud, 'dd/MM/yyyy HH:mm') : 'N/A'}">
+                                    01/01/2026
+                                </td>
+                            </tr>
+                            <tr th:if="${historialTxtColectivo == null or historialTxtColectivo.isEmpty()}">
+                                <td colspan="6" class="text-center py-5 text-muted italic">
+                                    <i class="bi bi-folder-x display-5 d-block mb-2 text-muted opacity-50"></i>
+                                    No se han detectado inyecciones contables de TXT colectivo aplicadas para tus áreas.
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="pills-calendario" role="tabpanel" aria-labelledby="pills-calendario-tab">
+            <div class="card p-4 bg-white shadow-sm rounded-4 border-0">
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+                    <div>
+                        <h4 class="fw-bold text-dark mb-1"><i class="bi bi-calendar3 me-2"></i>Calendario de Mapeo Operativo</h4>
+                        <p class="text-muted small mb-0">Mapeo unificado de incidencias y ausencias de personal.</p>
+                    </div>
+                </div>
+                <div id="calendarViewJefe" class="p-1"></div>
+            </div>
+        </div>
+
+    </div>
+</main>
+
+<div id="barraAccionesMasivasSolicitudes" class="d-none fixed-bottom bg-dark text-white p-3 shadow-lg border-top border-warning border-3" style="z-index: 1030;">
+    <div class="container">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-3">
+            <div class="d-flex align-items-center gap-3">
+                <span class="badge bg-warning text-dark fs-5 fw-bold px-3 py-2 rounded-pill shadow-sm" id="badgeContadorMasivoSolicitudes">0</span>
+                <div>
+                    <h6 class="fw-bold mb-0 text-white">Solicitudes Seleccionadas</h6>
+                    <small class="text-white-50">Puedes autorizar o rechazar este bloque de incidencias en un solo movimiento.</small>
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-success fw-bold px-4 shadow-sm d-flex align-items-center gap-1 py-2" onclick="procesarAccionMasivaSolicitudes(true)">
+                    <i class="bi bi-check-circle-fill"></i> Autorizar Selección
+                </button>
+                <button type="button" class="btn btn-danger fw-bold px-4 shadow-sm d-flex align-items-center gap-1 py-2" onclick="procesarAccionMasivaSolicitudes(false)">
+                    <i class="bi bi-x-circle-fill"></i> Rebotar Selección
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalNotificacionPremium" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm" style="max-width: 400px;">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <div class="px-4 py-3 border-0 d-flex align-items-center gap-3 text-white" id="notifPremiumHeader" style="background: linear-gradient(135deg, #d97706, #b45309);">
+                <i id="notifPremiumIcon" class="bi bi-exclamation-triangle-fill fs-4"></i>
+                <h5 class="modal-title fw-bold mb-0" id="notifPremiumTitulo">Aviso del Sistema</h5>
+            </div>
+            <div class="modal-body p-4 bg-white">
+                <p class="mb-0 fw-medium text-secondary text-start" id="notifPremiumMensaje" style="font-size:0.92rem; line-height:1.5;"></p>
+            </div>
+            <div class="modal-footer bg-light border-0 px-4 py-2.5">
+                <button type="button" class="btn btn-dark btn-sm rounded-3 fw-bold px-4 shadow-sm border-0" data-bs-dismiss="modal">Entendido</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalConfirmacionPremium" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 450px;">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <div class="bg-dark text-white px-4 py-3 border-0 d-flex align-items-center gap-3">
+                <i class="bi bi-question-circle-fill text-warning fs-4"></i>
+                <h5 class="modal-title fw-bold mb-0" id="confirmPremiumTitulo">¿Confirmar Acción?</h5>
+            </div>
+            <div class="modal-body p-4 bg-white text-start">
+                <p class="mb-0 fw-bold text-dark fs-6" id="confirmPremiumMensaje"></p>
+                <small class="text-muted d-block mt-2">Esta acción impactará directamente los registros contables de la pre-nómina en planta.</small>
+            </div>
+            <div class="modal-footer bg-light border-0 px-4 py-3 d-flex justify-content-end gap-2">
+                <button type="button" class="btn btn-light border btn-sm fw-bold px-3 rounded-3" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-warning btn-sm fw-bold px-4 rounded-3 shadow-sm text-dark" onclick="aceptarConfirmacionPremium()">Sí, Procesar <i class="bi bi-chevron-right ms-1"></i></button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalRechazoMasivoSolicitudes" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <div class="modal-header text-white px-4 py-3 border-0" style="background: linear-gradient(135deg, #002f6c, #004b93);">
+                <h5 class="modal-title fw-bold d-flex align-items-center gap-2">
+                    <i class="bi bi-exclamation-octagon-fill text-white fs-4"></i> Rechazo Masivo de Solicitudes
+                </h5>
+                <button type="button" class="btn-close btn-close-white shadow-none" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body bg-light bg-opacity-25 p-4">
+                <div class="alert alert-warning py-2 small border-0 shadow-sm rounded-3 mb-3">
+                    <i class="bi bi-info-circle-fill me-1"></i> El comentario ingresado se asignará de forma automática a todas las solicitudes seleccionadas.
+                </div>
+                <div class="mb-2">
+                    <label class="form-label text-dark fw-bold small mb-2"><i class="bi bi-chat-left-text-fill text-muted me-1"></i>Justificación General Obligatoria de Auditoría</label>
+                    <textarea class="form-control bg-white shadow-sm border border-secondary border-opacity-25 rounded-3 p-2.5" id="comentarioRechazoMasivoInput" rows="3" required placeholder="Escribe el motivo detallado del rechazo masivo..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer bg-light border-0 px-4 py-3">
+                <button type="button" class="btn btn-light border fw-bold px-3 rounded-3" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger fw-bold px-4 rounded-3 shadow-sm border-0" style="background-color:#dc2626;" onclick="confirmarRechazoMasivoSolicitudes()">Confirmar Rechazo Masivo</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalDetalleAusencias" tabindex="-1" aria-labelledby="modalTituloFecha" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <div class="modal-header text-white px-4 py-3 border-0" style="background: linear-gradient(135deg, #1e293b, #0f172a);">
+                <h5 class="modal-title fw-bold d-flex align-items-center gap-2" id="modalTituloFecha">
+                    <i class="bi bi-people-fill text-warning fs-4"></i> Personal Fuera de Línea
+                </h5>
+                <button type="button" class="btn-close btn-close-white shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="bg-light px-4 py-3 border-bottom d-flex align-items-center justify-content-between">
+                    <div>
+                        <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.7rem; letter-spacing: 0.5px;">Estatus General</small>
+                        <span class="badge bg-success bg-opacity-10 text-success border border-success px-2.5 py-1 rounded-pill fw-bold small mt-1">
+                            <i class="bi bi-shield-check me-1"></i> Validado en Planta
+                        </span>
+                    </div>
+                    <div class="text-end">
+                        <small class="text-muted text-uppercase fw-bold d-block" style="font-size: 0.7rem; letter-spacing: 0.5px;">Día Operativo</small>
+                        <span id="textFechaDetalleModal" class="fw-bold text-dark small mt-1 d-block">-</span>
+                    </div>
+                </div>
+                <div style="max-height: 325px; overflow-y: auto;" class="p-4 bg-white">
+                    <ul class="list-group list-group-flush rounded-3 border shadow-sm" id="listaAusentesContenedor"></ul>
+                </div>
+            </div>
+            <div class="modal-footer bg-light border-0 px-4 py-3">
+                <button type="button" class="btn btn-secondary rounded-3 px-4 fw-bold shadow-sm border-0" data-bs-dismiss="modal" style="background-color:#475569;">Entendido</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalRechazo" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <form th:action="@{/jefe/permisos/responder}" method="post">
+                <div class="modal-header text-white px-4 py-3 border-0" style="background: linear-gradient(135deg, #dc2626, #991b1b);">
+                    <h5 class="modal-title fw-bold d-flex align-items-center gap-2">
+                        <i class="bi bi-exclamation-octagon-fill text-white fs-4"></i> Rechazar Solicitud
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white shadow-none" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body bg-light bg-opacity-25 p-4">
+                    <input type="hidden" name="idSolicitud" id="overrideIdSolicitud2" />
+                    <input type="hidden" name="aprobado" value="false" />
+                    <input type="hidden" name="nominaJefe" th:value="${jefe.nomina}" />
+
+                    <div class="mb-2">
+                        <label class="form-label text-dark fw-bold small mb-2"><i class="bi bi-card-checklist text-muted me-1"></i>Motivo de Rechazo Estandarizado</label>
+                        <select class="form-select bg-white fw-bold text-dark shadow-sm border border-secondary border-opacity-25" name="comentarioRechazo" required>
+                            <option value="" disabled selected>-- Elige el motivo oficial de RH --</option>
+                            <option th:each="motivo : ${motivosRechazo}"
+                                    th:value="${motivo.descripcion}"
+                                    th:text="${motivo.codigo} + ' - ' + ${motivo.descripcion}">
+                            </option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light border-0 px-4 py-3">
+                    <button type="button" class="btn btn-light border fw-bold px-3 rounded-3" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-danger fw-bold px-4 rounded-3 shadow-sm border-0" style="background-color:#dc2626;">Confirmar Rechazo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalRecuperacion" tabindex="-1" aria-labelledby="modalRecuperacionLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <div class="modal-header text-white px-4 py-3 border-0" style="background: linear-gradient(135deg, #002f6c, #004b93);">
+                <h5 class="modal-title fw-bold d-flex align-items-center gap-2">
+                    <i class="bi bi-arrow-counterclockwise text-warning fs-4"></i> Registrar Recuperación Extraordinaria
+                </h5>
+                <button type="button" class="btn-close btn-close-white shadow-none" data-bs-dismiss="modal"></button>
+            </div>
+            <form th:action="@{/jefe/permisos/solicitar-recuperacion}" method="post">
+                <div class="modal-body bg-light bg-opacity-25 p-4">
+                    <input type="hidden" name="nominaJefe" th:value="${jefe.nomina}" />
+                    <input type="hidden" name="nominaEmpleado" id="recupNominaEmpleado" />
+
+                    <div class="mb-3">
+                        <label class="form-label text-dark fw-bold small mb-1">Colaborador Seleccionado</label>
+                        <div class="input-group shadow-sm rounded-3 overflow-hidden">
+                            <span class="input-group-text bg-white text-muted border-end-0"><i class="bi bi-person-badge"></i></span>
+                            <input type="text" class="form-control bg-white fw-bold text-dark border-start-0" id="recupNombreEmpleado" readonly style="cursor: not-allowed;">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label text-dark fw-bold small mb-1">Tipo de Incidencia a Justificar</label>
+                        <div class="input-group shadow-sm rounded-3 overflow-hidden">
+                            <span class="input-group-text bg-white text-muted border-end-0"><i class="bi bi-bookmark-star-fill text-primary"></i></span>
+                            <select class="form-select bg-white border-start-0 text-dark fw-bold" name="tipoIncidencia" id="recupTipoIncidencia" required>
+                                <option value="" disabled selected>-- Selecciona Tipo de Permiso --</option>
+                                <option value="TXT">Tiempo por Tiempo (TXT)</option>
+                                <option value="HO">Home Office (HO)</option>
+                                <option value="C">Visita Cliente (Salida de Planta)</option>
+                                <option value="P">Visita Proveedor</option>
+                                <option value="TET">Visita Planta Hermana Tetla (TET)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label text-dark fw-bold small mb-1">Fecha de la Falta / Incidencia</label>
+                        <div class="input-group shadow-sm rounded-3 overflow-hidden">
+                            <span class="input-group-text bg-white text-muted border-end-0"><i class="bi bi-calendar-x text-danger"></i></span>
+                            <input type="date" class="form-control bg-white border-start-0 text-dark fw-medium" name="fechaFalta" id="recupFechaFalta" required />
+                        </div>
+                        <small class="text-danger d-block mt-1 style-mini fw-medium"><i class="bi bi-clock-history"></i> Candado Activo: Fechas restringidas estrictamente a periodos nominales cerrados.</small>
+                    </div>
+
+                    <div class="mb-0">
+                        <label class="form-label text-dark fw-bold small mb-2"><i class="bi bi-journal-text text-muted me-1"></i>Justificación General Obligatoria de Auditoría</label>
+                        <textarea class="form-control shadow-sm bg-white border rounded-3 p-2.5" name="justificacion" id="recupJustificacion" rows="3" required placeholder="Escribe la razón detallada y acuerdos del pago de la falta..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light border-0 px-4 py-3">
+                    <div class="d-flex justify-content-end gap-2 w-100">
+                        <button type="button" class="btn btn-light border fw-bold px-4 rounded-3" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary fw-bold px-4 rounded-3 shadow-sm border-0" style="background-color:#004b93;">Autorizar Envío <i class="bi bi-send-fill ms-1"></i></button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<div class="modal fade" id="modalConfirmacionTxtColectivo" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <div class="modal-header text-white px-4 py-3 border-0" style="background: linear-gradient(135deg, #d97706, #b45309);">
+                <h5 class="modal-title fw-bold d-flex align-items-center gap-2">
+                    <i class="bi bi-ui-checks text-white fs-4"></i> Resumen de Inyección Colectiva
+                </h5>
+                <button type="button" class="btn-close btn-close-white shadow-none" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body bg-light p-4">
+                <div class="alert alert-warning border-0 shadow-sm rounded-3 py-2 small mb-4">
+                    <i class="bi bi-exclamation-triangle-fill me-1"></i> Estás a punto de afectar los saldos contables de múltiples operadores. Verifica los datos antes de inyectar.
+                </div>
+                <div class="row g-4 mb-4">
+                    <div class="col-md-4 text-center border-end">
+                        <p class="text-muted fw-bold small mb-1">Operadores Afectados</p>
+                        <p class="mb-0 fw-bold display-6 text-dark" id="resumenOperadoresTxt">0</p>
+                    </div>
+                    <div class="col-md-4 text-center border-end">
+                        <p class="text-muted fw-bold small mb-1">Fechas de Paro</p>
+                        <p class="mb-0 fw-bold fs-4 text-danger" id="resumenDiasParoTxt">-</p>
+                    </div>
+                    <div class="col-md-4 text-center">
+                        <p class="text-muted fw-bold small mb-1">Fechas de Pago</p>
+                        <div id="resumenFechasPagoTxt" class="mb-0 small fw-medium text-success d-flex flex-column align-items-center"></div>
+                    </div>
+                </div>
+                <div class="mb-0 bg-white p-3 rounded-3 shadow-sm border">
+                    <label class="form-label fw-bold text-dark small mb-2"><i class="bi bi-chat-left-text-fill text-muted me-1"></i>Paso 5: Justificación Obligatoria de Planta</label>
+                    <textarea class="form-control bg-light shadow-sm border-secondary border-opacity-25 rounded-3 p-2.5" id="txtColJustificacionModal" rows="3" required placeholder="Describe detalladamente el motivo de la afectación o paro de línea..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer bg-white border-0 px-4 py-3">
+                <button type="button" class="btn btn-light border fw-bold px-4 rounded-3" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-warning fw-bold px-4 rounded-3 shadow-sm border-0 text-dark" onclick="enviarLoteTxtAlBackend()">
+                    <i class="bi bi-database-fill-check me-1"></i> Confirmar Inyección Masiva
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalLoader" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 bg-transparent shadow-none">
+            <div class="modal-body text-center">
+                <div class="spinner-border text-warning" style="width: 4rem; height: 4rem;" role="status">
+                    <span class="visually-hidden">Procesando...</span>
+                </div>
+                <h5 class="mt-3 fw-bold text-white text-shadow">Procesando Lote TXT...</h5>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
+
+<script th:inline="javascript">
+    const TURNOS_MASTER = /*[[${listaTurnosMaster != null ? listaTurnosMaster : '[]'}]]*/ [];
+</script>
+
+<script th:inline="javascript">
+    function mostrarNotificacionPremium(titulo, mensaje, tipo = 'warning') {
+        const iconEl = document.getElementById('notifPremiumIcon');
+        const headerEl = document.getElementById('notifPremiumHeader');
+        const tituloEl = document.getElementById('notifPremiumTitulo');
+        const mensajeEl = document.getElementById('notifPremiumMensaje');
+
+        tituloEl.innerText = titulo;
+        mensajeEl.innerText = mensaje;
+
+        if (tipo === 'danger' || tipo === 'error') {
+            headerEl.style.background = 'linear-gradient(135deg, #dc2626, #991b1b)';
+            iconEl.className = 'bi bi-exclamation-octagon-fill text-white fs-4';
+        } else if (tipo === 'success') {
+            headerEl.style.background = 'linear-gradient(135deg, #15803d, #166534)';
+            iconEl.className = 'bi bi-check-circle-fill text-white fs-4';
+        } else {
+            headerEl.style.background = 'linear-gradient(135deg, #d97706, #b45309)';
+            iconEl.className = 'bi bi-exclamation-triangle-fill text-white fs-4';
+        }
+
+        // 🎯 FIX: Usar getOrCreateInstance evita que se dupliquen fondos grises en memoria
+        const modalEl = document.getElementById('modalNotificacionPremium');
+        const m = bootstrap.Modal.getOrCreateInstance(modalEl);
+        m.show();
+    }
+
+    let accionConfirmacionPendiente = null;
+    function mostrarConfirmacionPremium(titulo, mensaje, callback) {
+        document.getElementById('confirmPremiumTitulo').innerText = titulo;
+        document.getElementById('confirmPremiumMensaje').innerText = mensaje;
+        accionConfirmacionPendiente = callback;
+
+        // 🎯 FIX: Usar getOrCreateInstance aquí también
+        const modalEl = document.getElementById('modalConfirmacionPremium');
+        const m = bootstrap.Modal.getOrCreateInstance(modalEl);
+        m.show();
+    }
+
+    function aceptarConfirmacionPremium() {
+        const modalEl = document.getElementById('modalConfirmacionPremium');
+        const modalInstance = bootstrap.Modal.getInstance(modalEl);
+        if (modalInstance) modalInstance.hide();
+        if (accionConfirmacionPendiente) accionConfirmacionPendiente();
+    }
+
+    // 🛡️ PARCHE GLOBAL ANTI-CONGELAMIENTO (PANTALLA GRIS DE LA MUERTE)
+    // Este basurero maestro escucha cada vez que CUALQUIER modal de la página se cierra.
+    document.addEventListener('hidden.bs.modal', function () {
+        if (document.querySelectorAll('.modal.show').length > 0) {
+            // Si todavía hay otro modal abierto abajo, le devolvemos el scroll al body
+            document.body.classList.add('modal-open');
+        } else {
+            // Si ya no hay modales vivos, barremos y aniquilamos cualquier backdrop fantasma del DOM
+            document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+            document.body.classList.remove('modal-open');
+            document.body.style.overflow = '';
+            document.body.style.paddingRight = '';
+        }
+    });
+</script>
+
+<script th:inline="javascript">
+    document.addEventListener("DOMContentLoaded", function() {
+        const buscador = document.getElementById('buscadorPlantilla');
+        const itemsEmpleado = document.querySelectorAll('.item-empleado');
+        const contadorBadge = document.getElementById('contadorPlantilla');
+
+        if (buscador) {
+            buscador.addEventListener('input', function(e) {
+                const termino = e.target.value.toLowerCase().trim();
+                let visibles = 0;
+
+                itemsEmpleado.forEach(item => {
+                    const nombre = item.querySelector('.nombre-empleado')?.textContent.toLowerCase() || '';
+                    const nomina = item.querySelector('.nomina-empleado')?.textContent.toLowerCase() || '';
+                    const puesto = item.querySelector('.puesto-empleado')?.textContent.toLowerCase() || '';
+                    const cc = item.querySelector('.cc-empleado')?.textContent.toLowerCase() || '';
+                    const wc = item.querySelector('.wc-empleado')?.textContent.toLowerCase() || '';
+
+                    if (nombre.includes(termino) || nomina.includes(termino) || puesto.includes(termino) || cc.includes(termino) || wc.includes(termino)) {
+                        item.classList.remove('d-none');
+                        item.classList.add('d-flex');
+                        visibles++;
+                    } else {
+                        item.classList.remove('d-flex');
+                        item.classList.add('d-none');
+                    }
+                });
+                if (contadorBadge) contadorBadge.textContent = visibles;
+            });
+        }
+
+        var calendarEl = document.getElementById('calendarViewJefe');
+        var nominaJefe = /*[[${jefe.nomina}]]*/ 0;
+
+        if(calendarEl) {
+            var calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                locale: 'es',
+                firstDay: 1,
+                contentHeight: 650,
+                dayMaxEvents: true,
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,dayGridWeek'
+                },
+                buttonText: { today: 'Hoy', month: 'Mes', week: 'Semana' },
+                events: '/jefe/api/calendario-permisos-eventos?nomina=' + nominaJefe,
+
+                eventClick: function(info) {
+                    var props = info.event.extendedProps;
+                    if (props.tipo === 'FERIADO') return;
+
+                    var fechaFormateada = info.event.start.toLocaleDateString('es-MX', {
+                        day: 'numeric', month: 'short', year: 'numeric'
+                    });
+
+                    document.getElementById('modalTituloFecha').innerHTML = `
+                        <i class="bi bi-people-fill text-warning me-2"></i> ${info.event.title}
+                    `;
+                    document.getElementById('textFechaDetalleModal').innerText = fechaFormateada;
+
+                    var contenedorLista = document.getElementById('listaAusentesContenedor');
+                    contenedorLista.innerHTML = '';
+
+                    props.empleados.forEach(function(emp) {
+                        var iniciales = emp.nombre ? emp.nombre.substring(0, 2).toUpperCase() : "OP";
+                        var li = document.createElement('li');
+                        li.className = "list-group-item d-flex justify-content-between align-items-center px-3 py-2.5 border-bottom bg-white";
+                        li.innerHTML = `
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="rounded-circle bg-secondary bg-opacity-10 text-dark d-flex align-items-center justify-content-center fw-bold border border-2 border-white shadow-sm" style="width:38px; height:38px; font-size:0.85rem;">
+                                    ${iniciales}
+                                </div>
+                                <div>
+                                    <span class="fw-bold text-dark d-block small">${emp.nombre}</span>
+                                    <small class="text-muted font-monospace" style="font-size: 0.75rem;">#${emp.nomina}</small>
+                                </div>
+                            </div>
+                            <span class="badge bg-secondary bg-opacity-10 text-secondary border rounded-pill px-2.5 py-1 small fw-bold">WC ${emp.wc}</span>
+                        `;
+                        contenedorLista.appendChild(li);
+                    });
+
+                    var miModal = new bootstrap.Modal(document.getElementById('modalDetalleAusencias'));
+                    miModal.show();
+                }
+            });
+            calendar.render();
+
+            var tabEl = document.querySelector('#pills-calendario-tab');
+            if (tabEl) {
+                tabEl.addEventListener('shown.bs.tab', function () { calendar.render(); });
+            }
+        }
+    });
+
+    function ordenarPlantillaLista() {
+        const criterio = document.getElementById("selectorOrdenamiento").value;
+        const direccion = document.getElementById("selectorDireccion").value;
+        const listaContenedor = document.getElementById("listaPlantilla");
+
+        const items = Array.from(listaContenedor.querySelectorAll('.item-empleado'));
+        const esAsc = (direccion === "asc");
+
+        items.sort((itemA, itemB) => {
+            let valA, valB;
+
+            if (criterio === "nomina") {
+                valA = parseInt(itemA.querySelector(".nomina-empleado")?.innerText.replace(/[^0-9]/g, '')) || 0;
+                valB = parseInt(itemB.querySelector(".nomina-empleado")?.innerText.replace(/[^0-9]/g, '')) || 0;
+                return esAsc ? (valA - valB) : (valB - valA);
+            }
+            else if (criterio === "puesto") {
+                valA = itemA.querySelector(".puesto-empleado")?.innerText.trim().toLowerCase() || '';
+                valB = itemB.querySelector(".puesto-empleado")?.innerText.trim().toLowerCase() || '';
+                return esAsc ? valA.localeCompare(valB, 'es', { sensitivity: 'base' }) : valB.localeCompare(valA, 'es', { sensitivity: 'base' });
+            }
+            else if (criterio === "cc") {
+                let textA = itemA.querySelector(".cc-empleado")?.innerText || '';
+                let textB = itemB.querySelector(".cc-empleado")?.innerText || '';
+                valA = parseInt(textA.replace(/[^0-9]/g, '')) || 0;
+                valB = parseInt(textB.replace(/[^0-9]/g, '')) || 0;
+                if (valA === 0 && valB === 0) return esAsc ? textA.localeCompare(textB) : textB.localeCompare(textA);
+                return esAsc ? (valA - valB) : (valB - valA);
+            }
+            else if (criterio === "wc") {
+                let textA = itemA.querySelector(".wc-empleado")?.innerText || '';
+                let textB = itemB.querySelector(".wc-empleado")?.innerText || '';
+                valA = parseInt(textA.replace(/[^0-9]/g, '')) || 0;
+                valB = parseInt(textB.replace(/[^0-9]/g, '')) || 0;
+                if (valA === 0 && valB === 0) return esAsc ? textA.localeCompare(textB) : textB.localeCompare(textA);
+                return esAsc ? (valA - valB) : (valB - valA);
+            }
+            else if (criterio === "antiguedad") {
+                let dateStrA = itemA.querySelector(".antiguedad-date-val")?.innerText.trim() || '01/01/2000';
+                let dateStrB = itemB.querySelector(".antiguedad-date-val")?.innerText.trim() || '01/01/2000';
+                let partsA = dateStrA.split('/');
+                let partsB = dateStrB.split('/');
+                valA = new Date(partsA[2], partsA[1] - 1, partsA[0]).getTime() || 0;
+                valB = new Date(partsB[2], partsB[1] - 1, partsB[0]).getTime() || 0;
+                return esAsc ? (valA - valB) : (valB - valA);
+            }
+            return 0;
+        });
+
+        items.forEach(item => listaContenedor.appendChild(item));
+    }
+
+    function abrirModalRechazo(idSolicitud) {
+        document.getElementById('overrideIdSolicitud2').value = idSolicitud;
+        new bootstrap.Modal(document.getElementById('modalRechazo')).show();
+    }
+
+    function abrirModalRecuperacion(nomina, nombreCompleto) {
+        document.getElementById('recupNominaEmpleado').value = nomina;
+        document.getElementById('recupNombreEmpleado').value = "#" + nomina + " - " + nombreCompleto;
+
+        document.getElementById('recupTipoIncidencia').value = "";
+        const fechaInput = document.getElementById('recupFechaFalta');
+        fechaInput.value = "";
+        document.getElementById('recupJustificacion').value = "";
+
+        const ahora = new Date();
+        const diaSemana = ahora.getDay();
+        const horaActual = ahora.getHours();
+        let diasResta = 7;
+
+        if (diaSemana === 0) {
+            diasResta = 7;
+        } else if (diaSemana === 1) {
+            diasResta = 8;
+        } else if (diaSemana === 2) {
+            diasResta = (horaActual < 16) ? 9 : 2;
+        } else if (diaSemana > 2) {
+            diasResta = diaSemana;
+        }
+
+        const closedSunday = new Date(ahora);
+        closedSunday.setDate(ahora.getDate() - diasResta);
+
+        fechaInput.max = closedSunday.toISOString().split('T')[0];
+
+        new bootstrap.Modal(document.getElementById('modalRecuperacion')).show();
+    }
+</script>
+
+<script th:inline="javascript">
+    function toggleAllSolicitudesCheck(source) {
+        document.querySelectorAll('.check-solicitud-masiva').forEach(cb => cb.checked = source.checked);
+        evaluarChecksSolicitudes();
+    }
+
+    function evaluarChecksSolicitudes() {
+        const checkedBoxes = document.querySelectorAll('.check-solicitud-masiva:checked');
+        const totalMarcados = checkedBoxes.length;
+
+        const barra = document.getElementById('barraAccionesMasivasSolicitudes');
+        const badge = document.getElementById('badgeContadorMasivoSolicitudes');
+
+        if (badge) badge.innerText = totalMarcados;
+
+        if (barra) {
+            if (totalMarcados > 0) {
+                barra.classList.remove('d-none');
+            } else {
+                barra.classList.add('d-none');
+                const masterCheck = document.getElementById('masterCheckSolicitudes');
+                if (masterCheck) masterCheck.checked = false;
+            }
+        }
+    }
+
+    function updateSelectedCount() {
+        evaluarChecksSolicitudes();
+    }
+
+    function procesarAccionMasivaSolicitudes(aprobado) {
+        const total = document.querySelectorAll('.check-solicitud-masiva:checked').length;
+        if (aprobado) {
+            mostrarConfirmacionPremium(
+                "Autorización en Bloque",
+                `¿Confirmas la AUTORIZACIÓN MASIVA de las ${total} solicitudes seleccionadas del tablero?`,
+                function() { ejecutarEnvioMasivoSolicitudes(true, null); }
+            );
+        } else {
+            document.getElementById('comentarioRechazoMasivoInput').value = '';
+            new bootstrap.Modal(document.getElementById('modalRechazoMasivoSolicitudes')).show();
+        }
+    }
+
+    function confirmarRechazoMasivoSolicitudes() {
+        const comentario = document.getElementById('comentarioRechazoMasivoInput').value.trim();
+        if (comentario.length < 5) {
+            mostrarNotificacionPremium("Validación de Auditoría", "Describe detalladamente la causa del rechazo masivo (Mínimo 5 caracteres).", "warning");
+            return;
+        }
+
+        const modalEl = document.getElementById('modalRechazoMasivoSolicitudes');
+        const modalInstance = bootstrap.Modal.getInstance(modalEl);
+        if (modalInstance) modalInstance.hide();
+
+        mostrarConfirmacionPremium(
+            "Rechazo en Bloque",
+            "¿Confirmas el RECHAZO MASIVO de todas las solicitudes marcadas?",
+            function() { ejecutarEnvioMasivoSolicitudes(false, comentario); }
+        );
+    }
+
+    function ejecutarEnvioMasivoSolicitudes(aprobado, comentario) {
+        const checkedBoxes = document.querySelectorAll('.check-solicitud-masiva:checked');
+        if (checkedBoxes.length === 0) return;
+
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/jefe/permisos/responder-masivo';
+
+        const inputJefe = document.createElement('input');
+        inputJefe.type = 'hidden';
+        inputJefe.name = 'nominaJefe';
+        inputJefe.value = [[${jefe.nomina}]];
+        form.appendChild(inputJefe);
+
+        const inputAprobado = document.createElement('input');
+        inputAprobado.type = 'hidden';
+        inputAprobado.name = 'aprobado';
+        inputAprobado.value = aprobado;
+        form.appendChild(inputAprobado);
+
+        if (comentario) {
+            const inputComentario = document.createElement('input');
+            inputComentario.type = 'hidden';
+            inputComentario.name = 'comentarioRechazo';
+            inputComentario.value = comentario;
+            form.appendChild(inputComentario);
+        }
+
+        checkedBoxes.forEach(cb => {
+            const inputItem = document.createElement('input');
+            inputItem.type = 'hidden';
+            inputItem.name = 'itemsSeleccionados';
+            inputItem.value = cb.value;
+            form.appendChild(inputItem);
+        });
+
+        document.body.appendChild(form);
+        form.submit();
+    }
+</script>
+
+<script th:inline="javascript">
+    const tbodyParosTXTCol = document.getElementById("tbodyParosTXTCol");
+    const tbodyTXTCol = document.getElementById("tbodyTXTCol");
+    const btnAgregarParoTxtCol = document.getElementById("btnAgregarParoTxtCol");
+    const btnAgregarPagoTxtCol = document.getElementById("btnAgregarPagoTxtCol");
+
+    // Lógica para Fechas de Paro
+    function crearFilaParoTXTCol() {
+        if (!tbodyParosTXTCol) return;
+        if (tbodyParosTXTCol.children.length >= 6) {
+            mostrarNotificacionPremium("Límite Alcanzado", "No puedes ingresar más de 6 fechas de paro (semana operativa) en un solo lote.", "warning");
+            return;
+        }
+
+        let tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td><input type="date" class="form-control form-control-sm border-secondary border-opacity-25 fw-bold input-paro-fecha" required></td>
+            <td class="text-center"><button type="button" class="btn btn-sm btn-link text-danger btn-eliminar-paro-txtcol"><i class="bi bi-trash3-fill"></i></button></td>
+        `;
+
+        tr.querySelector(".btn-eliminar-paro-txtcol").addEventListener("click", function() {
+            tr.remove();
+            if (tbodyParosTXTCol.children.length === 0) crearFilaParoTXTCol();
+        });
+
+        tbodyParosTXTCol.appendChild(tr);
+    }
+
+    if(btnAgregarParoTxtCol) {
+        btnAgregarParoTxtCol.addEventListener("click", crearFilaParoTXTCol);
+        crearFilaParoTXTCol();
+    }
+
+    // Lógica para Fechas de Pago
+    function crearFilaPagoTXTCol() {
+        if (!tbodyTXTCol) return;
+
+        let numeroDeParos = tbodyParosTXTCol.querySelectorAll('.input-paro-fecha').length;
+        let limitePagos = numeroDeParos * 2;
+
+        if (numeroDeParos === 0 || !tbodyParosTXTCol.querySelector('.input-paro-fecha').value) {
+            mostrarNotificacionPremium("Atención", "Primero debes asignar al menos una Fecha de Paro válida.", "warning");
+            return;
+        }
+
+        if (tbodyTXTCol.children.length >= limitePagos) {
+            mostrarNotificacionPremium("Restricción Contable", `El límite de pagos está topado a ${limitePagos} exhibiciones (2 por cada día de paro registrado).`, "warning");
+            return;
+        }
+
+        let tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td><input type="date" class="form-control form-control-sm border-secondary border-opacity-25 fw-bold input-pago-fecha" required></td>
+            <td><input type="number" class="form-control form-control-sm border-secondary border-opacity-25 text-center fw-bold input-pago-horas" step="0.1" min="0.5" max="24" placeholder="Ej: 8.0" required></td>
+            <td class="text-center"><button type="button" class="btn btn-sm btn-link text-danger btn-eliminar-pago-txtcol"><i class="bi bi-trash3-fill"></i></button></td>
+        `;
+
+        tr.querySelector(".btn-eliminar-pago-txtcol").addEventListener("click", function() {
+            tr.remove();
+            if (tbodyTXTCol.children.length === 0) crearFilaPagoTXTCol();
+        });
+
+        tbodyTXTCol.appendChild(tr);
+    }
+
+    if(btnAgregarPagoTxtCol) {
+        btnAgregarPagoTxtCol.addEventListener("click", crearFilaPagoTXTCol);
+    }
+
+    function toggleAllWcTxtCol(source) {
+        document.querySelectorAll('.checkbox-wc-txt-col').forEach(cb => {
+            cb.checked = source.checked;
+        });
+        cargarOperadoresDesdeBackend();
+    }
+
+    function cargarOperadoresDesdeBackend() {
+        const checkboxesWc = document.querySelectorAll('.checkbox-wc-txt-col:checked');
+        const selectedWcs = Array.from(checkboxesWc).map(cb => cb.value);
+
+        const body = document.getElementById('bodyTxtColInyeccion');
+        const box = document.getElementById('boxTablaTxtCol');
+        const btnSubmit = document.getElementById('btnSubmitTxtCol');
+        const wrapper = document.getElementById('wrapperAsignadorTurnoTxt');
+
+        if (selectedWcs.length === 0) {
+            body.innerHTML = "";
+            box.classList.add('d-none');
+            btnSubmit.classList.add('d-none');
+            wrapper.classList.add('d-none');
+            document.getElementById('masterCheckWcTxtCol').checked = false;
+            return;
+        }
+
+        const wcParam = selectedWcs.join(',');
+
+        // Seguimos mandando la fecha real si es que ya llenaron el Paso 2
+        // Si aún no llenan fechas (están en el Paso 1), mandamos la dummy para cargar la tabla
+        const inputsParo = Array.from(tbodyParosTXTCol.querySelectorAll('.input-paro-fecha')).map(i => i.value);
+        const fechaFaltaPivote = inputsParo.find(f => f !== '') || new Date().toISOString().split('T')[0];
+
+        fetch(`/api/permisos/colectivo/cargar-operadores?workCenterIds=${wcParam}&fechaParo=${fechaFaltaPivote}`)
+            .then(res => res.json())
+            .then(data => {
+                // 🎯 NUEVO FLUJO: Verificamos si el backend mandó una advertencia (Soft Warning)
+                if (data.advertencia) {
+                    mostrarNotificacionPremium("Información de Planta", data.advertencia, "warning");
+                }
+
+                body.innerHTML = "";
+
+                // La lista real viene ahora dentro de data.operadores
+                const operadores = data.operadores || [];
+
+                operadores.forEach(op => {
+                    let selectOpciones = '';
+                    TURNOS_MASTER.forEach(turno => {
+                        if (turno.activo) {
+                            let seleccionado = (op.turnoDefault === turno.nombreTurno) ? 'selected' : '';
+                            selectOpciones += `<option value="${turno.nombreTurno}" ${seleccionado}>${turno.nombreTurno} (${turno.horasJornada} hrs)</option>`;
+                        }
+                    });
+
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td class="text-center align-middle bg-white">
+                            <input class="form-check-input check-row-txtcol fs-5 shadow-sm border-secondary" type="checkbox" value="${op.nomina}" checked onclick="evaluarChecksTxtCol()">
+                        </td>
+                        <td class="fw-bold font-monospace text-secondary align-middle bg-white">#${op.nomina}</td>
+                        <td class="fw-medium text-dark align-middle bg-white">${op.nombre}</td>
+                        <td class="fw-medium text-dark align-middle bg-white"><span class="badge bg-light text-dark border">WC ${op.wc || wcParam}</span></td>
+                        <td class="bg-warning bg-opacity-10 border-start border-warning p-2">
+                            <select class="form-select form-select-sm select-turno-txtcol fw-bold text-dark border-secondary shadow-sm" id="turno-txt-${op.nomina}">
+                                ${selectOpciones}
+                            </select>
+                        </td>
+                    `;
+                    body.appendChild(row);
+                });
+
+                if (operadores.length > 0) {
+                    box.classList.remove('d-none');
+                    btnSubmit.classList.remove('d-none');
+                    wrapper.classList.remove('d-none');
+                    document.getElementById('masterCheckTxtCol').checked = true;
+                    evaluarChecksTxtCol();
+                }
+            })
+            .catch(err => {
+                mostrarNotificacionPremium("Carga Fallida", "Error al procesar: " + err.message, "danger");
+                document.querySelectorAll('.checkbox-wc-txt-col').forEach(cb => cb.checked = false);
+                document.getElementById('masterCheckWcTxtCol').checked = false;
+            });
+    }
+
+    function toggleAllTxtColCheck(source) {
+        document.querySelectorAll('.check-row-txtcol').forEach(cb => cb.checked = source.checked);
+        evaluarChecksTxtCol();
+    }
+
+    function evaluarChecksTxtCol() {
+        const marcados = document.querySelectorAll('.check-row-txtcol:checked').length;
+        document.getElementById('badgeSeleccionadosTxtCol').innerText = marcados;
+
+        document.querySelectorAll('.check-row-txtcol').forEach(cb => {
+            const tr = cb.closest('tr');
+            const sel = tr.querySelector('.select-turno-txtcol');
+            if (sel) sel.disabled = !cb.checked;
+
+            if(!cb.checked) {
+                tr.querySelectorAll('td').forEach(td => td.classList.add('opacity-50'));
+            } else {
+                tr.querySelectorAll('td').forEach(td => td.classList.remove('opacity-50'));
+            }
+        });
+    }
+
+    function aplicarTurnoMasivoTxt() {
+        const turnoElegido = document.getElementById('selectorTurnoMasivoTxt').value;
+        if (!turnoElegido) return;
+
+        document.querySelectorAll('.check-row-txtcol:checked').forEach(cb => {
+            const selectFila = document.getElementById(`turno-txt-${cb.value}`);
+            if (selectFila) selectFila.value = turnoElegido;
+        });
+    }
+
+    function prepararResumenTxtCol() {
+        const marcados = document.querySelectorAll('.check-row-txtcol:checked');
+        if (marcados.length === 0) {
+            mostrarNotificacionPremium("Operadores Requeridos", "Debes tener al menos a un colaborador marcado en la tabla para procesar.", "warning");
+            return;
+        }
+
+        const inputsParo = Array.from(tbodyParosTXTCol.querySelectorAll('.input-paro-fecha')).filter(i => i.value !== '');
+        if (inputsParo.length === 0) {
+            mostrarNotificacionPremium("Faltan Fechas", "Asegúrate de ingresar al menos una Fecha de Paro válida.", "warning");
+            return;
+        }
+
+        const inputsFechaPago = tbodyTXTCol.querySelectorAll(".input-pago-fecha");
+        const inputsHorasPago = tbodyTXTCol.querySelectorAll(".input-pago-horas");
+        let pagosValidos = true;
+        let fechasPagoHTML = '';
+
+        for (let i = 0; i < inputsFechaPago.length; i++) {
+            if (!inputsFechaPago[i].value || !inputsHorasPago[i].value) { pagosValidos = false; break; }
+            fechasPagoHTML += `<li><i class="bi bi-calendar-check me-1"></i> ${inputsFechaPago[i].value} <span class="badge bg-secondary ms-1">${inputsHorasPago[i].value} hrs</span></li>`;
+        }
+
+        if(!pagosValidos || inputsFechaPago.length === 0) {
+            mostrarNotificacionPremium("Desglose Incompleto", "Completa todas las fechas y horas en el desglose de pagos.", "warning");
+            return;
+        }
+
+        // Llenar Modal
+        document.getElementById('resumenOperadoresTxt').innerText = marcados.length;
+        document.getElementById('resumenDiasParoTxt').innerHTML = inputsParo.map(i => `<span class="d-block" style="font-size:0.9rem;">${i.value}</span>`).join('');
+        document.getElementById('resumenFechasPagoTxt').innerHTML = fechasPagoHTML;
+
+        // Limpiar justificacion previa
+        document.getElementById('txtColJustificacionModal').value = "";
+
+        new bootstrap.Modal(document.getElementById('modalConfirmacionTxtColectivo')).show();
+    }
+
+    function enviarLoteTxtAlBackend() {
+        const justificacionField = document.getElementById('txtColJustificacionModal');
+        const justificacion = justificacionField ? justificacionField.value.trim() : "";
+
+        // 🎯 FIX: Si falta la justificación, cerramos primero el modal de resumen de golpe
+        // para que la alerta Premium nazca limpia, libre y al frente de la pantalla
+        if (justificacion.length < 5) {
+            const modalResumenEl = document.getElementById('modalConfirmacionTxtColectivo');
+            const modalResumenInstance = bootstrap.Modal.getInstance(modalResumenEl);
+            if (modalResumenInstance) {
+                modalResumenInstance.hide();
+            }
+
+            // Retardamos 200ms la alerta para darle tiempo a Bootstrap de limpiar el DOM y que no se pasme
+            setTimeout(() => {
+                mostrarNotificacionPremium(
+                    "Justificación Corta",
+                    "Describe detalladamente la causa del paro de línea (Mínimo 5 letras).",
+                    "warning"
+                );
+            }, 200);
+            return;
+        }
+
+        const marcados = document.querySelectorAll('.check-row-txtcol:checked');
+        const fechasParo = Array.from(tbodyParosTXTCol.querySelectorAll('.input-paro-fecha')).map(i => i.value).filter(val => val !== '');
+
+        const desgloses = [];
+        const inputsFechaPago = tbodyTXTCol.querySelectorAll(".input-pago-fecha");
+        const inputsHorasPago = tbodyTXTCol.querySelectorAll(".input-pago-horas");
+
+        for (let i = 0; i < inputsFechaPago.length; i++) {
+            desgloses.push({
+                fechaPago: inputsFechaPago[i].value,
+                horasPago: parseFloat(inputsHorasPago[i].value)
+            });
+        }
+
+        const payloadLote = [];
+        marcados.forEach(cb => {
+            const nomina = cb.value;
+            const turno = document.getElementById(`turno-txt-${nomina}`).value;
+
+            payloadLote.push({
+                empleadoNomina: parseInt(nomina),
+                codigoPermiso: "TXT",
+                fechaIncidencia: fechasParo[0],
+                fechasIncidencia: fechasParo,
+                justificacionSupervisor: justificacion,
+                nombreTurno: turno,
+                desglosesPago: desgloses
+            });
+        });
+
+        // Ocultar modal actual y mostrar loader definitivo de procesamiento
+        const modalResumenEl = document.getElementById('modalConfirmacionTxtColectivo');
+        const modalResumenInstance = bootstrap.Modal.getInstance(modalResumenEl);
+        if (modalResumenInstance) modalResumenInstance.hide();
+
+        const loader = new bootstrap.Modal(document.getElementById('modalLoader'));
+        loader.show();
+
+        fetch('/api/permisos/colectivo/guardar-lote', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payloadLote)
+        })
+        .then(res => res.json())
+        .then(data => {
+            loader.hide();
+            mostrarNotificacionPremium("Lote Procesado", data.message || "Guardado Correctamente", "success");
+            setTimeout(() => { window.location.reload(); }, 2000);
+        })
+        .catch(err => {
+            loader.hide();
+            mostrarNotificacionPremium("Error de Red", "Fallo de comunicación con el servidor central: " + err, "danger");
+        });
+    }
+</script>
+
+</body>
+</html>

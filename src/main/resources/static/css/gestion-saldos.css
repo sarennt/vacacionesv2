@@ -1,0 +1,105 @@
+/* =================================================================
+   ESTILOS EXCLUSIVOS: PANTALLA DE AJUSTE DE SALDOS (AUDITORÍA)
+   ================================================================= */
+:root {
+    --primary-color: #002f6c;
+    --secondary-color: #004491;
+    --bg-color: #f8f9fa;
+    --surface-color: #ffffff;
+    --text-primary: #191c1d;
+    --text-secondary: #434750;
+    --success-bg: #e8f5e9;
+    --success-text: #1b5e20;
+    --danger-bg: #ffebee;
+    --danger-text: #c62828;
+}
+
+body {
+    background-color: var(--bg-color);
+    font-family: 'Inter', sans-serif;
+    color: var(--text-primary);
+}
+
+/* Navbar Superior (Estilo App) */
+.top-navbar {
+    background-color: var(--primary-color);
+    color: white;
+    height: 64px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+/* Tarjetas (Cards) Modernas */
+.custom-card {
+    background-color: var(--surface-color);
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+/* Banner superior en el perfil del empleado */
+.profile-banner {
+    height: 100px;
+    background: linear-gradient(to right, var(--primary-color), var(--secondary-color));
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+}
+
+/* Ícono de Perfil Flotante */
+.profile-avatar {
+    width: 80px;
+    height: 80px;
+    background-color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: -40px auto 16px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    color: var(--primary-color);
+}
+
+/* Caja de Saldo Gigante */
+.balance-box {
+    background-color: #f0f4f8;
+    border: 1px solid #dce4ec;
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+}
+
+.balance-number {
+    font-size: 4rem;
+    font-weight: 700;
+    color: var(--primary-color);
+    line-height: 1;
+}
+
+/* Estilos de la Tabla de Auditoría */
+.audit-table th {
+    background-color: #f1f3f5;
+    color: var(--text-secondary);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+}
+
+/* Badges (Etiquetas) de días sumados o restados */
+.badge-positive {
+    background-color: var(--success-bg);
+    color: var(--success-text);
+    font-weight: bold;
+    padding: 5px 12px;
+    border-radius: 6px;
+    display: inline-block;
+    min-width: 45px;
+}
+
+.badge-negative {
+    background-color: var(--danger-bg);
+    color: var(--danger-text);
+    font-weight: bold;
+    padding: 5px 12px;
+    border-radius: 6px;
+    display: inline-block;
+    min-width: 45px;
+}

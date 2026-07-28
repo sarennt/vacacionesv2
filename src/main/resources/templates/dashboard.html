@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Dashboard del Colaborador - Sistema de Vacaciones</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link class="rtl" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+
+    <link rel="stylesheet" th:href="@{/css/estilos-grammer.css}">
+</head>
+<body class="bg-light pb-5">
+<div th:replace="~{fragments/navbar :: menuPlanta}"></div>
+
+<div style="height: 30px;"></div>
+
+<main class="container mx-auto px-3">
+    <div class="row g-4">
+
+        <div class="col-lg-4">
+            <div class="custom-card shadow-sm border overflow-hidden mb-4 bg-white rounded-3">
+                <div class="profile-banner bg-corporativo" style="height: 90px; background: linear-gradient(135deg, #002f6c 0%, #004b93 100%);"></div>
+
+                <div class="px-4 pb-4 text-center" style="margin-top: -45px;">
+                    <div class="bg-white shadow-sm rounded-circle d-flex align-items-center justify-content-center border mx-auto" style="width: 90px; height: 90px; z-index: 5; position: relative;">
+                        <i class="bi bi-person-circle text-secondary" style="font-size: 56px; line-height: 1;"></i>
+                    </div>
+                    <h3 class="h4 fw-bold mb-1 text-dark mt-2" th:text="${empleado.nombreCompleto}">Nombre del Empleado</h3>
+
+                    <div class="d-flex flex-wrap gap-2 justify-content-center mb-3 align-items-center">
+                        <span class="badge bg-light text-secondary border px-3 py-2 rounded-pill fw-medium">Nómina: <span class="fw-bold text-dark" th:text="${empleado.nomina}">00000</span></span>
+                        <span class="badge border px-3 py-2 rounded-pill text-white bg-primary" th:text="${empleado.tipoEmpleado}">ADMINISTRATIVO</span>
+                        <span th:if="${empleado.estatus == 'ACTIVO' or empleado.estatus == null}" class="badge bg-success px-3 py-2 rounded-pill text-white fw-bold">ACTIVO</span>
+                        <span th:if="${empleado.estatus == 'BAJA'}" class="badge bg-danger px-3 py-2 rounded-pill text-white fw-bold">BAJA</span>
+                    </div>
+
+                    <div class="text-start bg-light p-3 rounded-3 border mb-3" style="font-size: 0.85rem;">
+                        <div class="mb-2 text-muted"><i class="bi bi-briefcase-fill me-2 text-secondary"></i><strong>Puesto:</strong> <span class="text-dark fw-medium" th:text="${empleado.puesto ?: 'N/A'}">Puesto Oficial</span></div>
+                        <div class="mb-2 text-muted"><i class="bi bi-calendar-check-fill me-2 text-secondary"></i><strong>Fecha Ingreso:</strong> <span class="font-monospace fw-bold text-dark" th:text="${empleado.fechaIngreso != null ? #temporals.format(empleado.fechaIngreso, 'dd/MM/yyyy') : 'N/A'}">01/01/2020</span></div>
+                        <div th:if="${empleado.workCenter != null}" class="text-muted"><i class="bi bi-gear-wide-connected me-2 text-secondary"></i><strong>Línea / WC:</strong> <span class="badge bg-dark bg-opacity-10 text-dark font-monospace" th:text="'[' + ${empleado.workCenter.id} + '] ' + ${empleado.workCenter.nombre}">WC 1</span></div>
+                    </div>
+
+                    <div class="balance-box bg-light p-4 rounded-3 border overflow-hidden text-center shadow-sm">
+                        <p class="text-secondary text-uppercase tracking-wider fw-bold mb-1" style="font-size: 0.75rem;">Saldo Acumulado General</p>
+                        <div class="d-flex justify-content-center align-items-baseline gap-1">
+                            <span class="fs-1 th-balance fw-bold" th:classappend="${saldo < 0} ? 'text-danger' : 'text-success'" th:text="${saldo}">0.0</span>
+                            <span class="text-muted fw-bold small">días</span>
+                        </div>
+                        <div class="text-muted border-top pt-2 mt-2" style="font-size: 0.78rem;">
+                            <span>Proporcional del ciclo actual: <strong class="text-info" th:text="${empleado.saldoProporcional != null ? empleado.saldoProporcional : '0.00'}">0.00</strong> días</span>
+                        </div>
+                    </div>
+
+                    <div th:if="${empleado.getSaldoCiclosAnteriores() != null and empleado.getSaldoCiclosAnteriores().doubleValue() > 0}" class="mt-3 p-3 bg-white border text-start rounded-3 shadow-sm" style="border-left: 5px solid #ffc107 !important;">
+                        <p class="text-dark fw-bold mb-2 small"><i class="bi bi-clock-history text-warning me-1"></i> Saldo Pendiente (Atrasado)</p>
+                        <div class="table-responsive mb-2">
+                            <table class="table table-sm table-bordered align-middle text-center mb-0" style="font-size: 0.8rem; min-width: 100%;">
+                                <thead class="table-light text-muted small text-uppercase">
+                                <tr>
+                                    <th class="py-1.5 fw-bold" style="font-size: 0.68rem;">Días de Ciclos Anteriores</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr>
+                                    <td class="bg-light bg-opacity-50 font-monospace fw-bold text-warning py-2 fs-5">
+                                        <span th:text="${empleado.getSaldoCiclosAnteriores()}">0.0</span>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="alert py-2 px-3 border-0 d-flex align-items-center gap-2 mb-0 rounded-3"
+                             th:classappend="${empleado.getFechaLimiteExpiracion() != null and T(java.time.LocalDate).now().isAfter(empleado.getFechaLimiteExpiracion())} ? 'alert-danger bg-danger bg-opacity-10 text-danger' : 'alert-warning bg-warning bg-opacity-15 text-dark'"
+                             style="font-size: 0.76rem; line-height: 1.3;">
+                            <i class="bi" th:classappend="${empleado.getFechaLimiteExpiracion() != null and T(java.time.LocalDate).now().isAfter(empleado.getFechaLimiteExpiracion())} ? 'bi-exclamation-octagon-fill text-danger' : 'bi-clock-fill text-warning'"></i>
+                            <div class="fw-medium">
+                                <span th:if="${empleado.getFechaLimiteExpiracion() != null and !T(java.time.LocalDate).now().isAfter(empleado.getFechaLimiteExpiracion())}">
+                                    Tienes hasta el <strong class="text-dark" th:text="${#temporals.format(empleado.getFechaLimiteExpiracion(), 'dd/MM/yyyy')}">01/01/2026</strong> para tomar tus días atrasados o Dirección de RH los podrá depurar.
+                                </span>
+                                <span th:if="${empleado.getFechaLimiteExpiracion() != null and T(java.time.LocalDate).now().isAfter(empleado.getFechaLimiteExpiracion())}">
+                                    ¡Plazo Expirado! Tu fecha límite fue el <strong th:text="${#temporals.format(empleado.getFechaLimiteExpiracion(), 'dd/MM/yyyy')}">01/01/2026</strong>. Tu saldo atrasado se encuentra sujeto a remoción contable de RH.
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-3 p-3 bg-white border text-start rounded-3 shadow-sm" style="border-left: 5px solid #198754 !important;">
+                        <p class="text-dark fw-bold mb-2 small"><i class="bi bi-calendar2-check-fill text-success me-1"></i> Saldo Periodo Actual</p>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered align-middle text-center mb-0" style="font-size: 0.8rem; min-width: 100%;">
+                                <thead class="table-light text-muted small text-uppercase">
+                                <tr>
+                                    <th class="py-1.5 fw-bold" style="font-size: 0.68rem;">Año Corriente (Días Base + Beneficios)</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr>
+                                    <td class="bg-light bg-opacity-50 font-monospace fw-bold text-success py-2 fs-5">
+                                        <span th:text="${empleado.getSaldoPeriodoActual()}">0.0</span>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div th:if="${esSindicalizado}" class="mb-4 p-3 rounded-3 border bg-white shadow-sm text-start" style="border-left: 5px solid #004b93 !important;">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="text-secondary small fw-bold"><i class="bi bi-trophy-fill text-warning me-1"></i> Fila Virtual VIP:</span>
+                            <span class="badge bg-primary px-3 py-1.5 rounded-pill font-monospace fw-bold fs-6" style="background-color: #002f6c !important;" th:text="'Lugar #' + ${posicionRanking}">Lugar #1</span>
+                        </div>
+                        <div class="mt-2 text-muted" style="font-size: 0.76rem; line-height: 1.3;">
+                            Medido contra la plantilla de tu Supervisor de área. Cupo VIP actual configurado: <strong class="text-dark" th:text="'Top ' + ${topLimite}">Top 10</strong>.
+                        </div>
+                    </div>
+
+                    <div class="d-grid mt-4">
+                        <a href="/pantallas/solicitar-vacaciones" class="btn btn-lg text-white btn-solicitar-premium bg-corporativo d-flex align-items-center justify-content-center gap-2 fw-bold shadow-sm">
+                            <i class="bi bi-calendar-plus-fill fs-5"></i> NUEVA SOLICITUD DE AUSENCIA
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+
+            <div class="d-flex justify-content-between align-items-center mb-3 p-3 bg-white shadow-sm border rounded-3">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="bg-secondary bg-opacity-10 p-2 rounded-3 d-flex align-items-center justify-content-center" style="width: 38px; height: 36px;">
+                        <i class="bi bi-clock-history text-dark fs-5"></i>
+                    </div>
+                    <div>
+                        <h4 class="h6 fw-bold mb-0 text-dark">Consulta de Historial e Incidencias</h4>
+                        <small class="text-muted font-monospace d-none d-sm-inline" style="font-size: 0.72rem;">Control de movimientos contables y pre-nómina</small>
+                    </div>
+                </div>
+                <button class="btn btn-sm fw-bold rounded-pill px-3 shadow-sm transition-all"
+                        th:classappend="${(fechaInicioFilter != null and !fechaInicioFilter.trim().isEmpty()) or (fechaFinFilter != null and !fechaFinFilter.trim().isEmpty())} ? 'btn-dark' : 'btn-outline-dark'"
+                        type="button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#collapseHistorialMaster"
+                        th:aria-expanded="${(fechaInicioFilter != null and !fechaInicioFilter.trim().isEmpty()) or (fechaFinFilter != null and !fechaFinFilter.trim().isEmpty())} ? 'true' : 'false'"
+                        aria-controls="collapseHistorialMaster"
+                        id="btnToggleHistorial">
+                    <span th:text="${(fechaInicioFilter != null and !fechaInicioFilter.trim().isEmpty()) or (fechaFinFilter != null and !fechaFinFilter.trim().isEmpty())} ? 'Ocultar Historial' : 'Mostrar Historial'">Mostrar Historial</span>
+                    <i class="bi ms-1" th:classappend="${(fechaInicioFilter != null and !fechaInicioFilter.trim().isEmpty()) or (fechaFinFilter != null and !fechaFinFilter.trim().isEmpty())} ? 'bi-chevron-up' : 'bi-chevron-down'" id="iconoHistorial"></i>
+                </button>
+            </div>
+
+            <div class="collapse" id="collapseHistorialMaster"
+                 th:classappend="${(fechaInicioFilter != null and !fechaInicioFilter.trim().isEmpty()) or (fechaFinFilter != null and !fechaFinFilter.trim().isEmpty())} ? 'show' : ''">
+
+                <ul class="nav nav-pills bg-white shadow-sm rounded-3 p-1 mb-3 border pills-compact-wrapper" id="pills-dashboard-tab" role="tablist">
+                    <li class="nav-item flex-grow-1" role="presentation">
+                        <button class="nav-link active rounded-2 fw-bold py-2 w-100" id="pills-vacaciones-tab" data-bs-toggle="pill" data-bs-target="#pills-vacaciones" type="button" role="tab" aria-selected="true">
+                            <i class="bi bi-airplane-engines-fill me-1 text-success"></i> Historial de Vacaciones
+                        </button>
+                    </li>
+                    <li class="nav-item flex-grow-1" role="presentation">
+                        <button class="nav-link rounded-2 fw-bold py-2 w-100" id="pills-permisos-tab" data-bs-toggle="pill" data-bs-target="#pills-permisos" type="button" role="tab" aria-selected="false">
+                            <i class="bi bi-clipboard-x-fill me-1 text-warning"></i> Historial Incidencias
+                        </button>
+                    </li>
+                </ul>
+
+                <section class="custom-card p-2.5 mb-3 bg-white shadow-sm border filters-compact-wrapper rounded-3">
+                    <form action="/pantallas/dashboard" method="GET" class="row g-2 align-items-center">
+                        <div class="col-sm-5 d-flex align-items-center gap-2">
+                            <label for="fechaInicio" class="text-nowrap text-secondary font-monospace small mb-0 fw-bold">Desde:</label>
+                            <input type="date" class="form-control form-control-sm bg-light border" id="fechaInicio" name="fechaInicio" th:value="${fechaInicioFilter}">
+                        </div>
+                        <div class="col-sm-5 d-flex align-items-center gap-2">
+                            <label for="fechaFin" class="text-nowrap text-secondary font-monospace small mb-0 fw-bold">Hasta:</label>
+                            <input type="date" class="form-control form-control-sm bg-light border" id="fechaFin" name="fechaFin" th:value="${fechaFinFilter}">
+                        </div>
+                        <div class="col-sm-2">
+                            <button type="submit" class="btn btn-sm btn-dark w-100 fw-bold shadow-sm d-flex align-items-center justify-content-center gap-1" style="height: 31px; border-radius: 6px;">
+                                <i class="bi bi-funnel-fill"></i> Filtrar
+                            </button>
+                        </div>
+                    </form>
+                </section>
+
+                <div class="tab-content" id="pills-dashboard-tabContent">
+
+                    <div class="tab-pane fade show active" id="pills-vacaciones" role="tabpanel" aria-labelledby="pills-vacaciones-tab">
+                        <div class="custom-card p-3 bg-white shadow-sm border rounded-3">
+                            <h4 class="h6 fw-bold text-dark border-bottom pb-2 mb-3"><i class="bi bi-clock-history me-2 text-success"></i> Solicitudes de Vacaciones y Cierres Colectivos</h4>
+
+                            <div class="text-center py-5 text-muted" th:if="${historialVacaciones == null or historialVacaciones.isEmpty()}">
+                                <i class="bi bi-folder-x fs-1 opacity-50"></i>
+                                <p class="mb-0 fw-medium mt-1">No se detectaron movimientos contables de vacaciones en este rango.</p>
+                            </div>
+
+                            <div th:if="${historialVacaciones != null and !historialVacaciones.isEmpty()}" class="d-flex flex-column gap-3">
+                                <div th:each="sol : ${historialVacaciones}" class="card border p-3 rounded-3 shadow-sm position-relative"
+                                     th:style="${#strings.equalsIgnoreCase(sol.tipoSolicitud, 'Depuración Vacaciones Vencidas')} ? 'border-left: 5px solid #dc3545 !important;' : 'border-left: 5px solid #198754 !important;'">
+
+                                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
+                                        <div>
+                                            <span th:if="${#strings.equalsIgnoreCase(sol.tipoSolicitud, 'Depuración Vacaciones Vencidas')}" class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 px-2.5 py-1.5 rounded text-uppercase fw-bold" style="font-size: 0.72rem;"><i class="bi bi-shield-slash-fill me-1"></i> Depuración de Remanente</span>
+                                            <span th:if="${#strings.equalsIgnoreCase(sol.tipoSolicitud, 'Vacaciones Colectivas')}" class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-2.5 py-1.5 rounded text-uppercase fw-bold" style="font-size: 0.72rem;"><i class="bi bi-people-fill me-1"></i> Paro / Colectivo Masivo</span>
+                                            <span th:if="${!#strings.equalsIgnoreCase(sol.tipoSolicitud, 'Depuración Vacaciones Vencidas') and !#strings.equalsIgnoreCase(sol.tipoSolicitud, 'Vacaciones Colectivas')}" class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-2.5 py-1.5 rounded text-uppercase fw-bold" style="font-size: 0.72rem;"><i class="bi bi-calendar-check me-1"></i> Vacación Ordinaria</span>
+
+                                            <h5 class="h6 fw-bold text-dark mt-2 mb-0" th:text="'Folio #' + ${sol.id} + ' | Del ' + ${#strings.substring(sol.fechaInicio,0,10)} + ' al ' + ${#strings.substring(sol.fechaFin,0,10)}">Folio #000</h5>
+                                        </div>
+
+                                        <span class="badge rounded-pill px-3 py-1.5 fw-bold"
+                                              th:classappend="${#strings.equalsIgnoreCase(sol.estatus, 'Aprobado')} ? 'bg-success text-white' : (${#strings.equalsIgnoreCase(sol.estatus, 'Rechazado')} ? 'bg-danger text-white' : 'bg-warning text-dark')"
+                                              th:text="${sol.estatus}">Aprobado</span>
+                                    </div>
+
+                                    <div class="row g-2 text-secondary font-monospace mb-2" style="font-size: 0.8rem;">
+                                        <div class="col-sm-6"><i class="bi bi-calculator me-1"></i><strong>Impacto de Días:</strong> <span class="fw-bold text-dark" th:text="${sol.diasTotalesCalculados} + ' días laborables'">1 día</span></div>
+                                        <div class="col-sm-6"><i class="bi bi-clock me-1"></i><strong>Registrada el:</strong> <span th:text="${#temporals.format(sol.fechaCreacion, 'dd/MM/yyyy HH:mm')}">N/A</span></div>
+                                    </div>
+
+                                    <div class="bg-light p-2 rounded border" style="font-size: 0.82rem; line-height: 1.4;">
+                                        <div class="text-dark fw-medium" style="font-size: 0.78rem;"><i class="bi bi-chat-left-quote-fill text-primary me-1"></i><strong>Comentario de Autorización:</strong></div>
+                                        <span class="text-muted fst-italic" th:text="${sol.comentarioJefe ?: 'Sin observaciones adicionales.'}">Detalle</span>
+
+                                        <div th:if="${#strings.equalsIgnoreCase(sol.estatus, 'Rechazado') and sol.comentarioSupervisor != null and !sol.comentarioSupervisor.trim().isEmpty()}" class="mt-2 pt-2 border-top text-danger fw-bold" style="font-size: 0.78rem;">
+                                            <i class="bi bi-x-circle-fill me-1"></i>Motivo de Rechazo: <span class="text-dark fst-italic fw-normal" th:text="${sol.comentarioSupervisor}">Motivo</span>
+                                        </div>
+
+                                        <div class="text-secondary mt-1 pt-1 border-top" style="font-size: 0.75rem;">
+                                            <i class="bi bi-person-fill-check me-1"></i>Responsable Firma: <span class="fw-bold text-dark" th:text="${sol.jefeAutorizadorNombre ?: 'Mesa de Control RH / Planta'}">RH</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade" id="pills-permisos" role="tabpanel" aria-labelledby="pills-permisos-tab">
+                        <div class="custom-card p-3 bg-white shadow-sm border rounded-3">
+                            <h4 class="h6 fw-bold text-dark border-bottom pb-2 mb-3"><i class="bi bi-clock-history me-2 text-warning"></i> Bitácora de Justificaciones e Incidencias Operativas</h4>
+
+                            <div class="text-center py-5 text-muted" th:if="${historialPermisos == null or historialPermisos.isEmpty()}">
+                                <i class="bi bi-folder-x fs-1 opacity-50"></i>
+                                <p class="mb-0 fw-medium mt-1">No se detectaron permisos ni incidencias operativas en este rango.</p>
+                            </div>
+
+                            <div th:if="${historialPermisos != null and !historialPermisos.isEmpty()}" class="d-flex flex-column gap-3">
+                                <div th:each="perm : ${historialPermisos}" class="card border p-3 rounded-3 shadow-sm position-relative" style="border-left: 5px solid #ffc107 !important;">
+
+                                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
+                                        <div>
+                                            <span th:if="${#strings.contains(perm.tipoSolicitud, 'TXT')}" class="badge bg-warning bg-opacity-15 text-warning-dark border border-warning border-opacity-25 px-2.5 py-1.5 rounded text-uppercase fw-bold" style="font-size: 0.72rem; color: #856404;"><i class="bi bi-stopwatch-fill me-1"></i> Tiempo por Tiempo (TXT)</span>
+                                            <span th:if="${#strings.contains(perm.tipoSolicitud, 'HO')}" class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 px-2.5 py-1.5 rounded text-uppercase fw-bold" style="font-size: 0.72rem;"><i class="bi bi-house-door-fill me-1"></i> Home Office (HO)</span>
+                                            <span th:if="${#strings.contains(perm.tipoSolicitud, 'PT')}" class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 px-2.5 py-1.5 rounded text-uppercase fw-bold" style="font-size: 0.72rem;"><i class="bi bi-exclamation-triangle-fill me-1"></i> Paro Técnico (PT)</span>
+                                            <span th:if="${#strings.contains(perm.tipoSolicitud, 'C')}" class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 px-2.5 py-1.5 rounded text-uppercase fw-bold" style="font-size: 0.72rem;"><i class="bi bi-building-fill me-1"></i> Comisión Visita Cliente</span>
+                                            <span th:if="${#strings.contains(perm.tipoSolicitud, 'P')}" class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 px-2.5 py-1.5 rounded text-uppercase fw-bold" style="font-size: 0.72rem;"><i class="bi bi-truck me-1"></i> Comisión Visita Proveedor</span>
+                                            <span th:if="${#strings.contains(perm.tipoSolicitud, 'TET')}" class="badge bg-dark text-white px-2.5 py-1.5 rounded text-uppercase fw-bold" style="font-size: 0.72rem;"><i class="bi bi-geo-alt-fill me-1"></i> Estancia Planta Tetla</span>
+                                            <span th:if="${#strings.equalsIgnoreCase(perm.tipoSolicitud, 'Recuperación de Falta')}" class="badge bg-dark bg-opacity-10 text-dark border border-dark border-opacity-25 px-2.5 py-1.5 rounded text-uppercase fw-bold" style="font-size: 0.72rem;"><i class="bi bi-exclamation-diamond-fill me-1"></i> Falta Justificada / Supervisor</span>
+
+                                            <h5 class="h6 fw-bold text-dark mt-2 mb-0" th:text="'Folio #' + ${perm.id} + ' | Fecha Incidencia: ' + ${#strings.substring(perm.fechaInicio,0,10)}">Folio #000</h5>
+                                        </div>
+
+                                        <span class="badge rounded-pill px-3 py-1.5 fw-bold"
+                                              th:classappend="${#strings.equalsIgnoreCase(perm.estatus, 'Aprobado') or #strings.equalsIgnoreCase(perm.estatus, 'APROBADO')} ? 'bg-success text-white' : (${#strings.equalsIgnoreCase(perm.estatus, 'Rechazado') or #strings.equalsIgnoreCase(perm.estatus, 'RECHAZADO')} ? 'bg-danger text-white' : 'bg-warning text-dark')"
+                                              th:text="${perm.estatus}">Pendiente</span>
+                                    </div>
+
+                                    <div class="row g-2 text-secondary font-monospace mb-2" style="font-size: 0.8rem;">
+                                        <div class="col-sm-6"><i class="bi bi-hash me-1"></i><strong>Días Cobertura:</strong> <span class="fw-bold text-dark" th:text="${perm.diasTotalesCalculados} + ' día(s)'">1 día</span></div>
+                                        <div class="col-sm-6"><i class="bi bi-clock me-1"></i><strong>Cargada el:</strong> <span th:text="${#temporals.format(perm.fechaCreacion, 'dd/MM/yyyy HH:mm')}">N/A</span></div>
+                                    </div>
+
+                                    <div class="bg-light p-2 rounded border" style="font-size: 0.82rem; line-height: 1.4;">
+                                        <div class="text-dark fw-medium" style="font-size: 0.78rem;"><i class="bi bi-chat-left-quote-fill text-warning me-1"></i><strong>Justificación de Evidencia en Planta:</strong></div>
+                                        <span class="text-muted fst-italic" th:text="${perm.comentarioJefe ?: 'Sin observaciones adicionales.'}">Detalle</span>
+
+                                        <div th:if="${(#strings.equalsIgnoreCase(perm.estatus, 'Rechazado') or #strings.equalsIgnoreCase(perm.estatus, 'RECHAZADO')) and perm.comentarioSupervisor != null and !perm.comentarioSupervisor.trim().isEmpty()}" class="mt-2 pt-2 border-top text-danger fw-bold" style="font-size: 0.78rem;">
+                                            <i class="bi bi-x-circle-fill me-1"></i>Motivo de Rechazo: <span class="text-dark fst-italic fw-normal" th:text="${perm.comentarioSupervisor}">Motivo</span>
+                                        </div>
+
+                                        <div class="text-secondary mt-1 pt-1 border-top" style="font-size: 0.75rem;">
+                                            <i class="bi bi-person-fill-check me-1"></i>Supervisor Validador: <span class="fw-bold text-dark" th:text="${perm.jefeAutorizadorNombre ?: 'Mesa de Comando Operativa'}">Mando Medio</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+    </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<div class="modal fade" id="modalAlertaJefeDashboard" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 460px;">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <div class="text-white px-4 py-3 border-0 d-flex align-items-center gap-3" style="background: linear-gradient(135deg, #002f6c 0%, #004b93 100%);">
+                <div class="bg-white bg-opacity-20 p-2 rounded-circle d-flex align-items-center justify-content-center" style="width: 45px; height: 45px;">
+                    <i class="bi bi-bell-fill fs-4 text-warning animate-pulse"></i>
+                </div>
+                <div>
+                    <h5 class="modal-title fw-bold mb-0">Control de Pre-Nómina</h5>
+                    <small class="text-white-50 small">Tienes solicitudes pendientes por dictaminar</small>
+                </div>
+            </div>
+            <div class="modal-body p-4 bg-white text-start">
+                <p class="mb-3 text-secondary" th:text="'Hola, ' + ${empleado.nombreCompleto} + '. Detectamos que personal bajo tu línea de mando o Work Center ha ingresado solicitudes que requieren tu firma contable:'"></p>
+
+                <div class="d-flex flex-column gap-3">
+                    <div th:if="${alertaVacacionesCount > 0}" class="d-flex justify-content-between align-items-center p-3 bg-light rounded-3 border shadow-sm" style="border-left: 5px solid #198754 !important;">
+                        <div>
+                            <h6 class="fw-bold text-dark mb-0">Vacaciones Ordinarias</h6>
+                            <span class="badge bg-success bg-opacity-10 text-success rounded-pill px-2.5 py-1 small fw-bold mt-1" th:text="${alertaVacacionesCount} + ' pendientes'">0</span>
+                        </div>
+                        <a href="/pantallas/aprobaciones-jefe" class="btn btn-sm btn-success fw-bold px-3 rounded-pill shadow-sm">
+                            Revisar <i class="bi bi-chevron-right ms-1"></i>
+                        </a>
+                    </div>
+
+                    <div th:if="${alertaPermisosCount > 0}" class="d-flex justify-content-between align-items-center p-3 bg-light rounded-3 border shadow-sm" style="border-left: 5px solid #ffc107 !important;">
+                        <div>
+                            <h6 class="fw-bold text-dark mb-0">Incidencias (TXT / HO / PT)</h6>
+                            <span class="badge bg-warning text-dark rounded-pill px-2.5 py-1 small fw-bold mt-1" th:text="${alertaPermisosCount} + ' por evaluar'">0</span>
+                        </div>
+                        <a href="/pantallas/aprobaciones-permisos" class="btn btn-sm btn-warning text-dark fw-bold px-3 rounded-pill shadow-sm">
+                            Revisar <i class="bi bi-chevron-right ms-1"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="alert alert-danger bg-danger bg-opacity-10 text-danger border-0 d-flex align-items-center gap-2 mt-4 mb-0 py-2 px-3 rounded-3" style="font-size: 0.78rem;">
+                    <i class="bi bi-clock-fill text-danger fs-6"></i>
+                    <div class="fw-medium">Atención: Evita que el Cron Job aplique la Guillotina Semanal Automática.</div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light border-0 px-4 py-2.5">
+                <button type="button" class="btn btn-sm btn-dark rounded-3 fw-bold px-4 shadow-sm border-0" data-bs-dismiss="modal">Validar más tarde</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalAnuncioVIP" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 460px;">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <div class="text-white px-4 py-3 border-0 d-flex align-items-center gap-3" style="background: linear-gradient(135deg, #198754 0%, #0f5132 100%);">
+                <div class="bg-white bg-opacity-20 p-2 rounded-circle d-flex align-items-center justify-content-center" style="width: 45px; height: 45px;">
+                    <i class="bi bi-star-fill fs-4 text-warning animate-pulse"></i>
+                </div>
+                <div>
+                    <h5 class="modal-title fw-bold mb-0">¡Fase VIP Activada!</h5>
+                    <small class="text-white-50 small">Acceso exclusivo por días rezagados</small>
+                </div>
+            </div>
+            <div class="modal-body p-4 bg-white text-center">
+                <p class="text-secondary mb-3" style="font-size: 0.92rem;">
+                    ¡Atención, operario! Debido a tu volumen de días acumulados de años anteriores, has ganado un lugar privilegiado en la fila operativa:
+                </p>
+                <div class="bg-light p-3 rounded-3 border mb-3 text-center shadow-sm">
+                    <span class="text-secondary small d-block mb-1 fw-bold font-monospace">TU LUGAR ACTUAL</span>
+                    <span class="fs-2 fw-bold text-success font-monospace" th:text="'#' + ${posicionRanking}">#1</span>
+                </div>
+                <div class="text-start p-3 bg-light rounded-3 border" style="font-size: 0.85rem;">
+                    <div class="mb-2 text-muted"><i class="bi bi-calendar-event-fill text-success me-2"></i><strong>Apertura de Registro VIP:</strong> <span class="text-dark fw-bold" th:text="${fechaAperturaRezago != null ? #temporals.format(fechaAperturaRezago, 'dd/MM/yyyy') : 'Activa'}">23/10/2026</span></div>
+                    <div class="text-muted"><i class="bi bi-unlock-fill text-primary me-2"></i><strong>Apertura General Planta:</strong> <span class="text-dark fw-bold" th:text="${fechaAperturaGeneral != null ? #temporals.format(fechaAperturaGeneral, 'dd/MM/yyyy') : '01/11/2026'}">01/11/2026</span></div>
+                </div>
+                <p class="mt-3 mb-0 text-muted small" style="line-height: 1.4;">
+                    Tu Supervisor del área configuró un cupo de <strong th:text="${topLimite}">10</strong> personas para esta ronda. Aprovecha esta ventana especial antes de que el candado expire y abra la barra libre de planta.
+                </p>
+            </div>
+            <div class="modal-footer bg-light border-0 px-4 py-2.5">
+                <a href="/pantallas/solicitar-vacaciones" class="btn btn-sm btn-success rounded-3 fw-bold px-4 shadow-sm">Registrar Vacaciones</a>
+                <button type="button" class="btn btn-sm btn-outline-secondary rounded-3 fw-bold px-3 border-0" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script th:inline="javascript">
+    document.addEventListener("DOMContentLoaded", function() {
+        var lanzarAlerta = /*[[${mostrarAlertaModal}]]*/ false;
+        if (lanzarAlerta === true) {
+            var nodoModal = document.getElementById('modalAlertaJefeDashboard');
+            if (nodoModal) {
+                var bootstrapModalInstance = new bootstrap.Modal(nodoModal);
+                bootstrapModalInstance.show();
+            }
+        }
+
+        // ✨ DETONADOR AUTOMÁTICO DE MODAL ANUNCIO VIP
+        var mostrarVIP = /*[[${mostrarModalVIPAnuncio}]]*/ false;
+        if (mostrarVIP === true) {
+            var nodoModalVIP = document.getElementById('modalAnuncioVIP');
+            if (nodoModalVIP) {
+                var bootstrapModalVIPInstance = new bootstrap.Modal(nodoModalVIP);
+                bootstrapModalVIPInstance.show();
+            }
+        }
+
+        const containerHistorial = document.getElementById('collapseHistorialMaster');
+        const btnHistorial = document.getElementById('btnToggleHistorial');
+        const iconoHistorial = document.getElementById('iconoHistorial');
+
+        if (containerHistorial && btnHistorial && iconoHistorial) {
+            containerHistorial.addEventListener('show.bs.collapse', function () {
+                btnHistorial.querySelector('span').innerText = 'Ocultar Historial';
+                iconoHistorial.classList.remove('bi-chevron-down');
+                iconoHistorial.classList.add('bi-chevron-up');
+                btnHistorial.classList.remove('btn-outline-dark');
+                btnHistorial.classList.add('btn-dark');
+            });
+
+            containerHistorial.addEventListener('hide.bs.collapse', function () {
+                btnHistorial.querySelector('span').innerText = 'Mostrar Historial';
+                iconoHistorial.classList.remove('bi-chevron-up');
+                iconoHistorial.classList.add('bi-chevron-down');
+                btnHistorial.classList.remove('btn-dark');
+                btnHistorial.classList.add('btn-outline-dark');
+            });
+        }
+    });
+
+    // ✨ COMPRESOR VISUAL DE CIRUGÍA PARCIAL DE VACACIONES
+    setTimeout(function() {
+        const tarjetas = Array.from(document.querySelectorAll('.tarjeta-vacacion-fusion'));
+        const grupos = {};
+
+        // 1. Agrupar por grupoFolio (solo las que tienen grupo y no son nulas)
+        tarjetas.forEach(t => {
+            const grp = t.getAttribute('data-grupo');
+            if (grp && grp !== 'null' && grp !== '') {
+                if (!grupos[grp]) grupos[grp] = [];
+                grupos[grp].push(t);
+            }
+        });
+
+        // 2. Fusionar las fraccionadas
+        Object.keys(grupos).forEach(grp => {
+            const lote = grupos[grp];
+            if (lote.length > 1) { // ¡Hubo cirugía aquí!
+                // Ordenar cronológicamente
+                lote.sort((a, b) => a.getAttribute('data-inicio').localeCompare(b.getAttribute('data-inicio')));
+
+                const padre = lote[0];
+                const final = lote[lote.length - 1];
+
+                let diasAprobados = 0;
+                let desgloseHtml = `<div class="mt-3 pt-2 border-top"><strong class="text-corporativo" style="font-size:0.75rem;"><i class="bi bi-scissors me-1 text-warning"></i>Desglose de Aprobación Parcial:</strong><ul class="list-group list-group-flush mt-1 mb-0 shadow-sm border rounded">`;
+
+                lote.forEach(tarjeta => {
+                    const estatus = tarjeta.getAttribute('data-estatus');
+                    const dias = parseInt(tarjeta.getAttribute('data-dias')) || 0;
+                    const fIni = tarjeta.getAttribute('data-inicio');
+                    const fFin = tarjeta.getAttribute('data-fin');
+                    const motivo = tarjeta.getAttribute('data-motivo') || 'Sin observaciones';
+
+                    if (estatus === 'Aprobado') diasAprobados += dias;
+
+                    const icon = estatus === 'Aprobado' ? '<i class="bi bi-check-circle-fill text-success"></i>' : '<i class="bi bi-x-circle-fill text-danger"></i>';
+                    const colorTxt = estatus === 'Aprobado' ? 'text-success' : 'text-danger';
+
+                    desgloseHtml += `<li class="list-group-item px-2 py-1.5 bg-white border-bottom" style="font-size:0.75rem;">
+                                        ${icon} <span class="fw-bold text-dark">${fIni} al ${fFin}</span>:
+                                        <span class="fw-bold ${colorTxt}">${estatus}</span>
+                                        <div class="text-muted fst-italic ms-3 mt-1" style="font-size: 0.7rem;">- ${motivo}</div>
+                                     </li>`;
+
+                    // Desaparecemos las hijas del DOM para limpiar la pantalla
+                    if (tarjeta !== padre) {
+                        tarjeta.classList.add('d-none');
+                        tarjeta.classList.remove('tarjeta-vacacion-fusion');
+                    }
+                });
+
+                desgloseHtml += `</ul></div>`;
+
+                // 3. Tunear la tarjeta Padre para que luzca como un "Bloque Maestro"
+                const badge = padre.querySelector('.badge-estatus-fusion');
+                if (badge) {
+                    badge.className = 'badge rounded-pill px-3 py-1.5 fw-bold bg-dark text-white badge-estatus-fusion shadow-sm';
+                    badge.innerHTML = '<i class="bi bi-layers-half me-1 text-warning"></i>Aprobado Parcialmente';
+                }
+
+                const titulo = padre.querySelector('.titulo-fechas-fusion');
+                if (titulo) {
+                    titulo.innerHTML = `<i class="bi bi-folder-fill me-1 text-secondary"></i>Familia ${grp} | Del ${padre.getAttribute('data-inicio')} al ${final.getAttribute('data-fin')}`;
+                }
+
+                const spanDias = padre.querySelector('.span-dias-fusion');
+                if (spanDias) {
+                    spanDias.innerHTML = `<span class="text-success fw-bold">${diasAprobados} días (Autorizados)</span>`;
+                }
+
+                // 4. Inyectar el acordeón de desglose dentro del cuadro gris
+                const cajaComentarios = padre.querySelector('.caja-comentarios-fusion');
+                if (cajaComentarios) cajaComentarios.insertAdjacentHTML('beforeend', desgloseHtml);
+            }
+        });
+    }, 200); // 200ms para asegurar que el navegador asiente el DOM primero
+</script>
+</body>
+</html>

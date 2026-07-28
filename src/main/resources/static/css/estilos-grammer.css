@@ -1,0 +1,582 @@
+/* ==========================================================================
+   ESTILOS CORPORATIVOS GRAMMER - CORE LAYOUT
+   ========================================================================== */
+
+body {
+    background-color: #f8f9fa;
+    padding-bottom: 80px; /* Espacio para que la barra inferior no tape contenido */
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.bg-corporativo { background-color: #002f6c !important; }
+.text-corporativo { color: #002f6c !important; }
+
+.btn-corporativo {
+    background-color: #002f6c;
+    color: white;
+    border: none;
+    transition: background-color 0.2s ease;
+}
+
+.btn-corporativo:hover {
+    background-color: #001a40;
+    color: white;
+}
+
+.card-flotante {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+/* ==========================================================================
+   NAVEGACIÓN INFERIOR (MÓVIL) Y PESTAÑAS (NAV PILLS)
+   ========================================================================== */
+
+.nav-inferior {
+    background: white;
+    border-top: 1px solid #e1e3e4;
+    z-index: 1030;
+}
+
+.nav-item-activo {
+    color: #002f6c;
+    font-weight: bold;
+    background-color: #e6f0ff;
+    border-radius: 8px;
+}
+
+.nav-item-inactivo {
+    color: #6c757d;
+}
+
+/* ✨ CORRECCIÓN SUPREMA: Cierre de llave corregido para evitar anidación rota */
+/* Pestañas (Nav Pills) para Torre de Control y Aprobaciones */
+.nav-pills .nav-link.active, .nav-pills .show>.nav-link {
+    background-color: #002f6c;
+    color: white;
+}
+
+.nav-pills .nav-link {
+    color: #6c757d;
+    font-weight: 600;
+}
+
+/* ==========================================================================
+   NUEVOS ESTILOS PARA LA PLANTILLA Y TABLAS STICKY (ALTO RENDIMIENTO)
+   ========================================================================== */
+
+.sticky-filters-wrapper {
+    position: sticky;
+    top: 0;
+    background-color: #ffffff;
+    z-index: 1020;
+    padding-top: 15px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.table-responsive {
+    max-height: 650px;
+    overflow-y: auto;
+}
+
+.table thead th {
+    position: sticky;
+    top: 0;
+    background-color: #f8f9fa !important;
+    z-index: 1010;
+    box-shadow: inset 0 -1px 0 #dee2e6;
+}
+
+/* ==========================================================================
+   ESTILOS EXCLUSIVOS: CALENDARIO OUTLOOK OPERATIVO (FULLCALENDAR V6)
+   ========================================================================== */
+
+.fc {
+    --fc-border-color: #e9ecef;
+    --fc-button-bg-color: #002f6c;          /* Azul Grammer */
+    --fc-button-border-color: #002f6c;
+    --fc-button-hover-bg-color: #001a40;    /* Hover Corporativo */
+    --fc-button-hover-border-color: #001a40;
+    --fc-button-active-bg-color: #00112c;
+    --fc-button-active-border-color: #00112c;
+    --fc-today-bg-color: rgba(0, 47, 108, 0.03) !important;
+}
+
+/* ❌ Matamos el subrayado feo que Bootstrap le mete a los números */
+.fc a {
+    text-decoration: none !important;
+    transition: color 0.2s ease;
+}
+
+/* 🏢 Cabecera de los días de la semana (Lunes, Martes, etc.) */
+.fc .fc-col-header-cell {
+    background-color: #f1f4f9 !important;
+    border-bottom: 2px solid #cbd5e1 !important;
+    padding: 8px 0 !important;
+}
+
+.fc .fc-col-header-cell-cushion {
+    color: #002f6c !important;
+    font-weight: 700 !important;
+    font-size: 0.88rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* 🔢 Ajuste estético a los números de los días */
+.fc .fc-daygrid-day-number {
+    font-weight: 700;
+    color: #434750 !important;
+    padding: 10px 12px !important;
+    font-size: 0.92rem;
+}
+
+/* 📍 Efecto círculo premium para el día actual */
+.fc .fc-day-today .fc-daygrid-day-number {
+    color: #ffffff !important;
+    background-color: #002f6c !important;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    margin: 6px 8px !important;
+    padding: 0 !important;
+    box-shadow: 0 2px 6px rgba(0, 47, 108, 0.3);
+}
+
+/* 💊 Transformación de bloques planos a Píldoras tipo Outlook original */
+.fc .fc-daygrid-event {
+    margin: 3px 6px 0 6px !important;
+    border-radius: 6px !important;
+    padding: 4px 10px !important;
+    font-size: 0.8rem !important;
+    font-weight: 600 !important;
+    border: none !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.04) !important;
+    transition: transform 0.15s ease, filter 0.15s ease !important;
+}
+
+.fc .fc-daygrid-event:hover {
+    transform: translateY(-1px) scale(1.01);
+    filter: brightness(0.92);
+}
+
+/* 💤 Días que no pertenecen al mes en curso (Atenuados) */
+.fc .fc-day-other {
+    background-color: #fafafa !important;
+}
+.fc .fc-day-other .fc-daygrid-day-number {
+    color: #a0aec0 !important;
+    opacity: 0.6;
+}
+
+/* 🎛️ Tuneo fino a la botonera superior */
+.fc .fc-button {
+    padding: 6px 16px !important;
+    font-size: 0.85rem !important;
+    font-weight: 600 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02) !important;
+}
+
+.fc .fc-button-primary:not(:disabled).fc-button-active,
+.fc .fc-button-primary:not(:disabled):active {
+    background-color: #00112c !important;
+    border-color: #00112c !important;
+}
+
+/* ==========================================================================
+   🚨 NUEVOS ESTILOS EXCLUSIVOS PARA EL MÓDULO DE PERMISOS E INCIDENCIAS
+   ========================================================================== */
+
+/* 🎨 Contenedores dinámicos del HTML (Ocultar secciones sin parpadeos) */
+.seccion-dinamica {
+    display: none;
+    animation: fadeInClean 0.35s ease-out;
+}
+
+@keyframes fadeInClean {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ⏱️ Bloque de aviso e inputs para la tabla reactiva de Tiempo por Tiempo (TXT) */
+.bg-txt-preview {
+    background-color: #fff9e6 !important;
+    color: #664d03 !important;
+    border-left: 4px solid #ffc107 !important;
+}
+
+#tablaPagosTXT {
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+}
+
+#tablaPagosTXT thead th {
+    background-color: #f1f3f5 !important;
+    color: #495057 !important;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.btn-eliminar-pago {
+    transition: color 0.2s ease;
+}
+.btn-eliminar-pago:hover {
+    color: #dc3545 !important;
+}
+
+/* ==========================================================================
+   🚥 COLOR CODES UNIFICADOS PARA LAS PÍLDORAS DEL CALENDARIO OUTLOOK
+   (Asignados en el JSON de FullCalendar para el control de Headcount)
+   ========================================================================== */
+
+/* 🍏 V - Vacaciones Autorizadas */
+.bg-badge-v {
+    background-color: #e2f0d9 !important;
+    color: #385723 !important;
+    border-left: 4px solid #70ad47 !important;
+}
+
+/* ⚠️ TXT - Tiempo por Tiempo / Ausencias Programadas (Urgente Headcount) */
+.bg-badge-txt {
+    background-color: #fff2cc !important;
+    color: #000000 !important; /* Aquí forzamos el color negro */
+    border-left: 4px solid #ffc000 !important;
+}
+/* Y para asegurar que FullCalendar respete este negro: */
+.fc-event.bg-badge-txt .fc-event-main {
+    color: #000000 !important;
+}
+
+/* 🔮 HO - Home Office Staff */
+.bg-badge-ho {
+    background-color: #e8daef !important;
+    color: #6c3483 !important;
+    border-left: 4px solid #a569bd !important;
+}
+
+/* 🚙 C - Visita Cliente (Fuera de Planta) */
+.bg-badge-c {
+    background-color: #d4efdf !important;
+    color: #1e8449 !important;
+    border-left: 4px solid #27ae60 !important;
+}
+
+/* 🏭 P - Visita Proveedor */
+.bg-badge-p {
+    background-color: #d9ebd3 !important;
+    color: #274e13 !important;
+    border-left: 4px solid #6aa84f !important;
+}
+
+/* 🏢 TET - Visita Planta Hermana Tetla */
+.bg-badge-tet {
+    background-color: #e6f0ff !important;
+    color: #002f6c !important;
+    border-left: 4px solid #4a90e2 !important;
+}
+/* ==========================================================================
+   BARRA DE NAVEGACIÓN COMPACTA Y SEMAFORIZADA (Premium Grammer Navbar)
+   ========================================================================== */
+/* Encadenamiento de selectores para destruir el fondo blanco intruso */
+/* ==========================================================================
+   BLINDAJE ABSOLUTO CONTRA NAVBAR TRANSPARENTE O INTRUSOS EN PANTALLA
+   ========================================================================== */
+nav.navbar.navbar-grammer-custom {
+    background-color: #002f6c !important; /* Azul Grammer Oficial */
+    background: #002f6c !important;       /* Doble seguro por si reescriben la propiedad plana */
+    border-bottom: 2px solid #004b93 !important;
+    opacity: 1 !important;                 /* Rompe cualquier transparencia heredada */
+}
+
+/* Micro Logo Tipo Planta */
+.brand-g {
+    background: #ffffff !important;
+    color: #002f6c !important;
+    font-weight: 900;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+.brand-text {
+    font-size: 0.95rem;
+    letter-spacing: 0.5px;
+    color: #ffffff !important;
+}
+
+/* Enlaces delgados con transiciones suaves */
+.nav-link-custom {
+    color: rgba(255, 255, 255, 0.85) !important;
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding-top: 0.2rem !important;
+    padding-bottom: 0.2rem !important;
+    transition: all 0.2s ease;
+    border-radius: 4px;
+}
+
+.nav-link-custom:hover {
+    color: #ffffff !important;
+    background-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+/* Semáforos cromáticos en los íconos */
+.text-nav-dashboard { color: #0abcff !important; }  /* Dashboard: Azul Cielo */
+.text-nav-solicitar { color: #20c997 !important; }  /* Registrar: Verde Menta */
+.text-nav-vacaciones { color: #4ee44e !important; } /* Vacaciones: Verde LFT */
+.text-nav-permisos { color: #ffb703 !important; }   /* Permisos/TXT: Amarillo Alerta */
+.text-nav-saldos { color: #e0aaff !important; }     /* Gestión Manual: Morado Staff */
+.text-nav-control { color: #ff758f !important; }    /* Torre de Control: Coral */
+
+/* Ficha del operador */
+.bg-user-badge {
+    background-color: rgba(0, 0, 0, 0.25) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    font-size: 0.78rem;
+    letter-spacing: 0.3px;
+}
+
+/* Botón de Salida */
+.btn-danger-nav {
+    background-color: #dc3545 !important;
+    color: #ffffff !important;
+    border: none !important;
+    font-size: 0.75rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+.btn-danger-nav:hover {
+    background-color: #b52a37 !important;
+}
+
+/* Ajuste Responsivo Móvil */
+@media (max-width: 991.98px) {
+    .nav-link-custom {
+        padding-left: 0.5rem !important;
+        margin-top: 2px;
+        margin-bottom: 2px;
+    }
+    .user-section-nav {
+        border-top: 1px solid rgba(255, 255, 255, 0.15) !important;
+        padding-top: 8px;
+        flex-direction: column;
+        align-items: flex-start !important;
+    }
+    .bg-user-badge {
+        margin-bottom: 6px;
+    }
+}
+/* ===================================================
+   MÓDULO DE AUTENTICACIÓN SÍNCRONA (LOGIN PREMIUM)
+   =================================================== */
+.body-login {
+    background: linear-gradient(135deg, #002554 0%, #0a1128 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    margin: 0;
+    padding: 15px;
+}
+
+.login-container {
+    width: 100%;
+    max-width: 430px;
+}
+
+.login-card {
+    border: none;
+    border-radius: 16px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    background-color: rgba(255, 255, 255, 0.98);
+    padding: 3rem 2.5rem;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.3s ease;
+}
+
+/* Franja corporativa superior */
+.login-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 6px;
+    background: linear-gradient(90deg, #002f6c, #0056b3, #002f6c);
+}
+
+.brand-icon {
+    width: 65px;
+    height: 65px;
+    background: rgba(0, 47, 108, 0.06);
+    color: #002f6c;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+    margin: 0 auto 1.5rem auto;
+    border: 1px solid rgba(0, 47, 108, 0.1);
+}
+
+.form-label-login {
+    color: #4a5568;
+    font-size: 0.825rem;
+    letter-spacing: 0.5px;
+}
+
+/* Input groups acoplados a Bootstrap Icons */
+.login-card .input-group-text {
+    background-color: #f8f9fa;
+    border-color: #cbd5e1;
+    color: #64748b;
+    transition: all 0.2s ease;
+}
+
+.login-card .form-control {
+    border-color: #cbd5e1;
+    padding: 0.65rem 0.75rem;
+    font-size: 0.95rem;
+    color: #1e293b;
+    transition: all 0.2s ease;
+}
+
+.login-card .form-control:focus {
+    border-color: #002f6c;
+    box-shadow: 0 0 0 3px rgba(0, 47, 108, 0.15);
+}
+
+.login-card .form-control:focus + .input-group-text,
+.login-card .input-group:focus-within .input-group-text {
+    border-color: #002f6c;
+    color: #002f6c;
+    background-color: rgba(0, 47, 108, 0.02);
+}
+
+/* Botón de acceso de alta resistencia */
+.btn-primary-custom {
+    background: linear-gradient(90deg, #002f6c 0%, #004491 100%);
+    border: none;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    padding: 0.75rem;
+    font-size: 0.95rem;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.btn-primary-custom:hover {
+    background: linear-gradient(90deg, #001f4d 0%, #003370 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 47, 108, 0.3);
+}
+
+.btn-primary-custom:active {
+    transform: translateY(0);
+}
+
+/* Alertas de backend personalizadas */
+.login-card .alert {
+    border-radius: 10px;
+    border: none;
+    font-size: 0.85rem;
+    padding: 0.75rem 1rem;
+}
+.login-card .alert-danger {
+    background-color: #fef2f2;
+    color: #991b1b;
+    border-left: 4px solid #dc2626;
+}
+.login-card .alert-success {
+    background-color: #f0fdf4;
+    color: #166534;
+    border-left: 4px solid #16a34a;
+}
+/* ==========================================================================
+   OPTIMIZACIÓN DE ALTA DENSIDAD PARA DASHBOARD MÓVIL (GRAMMER COMPACT)
+   ========================================================================== */
+.custom-card {
+    border: none;
+    border-radius: 16px;
+    background-color: #ffffff;
+}
+
+.profile-banner {
+    background: linear-gradient(135deg, #002f6c, #004b93);
+    height: 100px;
+    border-top-left-radius: 16px;
+    border-top-right-radius: 16px;
+}
+
+.balance-box {
+    transition: all 0.25s ease-in-out;
+}
+
+.balance-box:hover {
+    transform: translateY(-2px);
+}
+
+.tracking-wider {
+    letter-spacing: 0.05em;
+}
+
+/* Modificadores de alta densidad para evitar saturación de pantalla */
+.pills-compact-wrapper .nav-link {
+    padding-top: 0.4rem !important;
+    padding-bottom: 0.4rem !important;
+    font-size: 0.85rem !important;
+}
+
+.filters-compact-wrapper {
+    padding: 0.6rem !important;
+    margin-bottom: 0.75rem !important;
+}
+
+.filters-compact-wrapper .form-label {
+    font-size: 0.75rem !important;
+    margin-bottom: 0.25rem !important;
+}
+
+/* Botón de acción masiva responsivo para dedos reales */
+.btn-solicitar-premium {
+    padding-top: 0.85rem !important;
+    padding-bottom: 0.85rem !important;
+    font-size: 1.05rem !important;
+    letter-spacing: 0.3px;
+    border-radius: 12px !important;
+    box-shadow: 0 4px 10px rgba(0, 47, 108, 0.25) !important;
+}
+
+/* Catálogo de Badges de Estado */
+.bg-badge-vacaciones {
+    background-color: #e2f0d9;
+    color: #385723;
+    border: 1px solid #c5e0b4;
+}
+
+.bg-badge-permisos {
+    background-color: #fff2cc;
+    color: #7f6000;
+    border: 1px solid #ffd966;
+}
+
+.bg-badge-ajuste {
+    background-color: #e6f4ea;
+    color: #137333;
+    border: 1px solid #ceead6;
+}
+
+.bg-badge-depuracion {
+    background-color: #fce8e6;
+    color: #c5221f;
+    border: 1px solid #fad2cf;
+}

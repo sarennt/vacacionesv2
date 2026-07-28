@@ -1,0 +1,58 @@
+<nav th:fragment="menuPlanta" class="navbar navbar-expand-lg navbar-dark navbar-grammer-custom py-1 shadow-sm">
+    <div class="container-fluid">
+        <a th:href="@{/pantallas/dashboard}" class="navbar-brand fw-bold d-flex align-items-center me-3">
+            <span class="brand-g">G</span><span class="brand-text ms-2">Grammer</span>
+        </a>
+
+        <button class="navbar-toggler py-0 border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon" style="width: 1.25rem; height: 1.25rem;"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <div class="navbar-nav align-items-lg-center w-100">
+
+                <a th:href="@{/pantallas/dashboard}" class="nav-link nav-link-custom mx-1">
+                    <i class="bi bi-house-door text-nav-dashboard"></i> Mi Dashboard
+                </a>
+                <a th:href="@{/pantallas/solicitar-vacaciones}" class="nav-link nav-link-custom mx-1">
+                    <i class="bi bi-file-earmark-plus text-nav-solicitar"></i> Solicitar
+                </a>
+
+                <th:block th:with="rol=${session.rolUsuario != null ? session.rolUsuario.trim().toUpperCase() : 'OPERADOR'},
+                                     nomina=${session.usuarioLogueado}">
+
+                    <th:block th:if="${rol == 'SHIFT' || rol == 'SHIFT LEADER' || rol == 'SUPERVISOR' || rol == 'GERENTE'
+                                       || rol == 'ADMIN' || rol == 'RH' || #lists.contains({'1555','1302','1550'}, nomina)}">
+                        <a th:href="@{/pantallas/aprobaciones-jefe}" class="nav-link nav-link-custom mx-1">
+                            <i class="bi bi-check2-square text-nav-vacaciones"></i> Aprobaciones Vacaciones
+                        </a>
+                        <a th:href="@{/pantallas/aprobaciones-permisos}" class="nav-link nav-link-custom mx-1">
+                            <i class="bi bi-shield-check text-nav-permisos"></i> Bandeja de Permisos
+                        </a>
+                    </th:block>
+
+                    <th:block th:if="${rol == 'NOMINAS' || rol == 'RH' || rol == 'ADMIN'
+                                       || #lists.contains({'1555','1302','1550'}, nomina)}">
+                        <a th:href="@{/pantallas/gestion-saldos}" class="nav-link nav-link-custom mx-1">
+                            <i class="bi bi-person-gear text-nav-saldos"></i> Gestión de Saldos
+                        </a>
+                        <a th:href="@{/pantallas/torre-control}" class="nav-link nav-link-custom mx-1">
+                            <i class="bi bi-sliders text-nav-control"></i> Torre de Control
+                        </a>
+                    </th:block>
+                </th:block>
+
+                <div class="ms-lg-auto d-flex align-items-center mt-2 mt-lg-0 user-section-nav">
+                    <span class="text-white small me-3 fw-bold bg-user-badge px-2 py-1 rounded">
+                        <i class="bi bi-person-circle text-white-50"></i>
+                        <span th:text="${session.nombreUsuario}" class="ms-1 text-white">Usuario Planta</span>
+                    </span>
+                    <a th:href="@{/logout}" class="btn btn-danger-nav btn-sm fw-bold">
+                        <i class="bi bi-box-arrow-right"></i> Salir
+                    </a>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</nav>
