@@ -20,6 +20,8 @@ import java.util.ArrayList;
 import java.util.stream.Collectors;
 import java.math.BigDecimal;
 
+import com.hrms.vacaciones.model.GrupoProceso;
+import com.hrms.vacaciones.model.CentroCosto;
 
 @Service
 public class VacacionesService {
@@ -38,6 +40,7 @@ public class VacacionesService {
     private final DiasFestivosRepository diasFestivosRepository;
     private final AduanaService aduanaService;
     private final CalendarioService calendarioService;
+    private final GrupoProcesoRepository grupoProcesoRepository;
 
     @Autowired
     public VacacionesService(
@@ -54,7 +57,8 @@ public class VacacionesService {
             WorkCenterRepository workCenterRepository,
             DiasFestivosRepository diasFestivosRepository,
             AduanaService aduanaService,
-            CalendarioService calendarioService) { // <-- Aquí sí va el paréntesis de cierre
+            CalendarioService calendarioService,
+            GrupoProcesoRepository grupoProcesoRepository) { // <-- Aquí sí va el paréntesis de cierre
 
         this.empleadoRepository = empleadoRepository;
         this.solicitudVacacionesRepository = solicitudVacacionesRepository;
@@ -70,6 +74,7 @@ public class VacacionesService {
         this.diasFestivosRepository = diasFestivosRepository;
         this.aduanaService = aduanaService;
         this.calendarioService = calendarioService;
+        this.grupoProcesoRepository = grupoProcesoRepository;
     }
 
     private String obtenerDiaSemanaEspNormalizado(LocalDate fecha) {
@@ -422,18 +427,50 @@ public class VacacionesService {
             List<Integer> wcsDelArea = lineasArea.stream().map(WorkCenter::getId).collect(Collectors.toList());
             if (wcsDelArea.isEmpty()) wcsDelArea.add(empleado.getWorkCenter().getId());
 
+            // --- INICIO DE LA NUEVA ADUANA: DOBLE CANDADO SIMPLIFICADO ---
             LocalDate diaCursor = request.fechaInicio();
             while (!diaCursor.isAfter(request.fechaFin())) {
 
-                // 🛡️ Filtro Único: Capa Macro (Bolsa de Turno en toda el Área del Supervisor)
-                long ocupadosArea = solicitudVacacionesRepository.contarOcupadosPorAreaYTurno(
-                        wcsDelArea, turnoAsignado.getId(), diaCursor);
+                // 🔒 CANDADO 1: La Regla de Oro (No empalmar el mismo WC y Turno)
+                // CERO MOCKS: Vamos a la base de datos a contar cuántos hay exactos en ese WC, turno y día.
+                long ocupadosMismoWcTurno = solicitudVacacionesRepository.contarOcupadosPorLineaYTurno(
+                        empleado.getWorkCenter().getId(), turnoAsignado.getId(), diaCursor
+                );
 
-                if (ocupadosArea >= configLinea.getMaxEmpleadosPorDia()) {
-                    throw new RuntimeException("Bolsa de Turno Agotada: El día " + diaCursor + " ya se alcanzó el máximo de " + configLinea.getMaxEmpleadosPorDia() + " lugares autorizados por tu Supervisor para el " + turnoAsignado.getNombreTurno() + ".");
+                if (ocupadosMismoWcTurno >= 1) {
+                    throw new RuntimeException("🚨 Choque de Turno: Ya hay una persona autorizada de tu misma línea (WC "
+                            + empleado.getWorkCenter().getId() + ") en el turno '"
+                            + turnoAsignado.getNombreTurno() + "' para el día " + diaCursor
+                            + ". El sistema solo permite 1 operador por turno.");
                 }
+
+                // 🔒 CANDADO 2: La Bolsa del Jefe (Cupo del Grupo de Procesos)
+                // Si pasó la regla del turno, verificamos que su grupo tenga lugares libres en la bolsa.
+                if (empleado.getCentroCosto() != null) {
+                    // 💡 Variable efectivamente final para el Lambda
+                    final LocalDate fechaEvaluada = diaCursor;
+
+                    grupoProcesoRepository.findByCentrosCosto_Id(empleado.getCentroCosto().getId())
+                            .ifPresent(grupo -> {
+                                // Extraemos todos los IDs de los Centros de Costo de esta bolsa
+                                List<Integer> ccIdsDelGrupo = grupo.getCentrosCosto().stream()
+                                        .map(CentroCosto::getId)
+                                        .collect(Collectors.toList());
+
+                                // Contamos cuántos se van de vacaciones de todo este bloque
+                                long ocupadosEnElMacroGrupo = solicitudVacacionesRepository.countVacacionesPorGrupoYFecha(ccIdsDelGrupo, fechaEvaluada);
+
+                                if (ocupadosEnElMacroGrupo >= grupo.getCupoMaximo()) {
+                                    throw new RuntimeException("🛑 Bolsa Agotada: El límite máximo de " + grupo.getCupoMaximo()
+                                            + " lugares para tu grupo ('" + grupo.getNombre()
+                                            + "') ha sido alcanzado para el día " + fechaEvaluada + ". Intenta con otra fecha.");
+                                }
+                            });
+                }
+
                 diaCursor = diaCursor.plusDays(1);
             }
+            // --- FIN DE LA NUEVA ADUANA ---
         }
 
         boolean esExtemporanea = determinarSiEsExtemporanea(empleado, request.fechaInicio());
@@ -1446,66 +1483,75 @@ public class VacacionesService {
         return descansosSaneados.contains(diaSemanaActual);
     }
 
-    private void ejecutarEfectoDominoCapacidad(SolicitudVacaciones solicitudAprobada) {
+    public void ejecutarEfectoDominoCapacidad(SolicitudVacaciones solicitudAprobada) {
         if (solicitudAprobada == null || solicitudAprobada.getEmpleado() == null ||
                 solicitudAprobada.getEmpleado().getWorkCenter() == null || solicitudAprobada.getTurno() == null) {
             return;
         }
 
         Integer turnoId = solicitudAprobada.getTurno().getId();
+        Integer wcId = solicitudAprobada.getEmpleado().getWorkCenter().getId();
         LocalDate inicio = solicitudAprobada.getFechaInicio();
         LocalDate fin = solicitudAprobada.getFechaFin();
 
         if (inicio == null || fin == null) return;
 
-        // 🧠 Preparar variables de la Bolsa Macro (Cero Mocks)
-        Integer supervisorNomina = solicitudAprobada.getEmpleado().getWorkCenter().getSupervisorNomina();
-        if (supervisorNomina == null) return;
-
-        List<WorkCenter> lineasArea = obtenerWorkCentersPorJefe(supervisorNomina);
-        List<Integer> wcsDelArea = lineasArea.stream().map(WorkCenter::getId).collect(Collectors.toList());
-        if (wcsDelArea.isEmpty()) wcsDelArea.add(solicitudAprobada.getEmpleado().getWorkCenter().getId());
-
         LocalDate diaCursor = inicio;
         while (!diaCursor.isAfter(fin)) {
-            int mes = diaCursor.getMonthValue();
-            int anio = diaCursor.getYear();
+            final LocalDate diaEvaluado = diaCursor;
 
-            // ✨ 4. BÚSQUEDA DEL ANCLA GLOBAL PARA EFECTO DOMINÓ
-            java.util.Optional<CapacidadVacacionesMes> configOpt = capacidadRepo
-                    .findBySupervisorNominaAndMesAndAnioAndTurno_Id(supervisorNomina, mes, anio, turnoId);
+            // 🧹 BARRIDO 1: Choque de Turno y WC (Regla 1x1)
+            long ocupadosMismoWcTurno = solicitudVacacionesRepository.contarOcupadosPorLineaYTurno(wcId, turnoId, diaEvaluado);
 
-            if (configOpt.isPresent()) {
-                CapacidadVacacionesMes configLinea = configOpt.get();
+            if (ocupadosMismoWcTurno >= 1) {
+                // Rechazamos a todos los que estaban formados esperando irse en ese mismo WC, Turno y Día
+                List<SolicitudVacaciones> pendientesWcTurno = solicitudVacacionesRepository.findAll().stream()
+                        .filter(s -> s.getEstatus() != null && s.getEstatus().toUpperCase().startsWith("PENDIENTE"))
+                        .filter(s -> s.getEmpleado() != null && s.getEmpleado().getWorkCenter() != null && s.getEmpleado().getWorkCenter().getId().equals(wcId))
+                        .filter(s -> s.getTurno() != null && s.getTurno().getId().equals(turnoId))
+                        .filter(s -> !s.getId().equals(solicitudAprobada.getId()))
+                        .filter(s -> !diaEvaluado.isBefore(s.getFechaInicio()) && !diaEvaluado.isAfter(s.getFechaFin()))
+                        .collect(Collectors.toList());
 
-                // 🛡️ Filtro Único: Capa Macro (Bolsa de Turno)
-                long ocupadosArea = solicitudVacacionesRepository.contarOcupadosPorAreaYTurno(wcsDelArea, turnoId, diaCursor);
-                boolean areaSaturada = ocupadosArea >= configLinea.getMaxEmpleadosPorDia();
-
-                if (areaSaturada) {
-                    final LocalDate diaLleno = diaCursor;
-
-                    // Como se llenó la macro-bolsa, caen todos los del área en ese turno
-                    List<SolicitudVacaciones> pendientesAfectadas = solicitudVacacionesRepository.findAll().stream()
-                            .filter(s -> s.getEstatus() != null && s.getEstatus().toUpperCase().startsWith("PENDIENTE"))
-                            .filter(s -> s.getEmpleado() != null && s.getEmpleado().getWorkCenter() != null && wcsDelArea.contains(s.getEmpleado().getWorkCenter().getId()))
-                            .filter(s -> s.getTurno() != null && s.getTurno().getId().equals(turnoId))
-                            .filter(s -> !s.getId().equals(solicitudAprobada.getId()))
-                            .filter(s -> !diaLleno.isBefore(s.getFechaInicio()) && !diaLleno.isAfter(s.getFechaFin()))
-                            .collect(Collectors.toList());
-
-                    for (SolicitudVacaciones solRechazada : pendientesAfectadas) {
-                        String timestamp = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").format(LocalDateTime.now());
-
-                        String razonContable = "La capacidad global del Área para el " + solicitudAprobada.getTurno().getNombreTurno() + " ha sido cubierta al 100%.";
-
-                        solRechazada.setEstatus("Rechazado");
-                        solRechazada.setComentarioSupervisor("[SISTEMA]: Solicitud RECHAZADA AUTOMÁTICAMENTE. Razón: " + razonContable + " Autorización previa asentada el " + timestamp + ".");
-                        solRechazada.setNotasSistema((solRechazada.getNotasSistema() != null ? solRechazada.getNotasSistema() + "\n" : "") + "[SISTEMA - EFECTO DOMINÓ] Rechazo coactivo por saturación el " + diaLleno);
-                        solicitudVacacionesRepository.save(solRechazada);
-                    }
+                for (SolicitudVacaciones solRechazada : pendientesWcTurno) {
+                    String timestamp = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").format(LocalDateTime.now());
+                    solRechazada.setEstatus("Rechazado");
+                    solRechazada.setComentarioSupervisor("[SISTEMA]: Solicitud RECHAZADA AUTOMÁTICAMENTE. Razón: El lugar para tu turno en la línea (WC " + wcId + ") ya fue ocupado. Autorización previa asentada el " + timestamp + ".");
+                    solRechazada.setNotasSistema((solRechazada.getNotasSistema() != null ? solRechazada.getNotasSistema() + "\n" : "") + "[SISTEMA - EFECTO DOMINÓ] Choque de turno el " + diaEvaluado);
+                    solicitudVacacionesRepository.save(solRechazada);
                 }
             }
+
+            // 🧹 BARRIDO 2: Saturación de la Bolsa (Grupo de Proceso)
+            if (solicitudAprobada.getEmpleado().getCentroCosto() != null) {
+                grupoProcesoRepository.findByCentrosCosto_Id(solicitudAprobada.getEmpleado().getCentroCosto().getId())
+                        .ifPresent(grupo -> {
+                            List<Integer> ccIdsDelGrupo = grupo.getCentrosCosto().stream()
+                                    .map(CentroCosto::getId)
+                                    .collect(Collectors.toList());
+
+                            long ocupadosEnElMacroGrupo = solicitudVacacionesRepository.countVacacionesPorGrupoYFecha(ccIdsDelGrupo, diaEvaluado);
+
+                            if (ocupadosEnElMacroGrupo >= grupo.getCupoMaximo()) {
+                                // Si se llenó la bolsa, rechazamos a todos los pendientes de CUALQUIER CC de este grupo para ese día
+                                List<SolicitudVacaciones> pendientesGrupo = solicitudVacacionesRepository.findAll().stream()
+                                        .filter(s -> s.getEstatus() != null && s.getEstatus().toUpperCase().startsWith("PENDIENTE"))
+                                        .filter(s -> s.getEmpleado() != null && s.getEmpleado().getCentroCosto() != null && ccIdsDelGrupo.contains(s.getEmpleado().getCentroCosto().getId()))
+                                        .filter(s -> !s.getId().equals(solicitudAprobada.getId()))
+                                        .filter(s -> !diaEvaluado.isBefore(s.getFechaInicio()) && !diaEvaluado.isAfter(s.getFechaFin()))
+                                        .collect(Collectors.toList());
+
+                                for (SolicitudVacaciones solRechazada : pendientesGrupo) {
+                                    String timestamp = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").format(LocalDateTime.now());
+                                    solRechazada.setEstatus("Rechazado");
+                                    solRechazada.setComentarioSupervisor("[SISTEMA]: Solicitud RECHAZADA AUTOMÁTICAMENTE. Razón: La capacidad máxima del grupo ('" + grupo.getNombre() + "') se ha agotado para este día. Autorización previa asentada el " + timestamp + ".");
+                                    solRechazada.setNotasSistema((solRechazada.getNotasSistema() != null ? solRechazada.getNotasSistema() + "\n" : "") + "[SISTEMA - EFECTO DOMINÓ] Saturación de Grupo el " + diaEvaluado);
+                                    solicitudVacacionesRepository.save(solRechazada);
+                                }
+                            }
+                        });
+            }
+
             diaCursor = diaCursor.plusDays(1);
         }
     }
@@ -1818,5 +1864,11 @@ public class VacacionesService {
         }
 
         return datos;
+    }
+    // 💡 Método auxiliar para leer el Switch Maestro en DB
+    public boolean isEscalamientoAutomaticoHabilitado() {
+        return configuracionSistemaRepository.findById("ESCALAMIENTO_AUTOMATICO")
+                .map(c -> "TRUE".equalsIgnoreCase(c.getValor()) || "ENABLED".equalsIgnoreCase(c.getValor()) || "1".equals(c.getValor()))
+                .orElse(false);
     }
 }

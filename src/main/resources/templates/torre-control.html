@@ -482,7 +482,34 @@
                     </form>
                 </div>
                 <div class="mt-5 pt-4 border-top">
-                    <h5 class="fw-bold text-danger mb-4"><i class="bi bi-stopwatch-fill me-2"></i>Tiempo de Gracia para Respuesta (SLA)</h5>
+                    <div class="card p-4 rounded-4 border shadow-sm mb-4" th:classappend="${escalamientoActivo} ? 'border-success bg-success bg-opacity-10' : 'border-secondary bg-light'">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div>
+                                <h5 class="fw-bold mb-1" th:classappend="${escalamientoActivo} ? 'text-success' : 'text-secondary'">
+                                    <i class="bi" th:classappend="${escalamientoActivo} ? 'bi-robot me-2' : 'bi-power me-2'"></i>
+                                    Escalamiento al Supervisor (Doble Filtro)
+                                </h5>
+                                <p class="text-muted small mb-0">Si está encendido, las solicitudes Ordinarias ignoradas por el Shift Leader escalarán al Supervisor para una segunda revisión. Si está apagado, la Barredora las Auto-Aprobará de inmediato al expirar su tiempo.</p>
+                            </div>
+
+                            <form th:action="@{/admin/configuracion/toggle-escalamiento}" method="post" class="m-0 text-end">
+                                <input type="hidden" name="nominaUsuario" th:value="${session.usuarioLogueado}">
+
+                                <input type="hidden" name="habilitado" th:value="${!escalamientoActivo}">
+
+                                <button type="submit" class="btn btn-lg rounded-pill px-4 fw-bold shadow-sm"
+                                        th:classappend="${escalamientoActivo} ? 'btn-success' : 'btn-secondary'"
+                                        th:title="${escalamientoActivo} ? 'Apagar Robot' : 'Encender Robot'">
+
+                                    <span th:if="${escalamientoActivo}"><i class="bi bi-toggle-on fs-4 me-2 align-middle"></i> ENCENDIDO</span>
+                                    <span th:unless="${escalamientoActivo}"><i class="bi bi-toggle-off fs-4 me-2 align-middle"></i> APAGADO</span>
+
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <h5 class="fw-bold text-danger mb-3"><i class="bi bi-stopwatch-fill me-2"></i>Tiempo de Gracia para Respuesta (SLA)</h5>
                     <form th:action="@{/admin/nomina/guardar-sla}" method="post" class="p-4 bg-white rounded-4 border border-danger shadow-sm">
                         <input type="hidden" name="nominaUsuario" th:value="${session.usuarioLogueado}">
                         <div class="row g-3 align-items-center">

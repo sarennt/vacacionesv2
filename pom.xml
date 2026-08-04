@@ -11,7 +11,7 @@
 	<groupId>com.hrms</groupId>
 	<artifactId>vacaciones</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>vacaciones</name>
+	<name>vacacionesv2</name>
 	<description>vacaciones spring</description>
 	<url/>
 	<licenses>

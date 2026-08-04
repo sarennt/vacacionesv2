@@ -85,6 +85,7 @@ public class TorreControlController {
         ConfiguracionCorteNomina cAdmin = configCorteRepo.findByTipoEmpleado("ADMINISTRATIVO").orElse(new ConfiguracionCorteNomina());
         model.addAttribute("corteAdmin", cAdmin.getDiaCorte() != null ? cAdmin.getDiaCorte() : 3);
         model.addAttribute("horaCorteAdmin", cAdmin.getHoraCorte());
+
         // Tiempo SLA Jefaturas
         model.addAttribute("horasSlaJefe", configSistemaRepo.findById("SLA_RESPUESTA_JEFE").map(ConfiguracionSistema::getValor).orElse("48"));
 
@@ -94,6 +95,16 @@ public class TorreControlController {
         model.addAttribute("jefaNomina", rolesNominaRepo.findById("JEFA_NOMINA").map(ConfiguracionRolesNomina::getNumNominaAsignada).orElse(null));
         model.addAttribute("progMaster", rolesNominaRepo.findById("PROGRAMADOR_MASTER").map(ConfiguracionRolesNomina::getNumNominaAsignada).orElse(null));
         model.addAttribute("progBackup", rolesNominaRepo.findById("PROGRAMADOR_RESPALDO").map(ConfiguracionRolesNomina::getNumNominaAsignada).orElse(null));
+
+        // =========================================================================
+        // ✨ NUEVO: LECTURA DEL SWITCH MAESTRO DE AUTO-APROBACIÓN (LA BARREDORA)
+        // =========================================================================
+        boolean escalamientoActivo = configSistemaRepo.findById("ESCALAMIENTO_AUTOMATICO")
+                .map(c -> "TRUE".equalsIgnoreCase(c.getValor()) || "ENABLED".equalsIgnoreCase(c.getValor()) || "1".equals(c.getValor()))
+                .orElse(false);
+
+        model.addAttribute("escalamientoActivo", escalamientoActivo);
+        // =========================================================================
 
         return "torre-control";
     }
