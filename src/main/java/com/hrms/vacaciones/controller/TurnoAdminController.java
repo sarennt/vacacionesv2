@@ -38,15 +38,11 @@ public class TurnoAdminController {
         if (turno.getActivo() == null) {
             turno.setActivo(true);
         }
-        if (turno.getEsPorDefecto() == null) {
-            turno.setEsPorDefecto(false);
-        }
+        // ELIMINA EL IF DE getEsPorDefecto AQUÍ
         if (turno.getDiasDescanso() == null || turno.getDiasDescanso().isBlank()) {
             turno.setDiasDescanso("DOMINGO"); // Escudo por defecto de la planta
         }
-        if (turno.getPeso() == null) {
-            turno.setPeso(3); // Ponderación estándar intermedia del Plan Maestro
-        }
+        // ELIMINA EL IF DE getPeso AQUÍ
 
         Turno guardado = turnoRepository.save(turno);
         return ResponseEntity.ok(guardado);
@@ -62,17 +58,12 @@ public class TurnoAdminController {
                     // 🧠 Alineación milimétrica con los nuevos campos de Turno.java
                     turnoExistente.setNombreTurno(turnoDetalles.getNombreTurno());
                     turnoExistente.setHorasJornada(turnoDetalles.getHorasJornada());
+                    turnoExistente.setHorasSemanales(turnoDetalles.getHorasSemanales()); // ✨ Inyectamos la nueva columna
                     turnoExistente.setMundo(turnoDetalles.getMundo());
                     turnoExistente.setDiasDescanso(turnoDetalles.getDiasDescanso());
 
                     if (turnoDetalles.getActivo() != null) {
                         turnoExistente.setActivo(turnoDetalles.getActivo());
-                    }
-                    if (turnoDetalles.getEsPorDefecto() != null) {
-                        turnoExistente.setEsPorDefecto(turnoDetalles.getEsPorDefecto());
-                    }
-                    if (turnoDetalles.getPeso() != null) {
-                        turnoExistente.setPeso(turnoDetalles.getPeso());
                     }
 
                     Turno actualizado = turnoRepository.save(turnoExistente);

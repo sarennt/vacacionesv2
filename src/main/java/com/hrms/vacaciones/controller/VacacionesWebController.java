@@ -10,11 +10,8 @@ import com.hrms.vacaciones.model.*;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import jakarta.servlet.http.HttpServletResponse;
@@ -22,6 +19,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.temporal.WeekFields;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -29,6 +27,8 @@ import java.util.ArrayList;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.HashMap;
+import java.util.Comparator;
 
 @Controller
 public class VacacionesWebController {
@@ -41,7 +41,13 @@ public class VacacionesWebController {
     private final SolicitudPermisoRepository solicitudPermisoRepository;
     private final DiasFestivosRepository diasFestivosRepository;
     private final ConfiguracionSistemaRepository configSistemaRepo;
-    private final TurnoRepository turnoRepo; // ✨ Repositorio maestro unificado
+    private final TurnoRepository turnoRepo;
+    private final TabuladorVacacionesRepository tabuladorRepo;
+    private final ConfiguracionRolesNominaRepository rolesNominaRepo;
+
+
+    // ✨ 1. DECLARAMOS EL REPOSITORIO DE CORTES
+    private final ConfiguracionCorteNominaRepository configuracionCorteNominaRepository;
 
     @Autowired
     public VacacionesWebController(EmpleadoService empleadoService,
@@ -52,7 +58,10 @@ public class VacacionesWebController {
                                    SolicitudPermisoRepository solicitudPermisoRepository,
                                    DiasFestivosRepository diasFestivosRepository,
                                    ConfiguracionSistemaRepository configSistemaRepo,
-                                   TurnoRepository turnoRepo) {
+                                   TurnoRepository turnoRepo,
+                                   ConfiguracionCorteNominaRepository configuracionCorteNominaRepository,
+                                   TabuladorVacacionesRepository tabuladorRepo,
+                                   ConfiguracionRolesNominaRepository rolesNominaRepo) { // ✨ NUEVO
         this.empleadoService = empleadoService;
         this.vacationsService = vacationsService;
         this.permisosService = permisosService;
@@ -62,12 +71,17 @@ public class VacacionesWebController {
         this.diasFestivosRepository = diasFestivosRepository;
         this.configSistemaRepo = configSistemaRepo;
         this.turnoRepo = turnoRepo;
+        this.configuracionCorteNominaRepository = configuracionCorteNominaRepository;
+        this.tabuladorRepo = tabuladorRepo;
+        this.rolesNominaRepo = rolesNominaRepo; // ✨ NUEVO
     }
 
     @GetMapping("/pantallas/dashboard")
     public String mostrarDashboard(HttpSession session,
                                    @RequestParam(value = "fechaInicio", required = false) String fechaInicioStr,
                                    @RequestParam(value = "fechaFin", required = false) String fechaFinStr,
+                                   @RequestParam(value = "nominaConsulta", required = false) Integer nominaConsulta,
+                                   @RequestParam(value = "modoVisor", required = false) Boolean modoVisor,
                                    Model model) {
 
         Object nominaObj = session.getAttribute("usuarioLogueado");
@@ -75,7 +89,14 @@ public class VacacionesWebController {
             return "redirect:/login";
         }
 
-        Integer nominaActiva = Integer.parseInt(nominaObj.toString());
+        // ✨ CIRUGÍA: Interceptar si es el Jefe espiando (Visor) o el flujo normal
+        Integer nominaActiva;
+        if (nominaConsulta != null && Boolean.TRUE.equals(modoVisor)) {
+            nominaActiva = nominaConsulta;
+            model.addAttribute("modoVisor", true); // Bandera para apagar cosas en el HTML
+        } else {
+            nominaActiva = Integer.parseInt(nominaObj.toString());
+        }
 
         Empleado empleado = empleadoRepository.findById(nominaActiva)
                 .orElseThrow(() -> new RuntimeException("Empleado no encontrado"));
@@ -94,8 +115,31 @@ public class VacacionesWebController {
         Map<String, List<SolicitudDTO>> dominiosHistorial =
                 vacationsService.obtenerHistorialSeparadoYFiltrado(nominaActiva, inicio, fin);
 
-        model.addAttribute("historialVacaciones", dominiosHistorial.get("vacaciones"));
-        model.addAttribute("historialPermisos", dominiosHistorial.get("permisos"));
+        // ✨ SEPARACIÓN DE VIVAS Y CANCELADAS
+        List<SolicitudDTO> todasVacaciones = dominiosHistorial.get("vacaciones");
+        List<SolicitudDTO> todosPermisos = dominiosHistorial.get("permisos");
+
+        // 1. Filtramos y ordenamos Vacaciones (Vivas) por fecha de creación descendiente (lo más nuevo primero)
+        List<SolicitudDTO> vacacionesVivas = todasVacaciones.stream()
+                .filter(s -> !s.estatus().equalsIgnoreCase("CANCELADO"))
+                .sorted((a, b) -> b.fechaCreacion().compareTo(a.fechaCreacion()))
+                .collect(Collectors.toList());
+        model.addAttribute("historialVacaciones", vacacionesVivas);
+
+        // 2. Filtramos y ordenamos Permisos (Vivos) por fecha de creación descendiente
+        List<SolicitudDTO> permisosVivos = todosPermisos.stream()
+                .filter(s -> !s.estatus().equalsIgnoreCase("CANCELADO"))
+                .sorted((a, b) -> b.fechaCreacion().compareTo(a.fechaCreacion()))
+                .collect(Collectors.toList());
+        model.addAttribute("historialPermisos", permisosVivos);
+
+        // 3. Agrupamos y ordenamos Canceladas por fecha de creación descendiente
+        List<SolicitudDTO> listaCanceladas = new ArrayList<>();
+        listaCanceladas.addAll(todasVacaciones.stream().filter(s -> s.estatus().equalsIgnoreCase("CANCELADO")).toList());
+        listaCanceladas.addAll(todosPermisos.stream().filter(s -> s.estatus().equalsIgnoreCase("CANCELADO")).toList());
+
+        listaCanceladas.sort((a, b) -> b.fechaCreacion().compareTo(a.fechaCreacion()));
+        model.addAttribute("historialCanceladas", listaCanceladas);
 
         model.addAttribute("fechaInicioFilter", fechaInicioStr);
         model.addAttribute("fechaFinFilter", fechaFinStr);
@@ -133,6 +177,16 @@ public class VacacionesWebController {
             model.addAttribute("mostrarAlertaModal", false);
         }
 
+        // ✨ INYECCIÓN RELOJ TORRE DE CONTROL PARA EL FRONTEND
+        ConfiguracionCorteNomina cSind = configuracionCorteNominaRepository.findByTipoEmpleado("SINDICALIZADO").orElse(new ConfiguracionCorteNomina());
+        model.addAttribute("diaCorteSind", cSind.getDiaCorte() != null ? cSind.getDiaCorte() : 2);
+        model.addAttribute("horaCorteSind", cSind.getHoraCorte() != null ? cSind.getHoraCorte().toString() : "12:00");
+
+        ConfiguracionCorteNomina cAdmin = configuracionCorteNominaRepository.findByTipoEmpleado("ADMINISTRATIVO").orElse(new ConfiguracionCorteNomina());
+        model.addAttribute("diaCorteAdmin", cAdmin.getDiaCorte() != null ? cAdmin.getDiaCorte() : 3);
+        model.addAttribute("horaCorteAdmin", cAdmin.getHoraCorte() != null ? cAdmin.getHoraCorte().toString() : "12:00");
+        model.addAttribute("listaTurnosMaster", turnoRepo.findByActivoTrue());
+
         return "dashboard";
     }
 
@@ -154,8 +208,14 @@ public class VacacionesWebController {
         model.addAttribute("roles", turnoRepo.findByActivoTrue());
         model.addAttribute("listaTurnosMaster", turnoRepo.findByActivoTrue());
 
-        List<String> fechasFestivas = diasFestivosRepository.findByActivoTrue().stream()
-                .map(festivo -> festivo.getFecha().toString())
+        // ✨ NUEVO: Ahora mandamos un diccionario con Fecha + Descripción para pintar el calendario
+        List<Map<String, String>> fechasFestivas = diasFestivosRepository.findByActivoTrue().stream()
+                .map(festivo -> {
+                    Map<String, String> map = new HashMap<>();
+                    map.put("fecha", festivo.getFecha().toString());
+                    map.put("descripcion", festivo.getDescripcion());
+                    return map;
+                })
                 .collect(Collectors.toList());
         model.addAttribute("festivos", fechasFestivas);
 
@@ -169,6 +229,28 @@ public class VacacionesWebController {
 
         model.addAttribute("horasAnticipacion", horasAnticipacion);
         model.addAttribute("bloquearExtemporaneas", bloquearExt);
+
+        // --- INICIO CÁLCULO DE GUÍLLOTINA PARA EL CALENDARIO ---
+        ConfiguracionCorteNomina configCorte = configuracionCorteNominaRepository.findByTipoEmpleado(tipoCorto.equals("SIND") ? "SINDICALIZADO" : "ADMINISTRATIVO").orElse(null);
+        LocalDate fechaMinimaPermitida = LocalDate.now().with(java.time.DayOfWeek.MONDAY); // Por defecto, el lunes de esta semana
+
+        if (configCorte != null) {
+            LocalDateTime ahora = LocalDateTime.now();
+            java.time.DayOfWeek diaCorte = java.time.DayOfWeek.of(configCorte.getDiaCorte() != null ? configCorte.getDiaCorte() : 2);
+            java.time.LocalTime horaCorte = configCorte.getHoraCorte() != null ? configCorte.getHoraCorte() : java.time.LocalTime.of(16, 0);
+
+            LocalDateTime limiteGuillotina = ahora.with(java.time.DayOfWeek.MONDAY)
+                    .plusDays(diaCorte.getValue() - 1)
+                    .toLocalDate()
+                    .atTime(horaCorte);
+
+            if (ahora.isBefore(limiteGuillotina)) {
+                // La nómina sigue viva, el calendario se abre hasta el lunes de la semana pasada
+                fechaMinimaPermitida = ahora.with(java.time.DayOfWeek.MONDAY).minusWeeks(1).toLocalDate();
+            }
+        }
+        model.addAttribute("fechaMinimaCaptura", fechaMinimaPermitida.toString());
+// --- FIN CÁLCULO ---
 
         return "solicitar";
     }
@@ -195,8 +277,14 @@ public class VacacionesWebController {
         model.addAttribute("roles", turnoRepo.findByActivoTrue());
         model.addAttribute("listaTurnosMaster", turnoRepo.findByActivoTrue());
 
-        List<String> fechasFestivas = diasFestivosRepository.findByActivoTrue().stream()
-                .map(festivo -> festivo.getFecha().toString())
+        // ✨ NUEVO: Ahora mandamos un diccionario con Fecha + Descripción para pintar el calendario
+        List<Map<String, String>> fechasFestivas = diasFestivosRepository.findByActivoTrue().stream()
+                .map(festivo -> {
+                    Map<String, String> map = new HashMap<>();
+                    map.put("fecha", festivo.getFecha().toString());
+                    map.put("descripcion", festivo.getDescripcion());
+                    return map;
+                })
                 .collect(Collectors.toList());
         model.addAttribute("festivos", fechasFestivas);
 
@@ -210,6 +298,27 @@ public class VacacionesWebController {
 
         model.addAttribute("horasAnticipacion", horasAnticipacion);
         model.addAttribute("bloquearExtemporaneas", bloquearExt);
+
+        // --- INICIO CÁLCULO DE GUÍLLOTINA PARA EL CALENDARIO ---
+        ConfiguracionCorteNomina configCorte = configuracionCorteNominaRepository.findByTipoEmpleado(tipoCorto.equals("SIND") ? "SINDICALIZADO" : "ADMINISTRATIVO").orElse(null);
+        LocalDate fechaMinimaPermitida = LocalDate.now().with(java.time.DayOfWeek.MONDAY);
+
+        if (configCorte != null) {
+            LocalDateTime ahora = LocalDateTime.now();
+            java.time.DayOfWeek diaCorte = java.time.DayOfWeek.of(configCorte.getDiaCorte() != null ? configCorte.getDiaCorte() : 2);
+            java.time.LocalTime horaCorte = configCorte.getHoraCorte() != null ? configCorte.getHoraCorte() : java.time.LocalTime.of(16, 0);
+
+            LocalDateTime limiteGuillotina = ahora.with(java.time.DayOfWeek.MONDAY)
+                    .plusDays(diaCorte.getValue() - 1)
+                    .toLocalDate()
+                    .atTime(horaCorte);
+
+            if (ahora.isBefore(limiteGuillotina)) {
+                fechaMinimaPermitida = ahora.with(java.time.DayOfWeek.MONDAY).minusWeeks(1).toLocalDate();
+            }
+        }
+        model.addAttribute("fechaMinimaCaptura", fechaMinimaPermitida.toString());
+        // --- FIN CÁLCULO ---
 
         return "solicitar";
     }
@@ -231,9 +340,14 @@ public class VacacionesWebController {
         model.addAttribute("esDesarrollador", vacationsService.esDesarrolladorDios(nominaLogueada));
         model.addAttribute("nominaLogueada", nominaLogueada);
         model.addAttribute("recuperacionesPendientes", vacationsService.obtenerPendientesDeNomina());
+
+        // ✨ FILTRO ESTRICTO: Solo jala incidencias desde el lunes de la semana pasada (Semana Viva de Nómina)
+        LocalDate inicioSemanaViva = LocalDate.now().with(java.time.DayOfWeek.MONDAY).minusWeeks(1);
+        model.addAttribute("auditoriaPermisos", permisosService.obtenerPermisosParaAuditoriaRH(inicioSemanaViva));
+        model.addAttribute("auditoriaVacaciones", vacationsService.obtenerVacacionesParaAuditoriaRH(inicioSemanaViva));
+
         model.addAttribute("historialRecuperacionesGlobal", vacationsService.obtenerHistorialRecuperacionesGlobal());
         model.addAttribute("plantillaCompleta", empleadoRepository.findAll());
-        model.addAttribute("historialDepuracionesGlobal", vacationsService.obtenerDepuracionesGlobales());
 
         if (buscarNomina != null) {
             empleadoRepository.findById(buscarNomina).ifPresent(emp -> {
@@ -241,17 +355,26 @@ public class VacacionesWebController {
                 model.addAttribute("saldoProporcional", emp.getSaldoProporcional());
                 model.addAttribute("historialAuditoria", vacationsService.obtenerHistorialAuditoriaSaldos(buscarNomina));
 
-                com.hrms.vacaciones.dto.TableroEmpleadoResponse tablero = vacationsService.obtenerTablero(buscarNomina);
-                model.addAttribute("historialGeneral", tablero.historial());
+                // ✨ CIRUGÍA: Reemplazamos el historial unificado por la consulta separada
+                Map<String, List<SolicitudDTO>> dominiosHistorial =
+                        vacationsService.obtenerHistorialSeparadoYFiltrado(buscarNomina, null, null);
+
+                // Mandamos las dos listas independientes a la vista
+                model.addAttribute("historialVacacionesIndiv", dominiosHistorial.get("vacaciones"));
+                model.addAttribute("historialPermisosIndiv", dominiosHistorial.get("permisos"));
 
                 List<SolicitudVacaciones> aprobadas = solicitudVacacionesRepository
+                        // ...
                         .findByEmpleado_NominaOrderByFechaInicioDesc(buscarNomina).stream()
                         .filter(s -> "Aprobado".equalsIgnoreCase(s.getEstatus()))
                         .collect(Collectors.toList());
                 model.addAttribute("solicitudesEmpleado", aprobadas);
             });
         }
-
+        // ✨ Pasamos el tabulador de ley de la BD hacia JavaScript
+        model.addAttribute("tabuladorLey", tabuladorRepo.findAll(org.springframework.data.domain.Sort.by("anioAntiguedad")));
+        // ✨ Inyectamos el bono a la pantalla de Auditoría
+        model.addAttribute("bonoAdmin", com.hrms.vacaciones.service.TabuladorCache.getBonoAdministrativo());
         return "gestion-saldos";
     }
 
@@ -369,6 +492,61 @@ public class VacacionesWebController {
         }
 
         return "redirect:/pantallas/gestion-saldos?tab=recuperaciones";
+    }
+
+    @PostMapping("/pantallas/gestion-saldos/retener-txt")
+    public String retenerTxtNomina(@RequestParam("solicitudId") Long solicitudId, HttpSession session, RedirectAttributes redirectAttributes) {
+        Object logueadoObj = session.getAttribute("usuarioLogueado");
+        if (logueadoObj == null) return "redirect:/login";
+        try {
+            permisosService.retenerIncidenciaTxt(solicitudId); // ✨ Ahora apunta a Permisos
+            redirectAttributes.addFlashAttribute("mensajeExito", "El formato fue retenido para el próximo corte.");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("mensajeError", "Error al retener: " + e.getMessage());
+        }
+        return "redirect:/pantallas/gestion-saldos?tab=auditoria";
+    }
+
+    @PostMapping("/pantallas/gestion-saldos/cerrar-nomina")
+    public String cerrarNomina(HttpSession session, RedirectAttributes redirectAttributes) {
+        Object logueadoObj = session.getAttribute("usuarioLogueado");
+        if (logueadoObj == null) return "redirect:/login";
+        try {
+            int movidos = permisosService.cerrarNominaLimpiarBandeja(); // ✨ Ahora apunta a Permisos
+            redirectAttributes.addFlashAttribute("mensajeExito", "Corte de nómina exitoso. " + movidos + " incidencias procesadas enviadas al historial.");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("mensajeError", "Error al cerrar nómina: " + e.getMessage());
+        }
+        return "redirect:/pantallas/gestion-saldos?tab=auditoria";
+    }
+
+    @PostMapping("/pantallas/gestion-saldos/resolver-auditoria-masiva")
+    public String resolverAuditoriaMasiva(
+            @RequestParam(value = "ids", required = false) List<String> ids, // Cambia a String para recibir el Prefijo
+            @RequestParam("status") String status,
+            @RequestParam(value = "comentario", required = false) String comentario,
+            HttpSession session, RedirectAttributes redirectAttributes) {
+
+        if (ids != null && !ids.isEmpty()) {
+            int procesados = 0;
+            for (String token : ids) {
+                try {
+                    // El front ahora manda 'PERM-5' o 'VAC-10'. Así sabemos a qué tabla pegarle y si debemos regresar saldo.
+                    if (token.startsWith("PERM-")) {
+                        Long id = Long.parseLong(token.substring(5));
+                        permisosService.rechazarPermisoAuditoria(id, comentario);
+                    } else if (token.startsWith("VAC-")) {
+                        Integer id = Integer.parseInt(token.substring(4));
+                        vacationsService.rechazarVacacionAuditoria(id, comentario);
+                    }
+                    procesados++;
+                } catch (Exception e) {
+                    System.out.println("Error procesando: " + token);
+                }
+            }
+            redirectAttributes.addFlashAttribute("mensajeExito", procesados + " incidencias fueron rechazadas (Las vacaciones canceladas reintegraron su saldo).");
+        }
+        return "redirect:/pantallas/gestion-saldos?tab=auditoria";
     }
 
     @PostMapping("/pantallas/gestion-saldos/actualizar-perfil")
@@ -542,7 +720,8 @@ public class VacacionesWebController {
                         String comment = v.getComentarioJefe() != null ? v.getComentarioJefe().trim() : "";
 
                         String incidencia = "V";
-                        if (comment.contains("[TXT]") || type.toUpperCase().contains("TXT")) incidencia = "TXT";
+                        if (comment.contains("[RETENIDO]")) incidencia = "F"; // ✨ REGLA DE ORO: Si está retenido, imprime F directo.
+                        else if (comment.contains("[TXT]") || type.toUpperCase().contains("TXT")) incidencia = "TXT";
                         else if (comment.contains("[HO]") || type.toUpperCase().contains("HO")) incidencia = "HO";
                         else if (comment.contains("[C]") || type.toUpperCase().contains("CLIENTE")) incidencia = "C";
                         else if (comment.contains("[P]") || type.toUpperCase().contains("PROVEEDOR")) incidencia = "P";
@@ -809,5 +988,157 @@ public class VacacionesWebController {
         }
         writer.flush();
         writer.close();
+    }
+
+    @PostMapping("/pantallas/solicitudes/cancelar-vacacion-api")
+    @ResponseBody
+    public org.springframework.http.ResponseEntity<?> cancelarVacacionApi(@RequestParam("idSolicitud") Integer idSolicitud, HttpSession session) {
+        Object nominaObj = session.getAttribute("usuarioLogueado");
+        if (nominaObj == null) return org.springframework.http.ResponseEntity.status(401).body(Map.of("error", "Sesión expirada"));
+
+        try {
+            vacationsService.cancelarSolicitudPorEmpleado(idSolicitud, Integer.parseInt(nominaObj.toString()));
+            return org.springframework.http.ResponseEntity.ok(Map.of("mensaje", "Vacación cancelada correctamente."));
+        } catch (Exception e) {
+            return org.springframework.http.ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/pantallas/solicitudes/cancelar-permiso-api")
+    @ResponseBody
+    public org.springframework.http.ResponseEntity<?> cancelarPermisoApi(@RequestParam("idSolicitud") Long idSolicitud, HttpSession session) {
+        Object nominaObj = session.getAttribute("usuarioLogueado");
+        if (nominaObj == null) return org.springframework.http.ResponseEntity.status(401).body(Map.of("error", "Sesión expirada"));
+
+        try {
+            permisosService.cancelarPermisoPorEmpleado(idSolicitud, Integer.parseInt(nominaObj.toString()));
+            return org.springframework.http.ResponseEntity.ok(Map.of("mensaje", "Permiso cancelado correctamente."));
+        } catch (Exception e) {
+            return org.springframework.http.ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // 🟢 API GET: Extrae los datos actuales del permiso para llenar el modal
+    @GetMapping("/pantallas/solicitudes/api/permiso/{id}")
+    @ResponseBody
+    public org.springframework.http.ResponseEntity<?> obtenerDetallePermisoApi(@PathVariable Long id, HttpSession session) {
+        Object nominaObj = session.getAttribute("usuarioLogueado");
+        if (nominaObj == null) return org.springframework.http.ResponseEntity.status(401).body(Map.of("error", "Sesión expirada"));
+
+        try {
+            SolicitudPermiso permiso = solicitudPermisoRepository.findById(id.intValue())
+                    .orElseThrow(() -> new RuntimeException("Permiso no encontrado."));
+
+            Map<String, Object> data = new HashMap<>();
+            data.put("id", permiso.getId());
+            data.put("codigoPermiso", permiso.getTipoPermiso() != null ? permiso.getTipoPermiso().getCodigo() : "N/A");
+            data.put("fechaIncidencia", permiso.getFechaIncidencia() != null ? permiso.getFechaIncidencia().toString() : "");
+            data.put("turno", permiso.getTurno() != null ? permiso.getTurno().getNombreTurno() : "");
+            data.put("justificacion", permiso.getJustificacionSupervisor() != null ? permiso.getJustificacionSupervisor() : "");
+            data.put("esPorHoras", permiso.getEsPorHoras());
+            data.put("horasPermiso", permiso.getHorasPermiso());
+
+            // Si es TXT, mandamos sus pagos
+            List<Map<String, Object>> pagos = new ArrayList<>();
+            if (permiso.getDesglosesPago() != null) {
+                for (SolicitudTxtPago p : permiso.getDesglosesPago()) {
+                    Map<String, Object> pd = new HashMap<>();
+                    pd.put("fecha", p.getFechaPago().toString());
+                    pd.put("horas", p.getHorasPago());
+                    pagos.add(pd);
+                }
+            }
+            data.put("desglosesPago", pagos);
+
+            return org.springframework.http.ResponseEntity.ok(data);
+        } catch (Exception e) {
+            return org.springframework.http.ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // 🟢 API POST: Recibe los datos nuevos y los guarda
+    @PostMapping("/pantallas/solicitudes/editar-permiso-api/{id}")
+    @ResponseBody
+    public org.springframework.http.ResponseEntity<?> guardarEdicionPermisoApi(@PathVariable Long id, @RequestBody com.hrms.vacaciones.dto.SolicitudPermisoRequestDTO request, HttpSession session) {
+        Object nominaObj = session.getAttribute("usuarioLogueado");
+        if (nominaObj == null) return org.springframework.http.ResponseEntity.status(401).body(Map.of("error", "Sesión expirada"));
+
+        try {
+            permisosService.actualizarSolicitudPermiso(id, request, Integer.parseInt(nominaObj.toString()));
+            return org.springframework.http.ResponseEntity.ok(Map.of("mensaje", "Solicitud actualizada correctamente."));
+        } catch (Exception e) {
+            return org.springframework.http.ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // ✨ NUEVO ENDPOINT: Alimentador del Calendario de Visibilidad Total (Auditoría RH)
+    @GetMapping("/pantallas/gestion-saldos/api/calendario-planta")
+    @ResponseBody
+    public List<Map<String, Object>> obtenerEventosPlantaAuditoria(
+            @RequestParam(value = "esquema", defaultValue = "TODOS") String esquema) {
+        return vacationsService.obtenerEventosCalendarioPlanta(esquema);
+    }
+
+    // =========================================================================
+    // 📊 MÓDULO DE PRENÓMINA Y RELOJ CHECADOR
+    // =========================================================================
+    @GetMapping("/pantallas/prenomina")
+    public org.springframework.web.servlet.ModelAndView mostrarPrenomina(jakarta.servlet.http.HttpSession session) {
+        Object logueadoObj = session.getAttribute("usuarioLogueado");
+        if (logueadoObj == null) {
+            return new org.springframework.web.servlet.ModelAndView("redirect:/login");
+        }
+
+        Integer miNomina = Integer.parseInt(logueadoObj.toString());
+        org.springframework.web.servlet.ModelAndView mav = new org.springframework.web.servlet.ModelAndView("prenomina");
+
+        // 1. Evaluar si es Jefe Operativo
+        com.hrms.vacaciones.model.Empleado empleado = empleadoRepository.findById(miNomina).orElse(null);
+        boolean esJefe = false;
+        if (empleado != null && empleado.getRolJerarquico() != null) {
+            String rol = empleado.getRolJerarquico().toUpperCase();
+            esJefe = rol.contains("SUPERVISOR") || rol.contains("SHIFT") || rol.contains("GERENTE");
+        }
+
+        // 2. Evaluar si es Nómina
+        boolean esNomina = vacationsService.esAdminORH(miNomina);
+
+        // ✨ 3. NUEVO: Evaluar si es Visor Global (Secretarias, Auditores)
+        com.hrms.vacaciones.model.ConfiguracionRolesNomina visorPre = rolesNominaRepo.findById("VISOR_PRENOMINA").orElse(null);
+        com.hrms.vacaciones.model.ConfiguracionRolesNomina visorBio = rolesNominaRepo.findById("VISOR_BIOMETRICO").orElse(null);
+        com.hrms.vacaciones.model.ConfiguracionRolesNomina visorMet = rolesNominaRepo.findById("VISOR_METRICAS").orElse(null);
+
+        boolean esVisorPrenomina = (visorPre != null && miNomina.equals(visorPre.getNumNominaAsignada()));
+        boolean esVisorBiometrico = (visorBio != null && miNomina.equals(visorBio.getNumNominaAsignada()));
+        boolean esVisorMetricas = (visorMet != null && miNomina.equals(visorMet.getNumNominaAsignada()));
+
+        // 4. Pasar variables al frontend
+        mav.addObject("esJefe", esJefe);
+        mav.addObject("esNomina", esNomina);
+        mav.addObject("esVisorPrenomina", esVisorPrenomina);
+        mav.addObject("esVisorBiometrico", esVisorBiometrico);
+        mav.addObject("esVisorMetricas", esVisorMetricas);
+
+        String rolUsuario = session.getAttribute("rolUsuario") != null ? session.getAttribute("rolUsuario").toString() : "USUARIO";
+        mav.addObject("rolUsuario", rolUsuario);
+
+        return mav;
+    }
+
+    // =========================================================================
+    // 🛡️ IMPORTADOR DE PRENÓMINA AUTORIZADA
+    // =========================================================================
+    @Autowired
+    private com.hrms.vacaciones.service.PrenominaAutorizadaImportService importServiceAutorizada;
+
+    @PostMapping("/prenomina/importar-autorizada")
+    public String importarAutorizada(@RequestParam("archivoExcelPulido") org.springframework.web.multipart.MultipartFile file, org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttributes) {
+        try {
+            importServiceAutorizada.importarPrenominaPulida(file);
+            redirectAttributes.addFlashAttribute("mensajeExito", "Prenómina pulida subida correctamente. Los ajustes manuales han sido guardados.");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("mensajeError", "Error al cargar la prenómina pulida: " + e.getMessage());
+        }
+        return "redirect:/pantallas/prenomina";
     }
 }

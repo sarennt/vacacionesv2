@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Portal de Vacaciones - Iniciar Sesión</title>
+    <title th:text="#{login.titulo}">Portal de Vacaciones - Iniciar Sesión</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <link rel="stylesheet" th:href="@{/css/estilos-grammer.css}">
@@ -18,8 +18,8 @@
         </div>
 
         <div class="text-center mb-4">
-            <h4 class="fw-bold text-dark mb-1" style="letter-spacing: -0.5px;">Administrador Incidencias Grammer</h4>
-            <p class="text-muted small">Módulo de Autenticación</p>
+            <h4 class="fw-bold text-dark mb-1" style="letter-spacing: -0.5px;" th:text="#{login.app.titulo}">Administrador Incidencias Grammer</h4>
+            <p class="text-muted small" th:text="#{login.app.subtitulo}">Módulo de Autenticación</p>
         </div>
 
         <div th:if="${error}" class="alert alert-danger d-flex align-items-center mb-4 shadow-sm" role="alert">
@@ -29,34 +29,47 @@
 
         <div th:if="${param.logout}" class="alert alert-success d-flex align-items-center mb-4 shadow-sm" role="alert">
             <i class="bi bi-check-circle-fill me-2 fs-5"></i>
-            <span>Sesión cerrada correctamente en el servidor.</span>
+            <span th:text="#{login.logout.exito}">Sesión cerrada correctamente en el servidor.</span>
         </div>
 
         <form th:action="@{/login}" method="POST">
 
             <div class="mb-3">
-                <label for="nomina" class="form-label-login text-uppercase fw-bold mb-2">Número de Nómina</label>
+                <label for="nomina" class="form-label-login text-uppercase fw-bold mb-2" th:text="#{login.label.nomina}">Número de Nómina</label>
                 <div class="input-group">
                     <span class="input-group-text"><i class="bi bi-person-badge"></i></span>
                     <input type="text" class="form-control" id="nomina" name="nomina"
-                           placeholder="Ej. 14450" required autocomplete="off">
+                           th:placeholder="#{login.placeholder.nomina}" required autocomplete="off">
                 </div>
             </div>
 
             <div class="mb-4">
-                <label for="tag" class="form-label-login text-uppercase fw-bold mb-2">TAG / Credencial</label>
+                <label for="tag" class="form-label-login text-uppercase fw-bold mb-2" th:text="#{login.label.tag}">TAG / Credencial</label>
                 <div class="input-group">
                     <span class="input-group-text"><i class="bi bi-upc-scan"></i></span>
                     <input type="password" class="form-control" id="tag" name="tag"
-                           placeholder="Ingresa el TAG de tu credencial" required>
+                           th:placeholder="#{login.placeholder.tag}" required>
                 </div>
             </div>
 
             <button type="submit" class="btn btn-primary-custom w-100 text-white shadow-sm d-flex align-items-center justify-content-center gap-2">
-                <span>Ingresar al Portal</span>
+                <span th:text="#{login.btn.ingresar}">Ingresar al Portal</span>
                 <i class="bi bi-arrow-right-short fs-4"></i>
             </button>
         </form>
+
+        <!-- ✨ NUEVO: Selector de Idioma Elegante (Estilo Minimalista) -->
+        <div class="mt-4 pt-3 border-top text-center">
+            <span class="text-muted small me-2"><i class="bi bi-globe me-1"></i><span th:text="#{login.idioma}">Idioma</span>:</span>
+            <div class="d-inline-flex gap-2 align-items-center">
+                <a href="?lang=es" class="text-decoration-none small fw-bold" th:classappend="${#locale.language == 'es' or #locale.language == ''} ? 'text-primary' : 'text-secondary opacity-50'">ES</a>
+                <span class="text-muted small opacity-25">|</span>
+                <a href="?lang=en" class="text-decoration-none small fw-bold" th:classappend="${#locale.language == 'en'} ? 'text-primary' : 'text-secondary opacity-50'">EN</a>
+                <span class="text-muted small opacity-25">|</span>
+                <a href="?lang=zh" class="text-decoration-none small fw-bold" th:classappend="${#locale.language == 'zh'} ? 'text-primary' : 'text-secondary opacity-50'">ZH</a>
+            </div>
+        </div>
+
     </div>
 </div>
 

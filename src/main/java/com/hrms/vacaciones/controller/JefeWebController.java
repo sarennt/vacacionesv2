@@ -1,11 +1,7 @@
 package com.hrms.vacaciones.controller;
 
 import com.hrms.vacaciones.dto.RespuestaJefeRequest;
-import com.hrms.vacaciones.model.Empleado;
-import com.hrms.vacaciones.model.HistoricoConfiguracionArea;
-import com.hrms.vacaciones.model.SolicitudPermiso;
-import com.hrms.vacaciones.model.SolicitudVacaciones;
-import com.hrms.vacaciones.model.WorkCenter;
+import com.hrms.vacaciones.model.*;
 import com.hrms.vacaciones.repository.EmpleadoRepository;
 import com.hrms.vacaciones.repository.MotivoRechazoRepository;
 import com.hrms.vacaciones.repository.SolicitudVacacionesRepository;
@@ -28,12 +24,15 @@ import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import com.hrms.vacaciones.repository.ConfiguracionSistemaRepository;
+import com.hrms.vacaciones.repository.PeriodoInhabilRepository;
+import com.hrms.vacaciones.repository.DiasFestivosRepository;
 
 @Controller
 public class JefeWebController {
@@ -45,6 +44,8 @@ public class JefeWebController {
     private final TurnoRepository turnoRepository;
     private final MotivoRechazoRepository motivoRechazoRepository;
     private final ConfiguracionSistemaRepository configuracionSistemaRepository;
+    private final PeriodoInhabilRepository periodoInhabilRepository;
+    private final DiasFestivosRepository diasFestivosRepository;
 
     @Autowired
     public JefeWebController(VacacionesService vacacionesService,
@@ -53,7 +54,9 @@ public class JefeWebController {
                              SolicitudVacacionesRepository solicitudVacacionesRepository,
                              TurnoRepository turnoRepository,
                              MotivoRechazoRepository motivoRechazoRepository,
-                             ConfiguracionSistemaRepository configuracionSistemaRepository) { // ✨ ESTE PARÁMETRO FALTABA AQUÍ
+                             PeriodoInhabilRepository periodoInhabilRepository,
+                             ConfiguracionSistemaRepository configuracionSistemaRepository,
+                             DiasFestivosRepository diasFestivosRepository) {
         this.vacacionesService = vacacionesService;
         this.permisosService = permisosService;
         this.empleadoRepository = empleadoRepository;
@@ -61,6 +64,8 @@ public class JefeWebController {
         this.turnoRepository = turnoRepository;
         this.motivoRechazoRepository = motivoRechazoRepository;
         this.configuracionSistemaRepository = configuracionSistemaRepository;
+        this.periodoInhabilRepository = periodoInhabilRepository;
+        this.diasFestivosRepository = diasFestivosRepository;
     }
 
     @GetMapping("/pantallas/aprobaciones-jefe")
@@ -80,11 +85,23 @@ public class JefeWebController {
 
         List<Integer> wcIds = (misLineas != null) ? misLineas.stream().map(WorkCenter::getId).toList() : new ArrayList<>();
 
+        boolean alertaAutopilot = false;
         if (misLineas != null && !misLineas.isEmpty()) {
-            model.addAttribute("historicoConfig", vacacionesService.obtenerHistoricoConfiguracion(wcIds));
+            List<HistoricoConfiguracionArea> historico = vacacionesService.obtenerHistoricoConfiguracion(nominaJefe);
+            model.addAttribute("historicoConfig", historico);
+
+            // ✨ DETECTOR DEL ROBOT: ¿El último movimiento fue del sistema en los últimos 3 días?
+            if (!historico.isEmpty()) {
+                HistoricoConfiguracionArea ultimoLog = historico.get(0);
+                if ("AUTOGENERADO_SISTEMA".equals(ultimoLog.getAccion()) &&
+                        ultimoLog.getFechaRegistro().isAfter(LocalDateTime.now().minusDays(3))) {
+                    alertaAutopilot = true;
+                }
+            }
         } else {
             model.addAttribute("historicoConfig", List.of());
         }
+        model.addAttribute("alertaAutopilot", alertaAutopilot);
 
         // 🔒 MUNDO 1: Cómputo de Vacaciones Ordinarias Pendientes
         List<SolicitudVacaciones> pendientes = vacacionesService.obtenerPendientesPorJefe(nominaJefe);
@@ -116,8 +133,44 @@ public class JefeWebController {
         // Bloque de historial de decisiones para el Supervisor
         if (jefe.getRolJerarquico() != null && "SUPERVISOR".equalsIgnoreCase(jefe.getRolJerarquico().trim())) {
             model.addAttribute("historialDecisiones", vacacionesService.obtenerHistorialDecisionesLinea(nominaJefe));
+
+            // 🚀 INYECCIÓN PARA LA VISTA DE GRUPOS DE PROCESO (CADENERO V2)
+            List<CentroCosto> todosMisCcs = vacacionesService.obtenerCentrosCostoPorJefe(nominaJefe);
+            List<GrupoProceso> misGrupos = vacacionesService.obtenerGruposProcesoPorJefe(nominaJefe);
+
+            // Filtramos CCs ocupados
+            List<Integer> ccsOcupados = misGrupos.stream()
+                    .filter(g -> "CC".equals(g.getTipoAgrupacion()) && g.getCentrosCosto() != null)
+                    .flatMap(g -> g.getCentrosCosto().stream())
+                    .map(CentroCosto::getId)
+                    .toList();
+
+            List<CentroCosto> ccsLibres = todosMisCcs.stream()
+                    .filter(cc -> !ccsOcupados.contains(cc.getId()))
+                    .toList();
+
+            // Filtramos WCs ocupados
+            List<Integer> wcsOcupados = misGrupos.stream()
+                    .filter(g -> "WC".equals(g.getTipoAgrupacion()) && g.getWorkCenters() != null)
+                    .flatMap(g -> g.getWorkCenters().stream())
+                    .map(WorkCenter::getId)
+                    .toList();
+
+            List<WorkCenter> wcsLibres = misLineas.stream()
+                    .filter(wc -> !wcsOcupados.contains(wc.getId()))
+                    .toList();
+
+            model.addAttribute("misCentrosCostoLibres", ccsLibres);
+            model.addAttribute("misWorkCentersLibres", wcsLibres);
+            model.addAttribute("misGruposProceso", misGrupos);
+
         } else {
+            // ✨ EL BLOQUE DE LOS SHIFT LEADERS ✨
             model.addAttribute("historialDecisiones", List.of());
+
+            // Rescatamos los grupos a los que pertenecen sus líneas para que el Radar cobre vida
+            List<GrupoProceso> misGrupos = vacacionesService.obtenerGruposProcesoPorJefe(nominaJefe);
+            model.addAttribute("misGruposProceso", misGrupos);
         }
 
         Map<String, Long> stats = vacacionesService.obtenerEstadisticasJefe(nominaJefe);
@@ -144,14 +197,27 @@ public class JefeWebController {
         model.addAttribute("resumenLotesColectivos", vacacionesService.obtenerResumenLotesColectivos(nominaJefe));
         model.addAttribute("todasColectivasDetalle", vacacionesService.obtenerTodasColectivasPorJefeProyectado(nominaJefe));
         model.addAttribute("listaTurnosMaster", turnoRepository.findByActivoTrue());
+
         // 🛡️ Tubería de Motivos de Rechazo oficiales para Vacaciones
         model.addAttribute("motivosRechazo", motivoRechazoRepository.findByModuloAndActivoTrue("VACACIONES"));
 
         // ✨ NUEVAS LÍNEAS: Rescatar el SLA de los Jefes desde Torre de Control
         String slaJefeStr = configuracionSistemaRepository.findById("SLA_RESPUESTA_JEFE")
                 .map(com.hrms.vacaciones.model.ConfiguracionSistema::getValor)
-                .orElse("48"); // 48 horas como chaleco salvavidas
+                .orElse("48");
         model.addAttribute("horasSlaJefe", Integer.parseInt(slaJefeStr));
+
+        // 👇 NUEVA LÍNEA: Inyectamos los Quintiles calculados (Solo 1 vez)
+        model.addAttribute("distribucionQuintiles", vacacionesService.obtenerDistribucionQuintiles(nominaJefe));
+
+        // 👇 NUEVA LÍNEA: Inyectamos los Blackout Dates (Periodos Inhábiles)
+        model.addAttribute("periodosInhabiles", periodoInhabilRepository.findBySupervisorNominaOrderByFechaInicioDesc(nominaJefe));
+
+        // 👇 NUEVAS LÍNEAS: Inyectamos los feriados para que el Radar de Cinépolis los bloquee
+        List<String> fechasFestivas = diasFestivosRepository.findByActivoTrue().stream()
+                .map(festivo -> festivo.getFecha().toString())
+                .collect(Collectors.toList());
+        model.addAttribute("festivos", fechasFestivas);
 
         return "aprobaciones-jefe";
     }
@@ -265,17 +331,10 @@ public class JefeWebController {
 
     @PostMapping("/jefe/configurar-lineas")
     public String guardarConfiguracionArea(
-            @RequestParam(value = "workCenterIds", required = false) List<Integer> workCenterIds,
             @RequestParam("mes") Integer mes,
             @RequestParam("anio") Integer anio,
-            @RequestParam("maxPersonal") Integer maxPersonal,
             @RequestParam(value = "fechaLimiteStr", required = false) String fechaLimiteStr,
             @RequestParam(value = "fechaLimiteRegistro", required = false) String fechaLimiteRegistro,
-            @RequestParam(value = "fechaRezagoStr", required = false) String fechaRezagoStr,
-            @RequestParam(value = "fechaRezago", required = false) String fechaRezago,
-            @RequestParam("diasMinimosRezago") Integer diasMinimosRezago,
-            @RequestParam(value = "turnoIds", required = false) List<Integer> turnoIds, // ✨ NUEVO: Malla de Turnos
-            @RequestParam(value = "cuposPorTurno", required = false) List<Integer> cuposPorTurno, // ✨ NUEVO: Malla de Cupos
             HttpSession session,
             RedirectAttributes redirectAttributes) {
 
@@ -290,13 +349,57 @@ public class JefeWebController {
                 throw new IllegalArgumentException("Faltan fechas obligatorias en el formulario.");
             }
 
-            // ✨ Disparamos el cerebro matemático mandándole los arrays completos
-            vacacionesService.guardarConfiguracionArea(nominaJefe, workCenterIds, mes, anio, maxPersonal,
-                    fechaLimiteReal, diasMinimosRezago, turnoIds, cuposPorTurno);
+            // ✨ Mandamos llamar al servicio solo con los datos de tiempo (Ya no hay turnos ni cupos aquí)
+            vacacionesService.guardarConfiguracionArea(nominaJefe, mes, anio, fechaLimiteReal);
 
-            redirectAttributes.addFlashAttribute("mensajeExito", "Las reglas operativas del periodo se guardaron con éxito para toda la matriz de turnos.");
+            redirectAttributes.addFlashAttribute("mensajeExito", "El periodo de registro se ha abierto correctamente con las fechas calculadas.");
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("mensajeError", "No se pudo guardar la configuración: " + e.getMessage());
+        }
+
+        return "redirect:/pantallas/aprobaciones-jefe?tab=reglas";
+    }
+
+    @PostMapping("/jefe/grupos/crear")
+    public String crearGrupoProceso(
+            @RequestParam("nombreGrupo") String nombreGrupo,
+            @RequestParam("cupoMaximo") Integer cupoMaximo,
+            @RequestParam(value = "tipoAgrupacion", defaultValue = "CC") String tipoAgrupacion,
+            @RequestParam(value = "cupoMaximoTurno", required = false) Integer cupoMaximoTurno,
+            @RequestParam(value = "centrosCostoIds", required = false) List<Integer> centrosCostoIds,
+            @RequestParam(value = "workCenterIds", required = false) List<Integer> workCenterIds,
+            HttpSession session,
+            RedirectAttributes redirectAttributes) {
+
+        Object logueadoObj = session.getAttribute("usuarioLogueado");
+        if (logueadoObj == null) return "redirect:/login";
+        Integer nominaJefe = Integer.parseInt(logueadoObj.toString());
+
+        try {
+            vacacionesService.crearGrupoProceso(nombreGrupo, cupoMaximo, tipoAgrupacion, cupoMaximoTurno, centrosCostoIds, workCenterIds, nominaJefe);
+            redirectAttributes.addFlashAttribute("mensajeExito", "¡Grupo '" + nombreGrupo.toUpperCase() + "' creado exitosamente bajo el esquema de " + tipoAgrupacion + "!");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("mensajeError", "Error al crear el grupo: " + e.getMessage());
+        }
+
+        return "redirect:/pantallas/aprobaciones-jefe?tab=reglas";
+    }
+
+    @PostMapping("/jefe/grupos/eliminar")
+    public String eliminarGrupoProceso(
+            @RequestParam("idGrupo") Integer idGrupo,
+            HttpSession session,
+            RedirectAttributes redirectAttributes) {
+
+        Object logueadoObj = session.getAttribute("usuarioLogueado");
+        if (logueadoObj == null) return "redirect:/login";
+
+        try {
+            // Llamamos al motor de borrado
+            vacacionesService.eliminarGrupoProceso(idGrupo);
+            redirectAttributes.addFlashAttribute("mensajeExito", "Grupo eliminado con éxito. Sus Centros de Costo han quedado libres nuevamente.");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("mensajeError", "Error al eliminar el grupo: " + e.getMessage());
         }
 
         return "redirect:/pantallas/aprobaciones-jefe?tab=reglas";
@@ -330,35 +433,29 @@ public class JefeWebController {
         if (logueadoObj == null) return;
         Integer nominaJefe = Integer.parseInt(logueadoObj.toString());
 
-        List<WorkCenter> misLineas = vacacionesService.obtenerWorkCentersPorJefe(nominaJefe);
-        List<HistoricoConfiguracionArea> historico = List.of();
-
-        if (misLineas != null && !misLineas.isEmpty()) {
-            List<Integer> wcIds = misLineas.stream().map(WorkCenter::getId).toList();
-            historico = vacacionesService.obtenerHistoricoConfiguracion(wcIds);
-        }
+        // ✨ Inyectamos la nueva consulta V2
+        List<HistoricoConfiguracionArea> historico = vacacionesService.obtenerHistoricoConfiguracion(nominaJefe);
 
         response.setContentType("text/csv; charset=UTF-8");
-        response.setHeader("Content-Disposition", "attachment; filename=\"historico_reglas_jefe_" + nominaJefe + ".csv\"");
+        response.setHeader("Content-Disposition", "attachment; filename=\"auditoria_reglas_jefe_" + nominaJefe + ".csv\"");
         response.getOutputStream().write(0xEF);
         response.getOutputStream().write(0xBB);
         response.getOutputStream().write(0xBF);
 
         PrintWriter writer = new PrintWriter(new OutputStreamWriter(response.getOutputStream(), StandardCharsets.UTF_8));
-        // ✨ CORRECCIÓN 1: Se eliminó "WC / Linea" de los encabezados
-        writer.println("Fecha Modificacion,Periodo Configurado,Tope Diario,Fecha Limite Registro,VIP Minimo Requerido,Accion Sistema,Realizado Por Nomina");
+
+        // ✨ NUEVAS CABECERAS
+        writer.println("\"Fecha Operación\",\"Periodo Configurado\",\"Fecha Límite Cierre\",\"Grupos Creados (Cupos)\",\"Bloqueos en el Mes\",\"Realizado Por\"");
 
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
         for (HistoricoConfiguracionArea log : historico) {
-            // ✨ CORRECCIÓN 2: Se quitó el %d de WC, el log.getWorkCenterId() y la palabra " personas"
-            writer.println(String.format("\"%s\",\"%02d/%d\",\"%d\",\"%s\",\"%d dias\",\"%s\",\"%d\"",
+            writer.println(String.format("\"%s\",\"%02d/%d\",\"%s\",\"%s\",\"%s\",\"%d\"",
                     log.getFechaRegistro() != null ? log.getFechaRegistro().format(dtf) : "N/A",
                     log.getMes(),
                     log.getAnio(),
-                    log.getMaxEmpleadosPorDia(), // Ahora escupe el puro número pelón
                     log.getFechaLimiteRegistro() != null ? log.getFechaLimiteRegistro().toString() : "N/A",
-                    log.getDiasMinimosRezago(),
-                    log.getAccion(),
+                    log.getResumenGrupos() != null ? log.getResumenGrupos().replace("\"", "\"\"") : "N/A",
+                    log.getResumenBloqueos() != null ? log.getResumenBloqueos().replace("\"", "\"\"") : "N/A",
                     log.getRealizadoPorNomina()
             ));
         }
@@ -500,5 +597,159 @@ public class JefeWebController {
         // 7. Liberamos memoria del servidor
         writer.flush();
         writer.close();
+    }
+
+    @GetMapping("/jefe/exportar-quintiles")
+    public void exportarQuintilesAExcel(@RequestParam("nomina") Integer nominaJefe, HttpServletResponse response) throws IOException {
+        // 1. Configuramos el tipo de archivo
+        response.setContentType("text/csv;charset=UTF-8");
+        response.setHeader("Content-Disposition", "attachment; filename=Distribucion_VIP_Grupos_Proceso.csv");
+
+        PrintWriter writer = response.getWriter();
+        // 2. Firma BOM UTF-8 para Excel
+        writer.write("\uFEFF");
+        // 3. NUEVAS CABECERAS (Más detalladas)
+        writer.println("\"Grupo de Proceso\",\"CCs del Grupo\",\"Día Asignado VIP\",\"Nómina\",\"Colaborador\",\"CC Empleado\",\"WC Empleado\",\"Saldo Devengado\",\"Antigüedad\"");
+
+        // 4. Obtenemos el mapa complejo
+        java.util.Map<String, java.util.Map<String, List<Empleado>>> quintiles = vacacionesService.obtenerDistribucionQuintiles(nominaJefe);
+
+        // ✨ TRUCO: Volvemos a traer los grupos para mapear sus CCs en un String (Ej: 333517/33458/45646)
+        List<GrupoProceso> misGrupos = vacacionesService.obtenerGruposProcesoPorJefe(nominaJefe);
+        java.util.Map<String, String> mapaCcsPorGrupo = new java.util.HashMap<>();
+        for (GrupoProceso g : misGrupos) {
+            String ccsString = g.getCentrosCosto().stream()
+                    .map(cc -> String.valueOf(cc.getId()))
+                    .collect(Collectors.joining("/"));
+            mapaCcsPorGrupo.put(g.getNombre(), ccsString);
+        }
+
+        // 5. Desglosamos e iteramos para imprimir
+        for (java.util.Map.Entry<String, java.util.Map<String, List<Empleado>>> grupoEntry : quintiles.entrySet()) {
+            String nombreGrupo = grupoEntry.getKey();
+            String ccsDelGrupo = mapaCcsPorGrupo.getOrDefault(nombreGrupo, "N/A");
+
+            for (java.util.Map.Entry<String, List<Empleado>> diaEntry : grupoEntry.getValue().entrySet()) {
+                String dia = diaEntry.getKey();
+
+                for (Empleado emp : diaEntry.getValue()) {
+                    String antiguedad = emp.getFechaIngreso() != null ?
+                            emp.getFechaIngreso().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) : "N/A";
+
+                    // Sacamos los datos individuales de la persona
+                    String ccEmp = emp.getCentroCosto() != null ? String.valueOf(emp.getCentroCosto().getId()) : "N/A";
+                    String wcEmp = emp.getWorkCenter() != null ? String.valueOf(emp.getWorkCenter().getId()) : "N/A";
+
+                    writer.println(
+                            "\"" + nombreGrupo + "\",\"" +
+                                    ccsDelGrupo + "\",\"" +
+                                    dia + "\",\"" +
+                                    emp.getNomina() + "\",\"" +
+                                    emp.getNombreCompleto().replace("\"", "\"\"") + "\",\"" +
+                                    ccEmp + "\",\"" +
+                                    wcEmp + "\",\"" +
+                                    emp.getSaldoVacacionesActual() + "\",\"" +
+                                    antiguedad + "\""
+                    );
+                }
+            }
+        }
+        writer.flush();
+        writer.close();
+    }
+
+    @PostMapping("/jefe/bloqueos/crear")
+    public String crearPeriodoInhabil(
+            @RequestParam("fechaInicio") String fechaInicioStr,
+            @RequestParam("fechaFin") String fechaFinStr,
+            @RequestParam("motivo") String motivo,
+            HttpSession session,
+            RedirectAttributes redirectAttributes) {
+
+        Object logueadoObj = session.getAttribute("usuarioLogueado");
+        if (logueadoObj == null) return "redirect:/login";
+        Integer nominaJefe = Integer.parseInt(logueadoObj.toString());
+
+        try {
+            LocalDate inicio = LocalDate.parse(fechaInicioStr);
+            LocalDate fin = LocalDate.parse(fechaFinStr);
+
+            if (inicio.isAfter(fin)) {
+                throw new IllegalArgumentException("La fecha de inicio no puede ser mayor a la fecha final.");
+            }
+
+            PeriodoInhabil bloqueo = PeriodoInhabil.builder()
+                    .supervisorNomina(nominaJefe)
+                    .fechaInicio(inicio)
+                    .fechaFin(fin)
+                    .motivo(motivo.trim().toUpperCase())
+                    .fechaRegistro(LocalDateTime.now())
+                    .build();
+
+            periodoInhabilRepository.save(bloqueo);
+            redirectAttributes.addFlashAttribute("mensajeExito", "Periodo Inhábil guardado. Nadie de tus líneas podrá pedir vacaciones en esas fechas.");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("mensajeError", "Error al guardar el bloqueo: " + e.getMessage());
+        }
+
+        return "redirect:/pantallas/aprobaciones-jefe?tab=reglas";
+    }
+
+    @PostMapping("/jefe/bloqueos/eliminar")
+    public String eliminarPeriodoInhabil(
+            @RequestParam("idBloqueo") Integer idBloqueo,
+            HttpSession session,
+            RedirectAttributes redirectAttributes) {
+
+        Object logueadoObj = session.getAttribute("usuarioLogueado");
+        if (logueadoObj == null) return "redirect:/login";
+
+        try {
+            periodoInhabilRepository.deleteById(idBloqueo);
+            redirectAttributes.addFlashAttribute("mensajeExito", "Bloqueo eliminado exitosamente. Las fechas vuelven a estar libres.");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("mensajeError", "Error al eliminar el bloqueo: " + e.getMessage());
+        }
+
+        return "redirect:/pantallas/aprobaciones-jefe?tab=reglas";
+    }
+
+    // =========================================================================
+    // 🧮 API: DETERMINADOR DE SEMANA VIP EN CALIENTE
+    // =========================================================================
+    @GetMapping("/jefe/api/semana-vip")
+    @ResponseBody
+    public java.util.Map<String, String> obtenerSemanaVipApi(
+            @RequestParam("mes") Integer mes,
+            @RequestParam("anio") Integer anio) {
+
+        java.util.Map<String, LocalDate> semanaVip = vacacionesService.calcularSemanaVIP(mes, anio);
+
+        java.util.Map<String, String> response = new java.util.HashMap<>();
+        response.put("inicio", semanaVip.get("inicio").toString());
+        response.put("fin", semanaVip.get("fin").toString());
+
+        return response;
+    }
+
+    @PostMapping("/jefe/workcenter/actualizar-cupo")
+    public String actualizarCupoWorkCenter(
+            @RequestParam("wcId") Integer wcId,
+            @RequestParam("cupoConcurrente") Integer cupoConcurrente,
+            HttpSession session,
+            RedirectAttributes redirectAttributes) {
+
+        Object logueadoObj = session.getAttribute("usuarioLogueado");
+        if (logueadoObj == null) return "redirect:/login";
+        Integer nominaJefe = Integer.parseInt(logueadoObj.toString());
+
+        try {
+            vacacionesService.actualizarCupoWorkCenter(wcId, cupoConcurrente, nominaJefe);
+            redirectAttributes.addFlashAttribute("mensajeExito", "Cupo del WC " + wcId + " actualizado a " + cupoConcurrente + " operador(es) concurrentes por turno.");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("mensajeError", "Error al actualizar cupo: " + e.getMessage());
+        }
+
+        return "redirect:/pantallas/aprobaciones-jefe?tab=reglas";
     }
 }

@@ -11,7 +11,7 @@ public class WorkCenter {
 
     private String nombre;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
     @JoinColumn(name = "centro_costo_id")
     private CentroCosto centroCosto;
 
@@ -57,5 +57,19 @@ public class WorkCenter {
 
     public void setSupervisorNomina(Integer supervisorNomina) {
         this.supervisorNomina = supervisorNomina;
+    }
+
+    // ==========================================
+    // ⚙️ PARAMETRIZACIÓN DINÁMICA DE CUPO (PISO)
+    // ==========================================
+    @Column(name = "cupo_concurrente_turno", nullable = false)
+    private Integer cupoConcurrenteTurno = 1;
+
+    public Integer getCupoConcurrenteTurno() {
+        return (cupoConcurrenteTurno == null || cupoConcurrenteTurno < 1) ? 1 : cupoConcurrenteTurno;
+    }
+
+    public void setCupoConcurrenteTurno(Integer cupoConcurrenteTurno) {
+        this.cupoConcurrenteTurno = (cupoConcurrenteTurno == null || cupoConcurrenteTurno < 1) ? 1 : cupoConcurrenteTurno;
     }
 }

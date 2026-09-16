@@ -1,0 +1,1515 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="#{prenomina.titulo.pestana}"></title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link rel="stylesheet" th:href="@{/css/estilos-grammer.css}">
+</head>
+<body class="bg-light pb-5">
+
+<div th:replace="~{fragments/navbar :: menuPlanta}"></div>
+
+<input type="hidden" id="nominaUsuarioGlobal" th:value="${session.usuarioLogueado}" />
+<input type="hidden" id="rolUsuarioGlobal" th:value="${rolUsuario}" />
+
+<div style="height: 80px;"></div>
+
+<!-- BARRA STICKY GLOBAL -->
+<div class="sticky-filters-wrapper shadow-sm mb-4 bg-white">
+    <div class="container px-3">
+        <div class="row align-items-center g-3">
+            <div class="col-md-4">
+                <h4 class="fw-bold text-corporativo mb-0"><i class="bi bi-wallet2 me-2"></i><span th:text="#{prenomina.titulo.pestana}"></span></h4>
+            </div>
+            <!-- ✨ SE OCULTA A LOS MORTALES CON d-none -->
+            <div class="col-md-4" th:classappend="${esJefe != true and esNomina != true and esVisorPrenomina != true and esVisorBiometrico != true and esVisorMetricas != true} ? 'd-none' : ''">
+                <div class="input-group shadow-sm">
+                    <span class="input-group-text bg-corporativo text-white border-0 fw-bold" th:text="#{prenomina.filtro.semana}"></span>
+                    <input type="number" class="form-control fw-bold bg-light text-center" id="semanaFiltroNum" placeholder="No." min="1" max="53">
+                    <span class="input-group-text bg-corporativo text-white border-0 fw-bold" th:text="#{prenomina.filtro.anio}"></span>
+                    <input type="number" class="form-control fw-bold bg-light text-center" id="semanaFiltroAnio" value="2026">
+                    <button class="btn btn-warning fw-bold text-dark" type="button" onclick="dispararBusquedaSemana()"><i class="bi bi-search"></i></button>
+                </div>
+            </div>
+
+            <!-- ✨ SE OCULTA A LOS MORTALES CON d-none -->
+            <div class="col-md-4 text-end" th:classappend="${esJefe != true and esNomina != true and esVisorPrenomina != true and esVisorBiometrico != true and esVisorMetricas != true} ? 'd-none' : ''">
+                <span class="badge bg-success bg-opacity-10 text-success border border-success rounded-pill px-3 py-2 fw-bold" id="rangoFechasSemana">
+                    <i class="bi bi-calendar-range me-1"></i> <span th:text="#{prenomina.estado.esperando}"></span>
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<main class="container px-3 pb-5">
+
+    <ul class="nav nav-pills nav-fill bg-white shadow-sm rounded-4 p-2 mb-4" id="pills-tab" role="tablist">
+        <!-- 1. MI PRENÓMINA (Todos) -->
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active rounded-3 fw-bold" id="pills-miprenomina-tab" data-bs-toggle="pill" data-bs-target="#pills-miprenomina" type="button" role="tab">
+                <i class="bi bi-person-vcard me-2"></i><span th:text="#{tab.miprenomina}"></span>
+            </button>
+        </li>
+        <!-- 2. MIS REGISTROS FACIALES (Todos) -->
+        <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-3 fw-bold text-secondary" id="pills-misregistros-tab" data-bs-toggle="pill" data-bs-target="#pills-misregistros" type="button" role="tab">
+                <i class="bi bi-fingerprint me-2"></i><span th:text="#{tab.misregistros}"></span>
+            </button>
+        </li>
+        <!-- 3. PRENÓMINA CRUDA (Exclusivo Nómina) -->
+        <li class="nav-item" role="presentation" th:if="${esNomina == true or esVisorPrenomina == true}">
+            <button class="nav-link rounded-3 fw-bold" id="pills-prenomina-tab" data-bs-toggle="pill" data-bs-target="#pills-prenomina" type="button" role="tab">
+                <i class="bi bi-table me-2"></i><span th:text="#{tab.prenomina}"></span>
+            </button>
+        </li>
+        <!-- 4. PRENÓMINA AUTORIZADA (Jefes Operativos + Nómina) -->
+        <li class="nav-item" role="presentation" th:if="${esJefe == true or esNomina == true or esVisorPrenomina == true}">
+            <button class="nav-link rounded-3 fw-bold text-success" id="pills-autorizada-tab" data-bs-toggle="pill" data-bs-target="#pills-autorizada" type="button" role="tab">
+                <i class="bi bi-shield-check me-2"></i><span th:text="#{tab.autorizada}"></span>
+            </button>
+        </li>
+        <!-- 5. AUDITORÍA FACIALES GLOBAL (Jefes Operativos + Nómina) -->
+        <li class="nav-item" role="presentation" th:if="${esJefe == true or esNomina == true or esVisorBiometrico == true}">
+            <button class="nav-link rounded-3 fw-bold" id="pills-reloj-tab" data-bs-toggle="pill" data-bs-target="#pills-reloj" type="button" role="tab">
+                <i class="bi bi-fingerprint me-2 text-primary"></i><span th:text="#{tab.auditoria}"></span>
+            </button>
+        </li>
+        <!-- 6. IMPORTADOR I/O (Exclusivo Nómina) -->
+        <li class="nav-item" role="presentation" th:if="${esNomina}">
+            <button class="nav-link rounded-3 fw-bold" id="pills-io-tab" data-bs-toggle="pill" data-bs-target="#pills-io" type="button" role="tab">
+                <i class="bi bi-arrow-left-right me-2 text-success"></i><span th:text="#{tab.io}"></span>
+            </button>
+        </li>
+        <!-- 7. VISOR Y MÉTRICAS (Jefes Operativos + Nómina) -->
+        <li class="nav-item" role="presentation" th:if="${esJefe == true or esNomina == true or esVisorMetricas == true}">
+            <button class="nav-link rounded-3 fw-bold" id="pills-dashboard-tab" data-bs-toggle="pill" data-bs-target="#pills-dashboard" type="button" role="tab">
+                <i class="bi bi-pie-chart-fill me-2 text-warning"></i><span th:text="#{tab.visor.metricas}"></span>
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="pills-tabContent">
+
+        <!-- ✨ PESTAÑA 1: MI PRENÓMINA INDIVIDUAL -->
+        <div class="tab-pane fade show active" id="pills-miprenomina" role="tabpanel">
+            <div class="row justify-content-center">
+                <div class="col-12 col-md-6 col-lg-4">
+                    <div class="bg-corporativo text-white p-3 rounded-top-4 shadow-sm text-center">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="small fw-medium opacity-75" th:text="#{miprenomina.consultar}"></span>
+                            <select class="form-select form-select-sm w-50 bg-white text-dark fw-bold border-0" id="miPrenominaSemanaSelect" onchange="cargarMiPrenomina()"></select>
+                        </div>
+                    </div>
+                    <div class="bg-white p-4 rounded-bottom-4 shadow-sm border border-top-0 mb-4">
+                        <div class="text-center mb-4 border-bottom pb-2">
+                            <h5 class="text-corporativo fw-bold mb-1" th:text="#{miprenomina.reporte}"></h5>
+                            <p class="text-muted small mb-0 fw-bold"><span th:text="#{miprenomina.turno}"></span> <span id="miTurnoLabel">--</span></p>
+                            <!-- ✨ INYECCIÓN DEL RANGO DE FECHAS VISUAL DEBAJO DEL TURNO -->
+                            <span class="badge bg-success bg-opacity-10 text-success border border-success rounded-pill px-3 py-1 mt-2 fw-bold" id="miPrenominaRangoLabel" style="font-size: 0.75rem;">
+                                --
+                            </span>
+                        </div>
+
+                        <!-- ✨ OBSERVACIONES MOVIDAS ARRIBA DE LOS DÍAS -->
+                        <div class="bg-light p-3 rounded-3 border mb-4">
+                            <p class="small text-muted fw-bold mb-1" th:text="#{miprenomina.observaciones}"></p>
+                            <p class="small text-dark mb-0 italic" id="miObservacionesLabel" th:text="#{miprenomina.sin.obs}"></p>
+                        </div>
+
+                        <div id="miPrenominaDiasContainer" class="d-flex flex-column gap-3 mb-4">
+                            <div class="text-center text-muted py-3"><div class="spinner-border spinner-border-sm text-corporativo me-2"></div><span th:text="#{miprenomina.cargando}"></span></div>
+                        </div>
+
+                        <div class="row g-2 mb-2">
+                            <div class="col-6">
+                                <div class="bg-corporativo p-3 rounded-3 text-center shadow-sm border-0">
+                                    <h4 class="fw-bold text-white mb-0" id="miTotalFaltas">0.00</h4>
+                                    <span class="small text-white-50 fw-bold" th:text="#{prenomina.total.faltas}"></span>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="bg-corporativo p-3 rounded-3 text-center shadow-sm border-0">
+                                    <h4 class="fw-bold text-warning mb-0" id="miTotalTE">0.00</h4>
+                                    <span class="small text-white-50 fw-bold" th:text="#{prenomina.total.te}"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ✨ PESTAÑA 2: MIS REGISTROS FACIALES -->
+        <div class="tab-pane fade" id="pills-misregistros" role="tabpanel">
+            <div class="card p-4 mb-4 border-top border-4 border-primary shadow-sm">
+                <div class="row align-items-end mb-4">
+                    <div class="col-md-6">
+                        <h5 class="fw-bold text-dark mb-1"><i class="bi bi-fingerprint text-primary me-2"></i><span th:text="#{misregistros.titulo}"></span></h5>
+                        <p class="text-muted small mb-0" th:text="#{misregistros.desc}"></p>
+                    </div>
+                    <div class="col-md-6 text-md-end mt-3 mt-md-0">
+                        <div class="d-inline-flex align-items-center gap-2 bg-light p-2 rounded-3 border shadow-sm">
+                            <span class="small fw-bold text-muted" th:text="#{prenomina.filtro.semana}"></span>
+                            <select class="form-select form-select-sm bg-white fw-bold text-primary border-primary" id="misRegistrosSemanaSelect" style="width: auto;" onchange="cargarMisRegistros()"></select>
+                        </div>
+                    </div>
+                </div>
+                <div class="table-responsive bg-white rounded-3 border">
+                    <table class="table table-sm align-middle mb-0 table-hover text-center" id="tablaMisRegistros">
+                        <thead class="table-light text-secondary small">
+                        <tr><th>Día</th><th>Fecha</th><th class="text-success"><i class="bi bi-box-arrow-in-right"></i> Entrada</th><th class="text-danger"><i class="bi bi-box-arrow-right"></i> Salida</th><th>Horas</th><th>Estatus</th></tr>
+                        </thead>
+                        <tbody class="small fw-medium" id="tbodyMisRegistros">
+                        <tr><td colspan="6" class="text-muted py-5 italic text-center">Cargando checadas...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- PESTAÑA 3: PRE-CÁLCULO -->
+        <div class="tab-pane fade" id="pills-prenomina" role="tabpanel">
+            <div class="card card-flotante p-4 mb-4 border-top border-4 border-corporativo">
+                <div class="row align-items-center mb-3 g-2">
+                    <div class="col-md-2">
+                        <h5 class="fw-bold text-dark mb-0" th:text="#{precalculo.titulo}"></h5>
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select form-select-sm shadow-sm fw-bold border-corporativo text-corporativo" id="filtroTipoNomina" onchange="dispararBusquedaSemana()">
+                            <option value="SINDICALIZADO" th:text="#{filtro.sindicalizado}"></option>
+                            <option value="ADMINISTRATIVO" th:text="#{filtro.administrativo}"></option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="input-group input-group-sm shadow-sm">
+                            <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                            <input type="text" class="form-control bg-light border-start-0" id="buscadorPrenomina" th:placeholder="#{filtro.buscar}" onkeyup="filtrarTablaPrenomina()">
+                        </div>
+                    </div>
+                    <div class="col-md-4 text-center">
+                        <div class="d-flex justify-content-center align-items-center gap-3">
+                            <div class="btn-group btn-group-sm shadow-sm" role="group">
+                                <input type="radio" class="btn-check" name="vistaPrenomina" id="vistaHoras" autocomplete="off" checked onchange="cambiarVistaPrenomina('horas')">
+                                <label class="btn btn-outline-corporativo fw-bold" for="vistaHoras"><i class="bi bi-clock-history me-1"></i> <span th:text="#{vista.horas}"></span></label>
+                                <input type="radio" class="btn-check" name="vistaPrenomina" id="vistaAsistencias" autocomplete="off" onchange="cambiarVistaPrenomina('asistencias')">
+                                <label class="btn btn-outline-corporativo fw-bold" for="vistaAsistencias"><i class="bi bi-check2-square me-1"></i> <span th:text="#{vista.asistencias}"></span></label>
+                            </div>
+                            <div class="form-check form-switch m-0 pt-1">
+                                <input class="form-check-input border-secondary shadow-sm" type="checkbox" id="switchDetalles" onchange="toggleDetalles()" style="cursor: pointer;">
+                                <label class="form-check-label small fw-bold text-muted" for="switchDetalles" th:text="#{vista.detalles}"></label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-1 text-end">
+                        <button class="btn btn-sm btn-success fw-bold shadow-sm w-100" onclick="exportarPrenominaAExcel()"><i class="bi bi-file-earmark-excel-fill"></i></button>
+                    </div>
+                </div>
+
+                <div class="table-responsive bg-white rounded-3 border">
+                    <table class="table table-sm align-middle mb-0 table-hover text-center" id="tablaPrenominaViva">
+                        <thead class="table-light text-secondary small align-middle text-center" style="font-size: 0.70rem;">
+                        <!-- Nivel 1: Nombres de los Días -->
+                            <tr class="border-bottom border-dark bg-white">
+                                <th rowspan="2" class="border-end align-middle" onclick="ordenarPrenomina(0, 'int')" style="cursor: pointer;">Nómina <i class="bi bi-arrow-down-up text-muted ms-1"></i></th>
+                                <th rowspan="2" class="text-start border-end align-middle" onclick="ordenarPrenomina(1, 'str')" style="cursor: pointer;">Colaborador <i class="bi bi-arrow-down-up text-muted ms-1"></i></th>
+                                <th rowspan="2" class="border-end align-middle d-none col-detalle" onclick="ordenarPrenomina(2, 'str')" style="cursor: pointer;">CC <i class="bi bi-arrow-down-up text-muted ms-1"></i></th>
+                                <th rowspan="2" class="border-end align-middle d-none col-detalle" onclick="ordenarPrenomina(3, 'str')" style="cursor: pointer;">Nombre CC <i class="bi bi-arrow-down-up text-muted ms-1"></i></th>
+                                <th rowspan="2" class="border-end align-middle d-none col-detalle" onclick="ordenarPrenomina(4, 'int')" style="cursor: pointer;">WC <i class="bi bi-arrow-down-up text-muted ms-1"></i></th>
+                                <th rowspan="2" class="border-end align-middle d-none col-detalle" onclick="ordenarPrenomina(5, 'str')" style="cursor: pointer;">Nombre WC <i class="bi bi-arrow-down-up text-muted ms-1"></i></th>
+                                <th rowspan="2" class="border-end align-middle d-none col-detalle" onclick="ordenarPrenomina(6, 'str')" style="cursor: pointer;">APU <i class="bi bi-arrow-down-up text-muted ms-1"></i></th>
+                                <th rowspan="2" class="border-end align-middle d-none col-detalle" onclick="ordenarPrenomina(7, 'str')" style="cursor: pointer;">Supervisor <i class="bi bi-arrow-down-up text-muted ms-1"></i></th>
+                                <th rowspan="2" class="border-end align-middle d-none col-detalle" onclick="ordenarPrenomina(8, 'str')" style="cursor: pointer;">Shift <i class="bi bi-arrow-down-up text-muted ms-1"></i></th>
+                                <th rowspan="2" class="border-end border-2 border-dark align-middle" onclick="ordenarPrenomina(9, 'str')" style="cursor: pointer;">Turno <i class="bi bi-arrow-down-up text-muted ms-1"></i></th>
+
+                                <th colspan="2" class="border-end border-2 border-dark">L</th>
+                                <th colspan="2" class="border-end border-2 border-dark">M</th>
+                                <th colspan="2" class="border-end border-2 border-dark">M</th>
+                                <th colspan="2" class="border-end border-2 border-dark">J</th>
+                                <th colspan="2" class="border-end border-2 border-dark">V</th>
+                                <th colspan="2" class="border-end border-2 border-dark">S</th>
+                                <th colspan="2" class="bg-warning text-dark border-end border-2 border-dark">D</th>
+
+                                <th rowspan="2" class="bg-warning bg-opacity-25 text-dark fw-bold border-end border-dark align-middle" onclick="ordenarPrenomina(24, 'float')" style="cursor: pointer;">Total TE <i class="bi bi-arrow-down-up text-muted ms-1"></i></th>
+                                <th rowspan="2" class="bg-danger bg-opacity-10 text-danger fw-bold align-middle" onclick="ordenarPrenomina(25, 'float')" style="cursor: pointer;">Total Faltas <i class="bi bi-arrow-down-up text-muted ms-1"></i></th>
+
+                                <!-- ✨ NUEVA COLUMNA INYECTADA -->
+                                <th rowspan="2" class="bg-primary bg-opacity-10 text-primary fw-bold align-middle" onclick="ordenarPrenomina(26, 'float')" style="cursor: pointer;">Total HRS <i class="bi bi-arrow-down-up text-muted ms-1"></i></th>
+
+                                <th rowspan="2" class="border-end border-dark align-middle" onclick="ordenarPrenomina(27, 'str')" style="cursor: pointer; min-width: 140px;">Detalle TXT <i class="bi bi-arrow-down-up text-muted ms-1"></i></th>
+                                <th rowspan="2" class="border-end border-2 border-dark align-middle" onclick="ordenarPrenomina(28, 'str')" style="cursor: pointer; min-width: 120px;">Quien Autoriza <i class="bi bi-arrow-down-up text-muted ms-1"></i></th>
+                            </tr>
+                            <!-- Nivel 2: Fechas Dinámicas y TE -->
+                            <tr class="border-bottom border-dark">
+                                <th class="table-success text-dark border-end border-dark px-1" id="thLUN">--</th><th class="bg-info bg-opacity-10 text-dark border-end border-2 border-dark fw-bold px-1">TE</th>
+                                <th class="table-success text-dark border-end border-dark px-1" id="thMAR">--</th><th class="bg-info bg-opacity-10 text-dark border-end border-2 border-dark fw-bold px-1">TE</th>
+                                <th class="table-success text-dark border-end border-dark px-1" id="thMIE">--</th><th class="bg-info bg-opacity-10 text-dark border-end border-2 border-dark fw-bold px-1">TE</th>
+                                <th class="table-success text-dark border-end border-dark px-1" id="thJUE">--</th><th class="bg-info bg-opacity-10 text-dark border-end border-2 border-dark fw-bold px-1">TE</th>
+                                <th class="table-success text-dark border-end border-dark px-1" id="thVIE">--</th><th class="bg-info bg-opacity-10 text-dark border-end border-2 border-dark fw-bold px-1">TE</th>
+                                <th class="table-success text-dark border-end border-dark px-1" id="thSAB">--</th><th class="bg-info bg-opacity-10 text-dark border-end border-2 border-dark fw-bold px-1">TE</th>
+                                <th class="table-success text-dark border-end border-dark px-1" id="thDOM">--</th><th class="bg-info bg-opacity-10 text-dark border-end border-2 border-dark fw-bold px-1">TE</th>
+                            </tr>
+                        </thead>
+                        <tbody class="small fw-medium" id="tbodyPrenominaViva">
+                        <tr>
+                            <td colspan="29" class="text-muted py-5 italic text-center">
+                                <i class="bi bi-arrow-up-circle fs-3 d-block mb-2"></i>
+                                Matriz en espera de selección semanal.
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ✨ NUEVA PESTAÑA: PRENÓMINA AUTORIZADA (VISOR FINAL) -->
+        <div class="tab-pane fade" id="pills-autorizada" role="tabpanel">
+            <div class="card card-flotante p-4 mb-4 border-top border-4 border-success">
+
+                <!-- Barra Superior de Controles -->
+                <div class="row align-items-center mb-3 g-2">
+                    <div class="col-md-2">
+                        <h5 class="fw-bold text-dark mb-0"><i class="bi bi-shield-check text-success me-2"></i>Autorizada</h5>
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select form-select-sm shadow-sm fw-bold border-success text-success" id="filtroTipoNominaAuth" onchange="dispararBusquedaSemana()">
+                            <option value="SINDICALIZADO" th:text="#{filtro.sindicalizado}"></option>
+                            <option value="ADMINISTRATIVO" th:text="#{filtro.administrativo}"></option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="input-group input-group-sm shadow-sm">
+                            <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                            <input type="text" class="form-control bg-light border-start-0" id="buscadorPrenominaFinal" th:placeholder="#{filtro.buscar}" onkeyup="filtrarTablaAutorizada()">
+                        </div>
+                    </div>
+                    <div class="col-md-2 text-center">
+                        <div class="form-check form-switch m-0 pt-1 d-inline-block">
+                            <input class="form-check-input border-secondary shadow-sm" type="checkbox" id="switchDetallesAutorizada" onchange="toggleDetallesAutorizada()" style="cursor: pointer;">
+                            <label class="form-check-label small fw-bold text-muted" for="switchDetallesAutorizada" th:text="#{vista.detalles}"></label>
+                        </div>
+                    </div>
+                    <div class="col-md-3" th:if="${esNomina == true}">
+                        <form data-tipo="importador" action="/prenomina/importar-autorizada" method="post" enctype="multipart/form-data" class="d-flex gap-2">
+                            <input class="form-control form-control-sm bg-light border-success fw-bold" type="file" name="archivoExcelPulido" accept=".xlsx" required>
+                            <button type="submit" class="btn btn-sm btn-success fw-bold shadow-sm"><i class="bi bi-cloud-arrow-up-fill"></i> <span th:text="#{autorizada.btn.subir}"></span></button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Tabla Viva del Visor Final -->
+                <div class="table-responsive bg-white rounded-3 border">
+                    <table class="table table-sm align-middle mb-0 table-hover text-center" id="tablaPrenominaAutorizada">
+                        <thead class="table-success text-dark small align-middle text-center" style="font-size: 0.70rem;">
+                        <!-- Nivel 1: Cabeceras -->
+                        <tr class="border-bottom border-dark bg-white">
+                            <th rowspan="2" class="border-end border-success align-middle" onclick="ordenarAutorizada(0, 'int')" style="cursor: pointer;">NO. <i class="bi bi-arrow-down-up text-muted ms-1"></i></th>
+                            <th rowspan="2" class="text-start border-end border-success align-middle" onclick="ordenarAutorizada(1, 'str')" style="cursor: pointer;">NOMBRE <i class="bi bi-arrow-down-up text-muted ms-1"></i></th>
+
+                            <!-- Columnas Ocultas -->
+                            <th rowspan="2" class="border-end align-middle d-none col-detalle-auth" onclick="ordenarAutorizada(2, 'str')" style="cursor: pointer;">CC <i class="bi bi-arrow-down-up text-muted ms-1"></i></th>
+                            <th rowspan="2" class="border-end align-middle d-none col-detalle-auth" onclick="ordenarAutorizada(3, 'str')" style="cursor: pointer;">Nombre CC <i class="bi bi-arrow-down-up text-muted ms-1"></i></th>
+                            <th rowspan="2" class="border-end align-middle d-none col-detalle-auth" onclick="ordenarAutorizada(4, 'int')" style="cursor: pointer;">WC <i class="bi bi-arrow-down-up text-muted ms-1"></i></th>
+                            <th rowspan="2" class="border-end align-middle d-none col-detalle-auth" onclick="ordenarAutorizada(5, 'str')" style="cursor: pointer;">Nombre WC <i class="bi bi-arrow-down-up text-muted ms-1"></i></th>
+                            <th rowspan="2" class="border-end align-middle d-none col-detalle-auth" onclick="ordenarAutorizada(6, 'str')" style="cursor: pointer;">APU <i class="bi bi-arrow-down-up text-muted ms-1"></i></th>
+                            <th rowspan="2" class="border-end align-middle d-none col-detalle-auth" onclick="ordenarAutorizada(7, 'str')" style="cursor: pointer;">Supervisor <i class="bi bi-arrow-down-up text-muted ms-1"></i></th>
+                            <th rowspan="2" class="border-end align-middle d-none col-detalle-auth" onclick="ordenarAutorizada(8, 'str')" style="cursor: pointer;">Shift <i class="bi bi-arrow-down-up text-muted ms-1"></i></th>
+
+                            <th rowspan="2" class="border-end border-2 border-success align-middle bg-warning bg-opacity-25" onclick="ordenarAutorizada(9, 'str')" style="cursor: pointer;">TURNO <i class="bi bi-arrow-down-up text-muted ms-1"></i></th>
+
+                            <th colspan="2" class="border-end border-2 border-success">L</th>
+                            <th colspan="2" class="border-end border-2 border-success">M</th>
+                            <th colspan="2" class="border-end border-2 border-success">M</th>
+                            <th colspan="2" class="border-end border-2 border-success">J</th>
+                            <th colspan="2" class="border-end border-2 border-success">V</th>
+                            <th colspan="2" class="border-end border-2 border-success">S</th>
+                            <th colspan="2" class="border-end border-2 border-success text-danger">D</th>
+
+                            <th rowspan="2" class="bg-danger bg-opacity-10 text-danger fw-bold align-middle" onclick="ordenarAutorizada(24, 'float')" style="cursor: pointer;">TOTAL FALTA <i class="bi bi-arrow-down-up text-muted ms-1"></i></th>
+                            <th rowspan="2" class="bg-secondary bg-opacity-25 text-dark fw-bold border-end border-success align-middle" onclick="ordenarAutorizada(25, 'float')" style="cursor: pointer;">TOTAL TE <i class="bi bi-arrow-down-up text-muted ms-1"></i></th>
+                            <th rowspan="2" class="bg-primary bg-opacity-10 text-primary fw-bold align-middle border-end border-success" onclick="ordenarAutorizada(26, 'float')" style="cursor: pointer;">TOTAL HRS <i class="bi bi-arrow-down-up text-muted ms-1"></i></th>
+
+                            <th rowspan="2" class="bg-warning bg-opacity-25 text-dark fw-bold align-middle" onclick="ordenarAutorizada(27, 'str')" style="cursor: pointer; min-width: 150px;">OBSERVACIONES <i class="bi bi-arrow-down-up text-muted ms-1"></i></th>
+                        </tr>
+                        <!-- Nivel 2: Fechas Dinámicas y TE -->
+                        <tr class="border-bottom border-success">
+                            <th class="table-success text-dark border-end border-success px-1" id="thLUNAuth">--</th><th class="bg-info bg-opacity-10 text-dark border-end border-2 border-success fw-bold px-1">TE</th>
+                            <th class="table-success text-dark border-end border-success px-1" id="thMARAuth">--</th><th class="bg-info bg-opacity-10 text-dark border-end border-2 border-success fw-bold px-1">TE</th>
+                            <th class="table-success text-dark border-end border-success px-1" id="thMIEAuth">--</th><th class="bg-info bg-opacity-10 text-dark border-end border-2 border-success fw-bold px-1">TE</th>
+                            <th class="table-success text-dark border-end border-success px-1" id="thJUEAuth">--</th><th class="bg-info bg-opacity-10 text-dark border-end border-2 border-success fw-bold px-1">TE</th>
+                            <th class="table-success text-dark border-end border-success px-1" id="thVIEAuth">--</th><th class="bg-info bg-opacity-10 text-dark border-end border-2 border-success fw-bold px-1">TE</th>
+                            <th class="table-success text-dark border-end border-success px-1" id="thSABAuth">--</th><th class="bg-info bg-opacity-10 text-dark border-end border-2 border-success fw-bold px-1">TE</th>
+                            <th class="table-success text-danger border-end border-success px-1" id="thDOMAuth">--</th><th class="bg-info bg-opacity-10 text-dark border-end border-2 border-success fw-bold px-1">TE</th>
+                        </tr>
+                        </thead>
+                        <tbody class="small fw-medium" id="tbodyPrenominaAutorizada">
+                        <tr>
+                            <td colspan="28" class="text-muted py-5 italic text-center">
+                                <i class="bi bi-file-earmark-spreadsheet fs-3 d-block mb-2 opacity-50"></i>
+                                Esperando archivo Excel pulido. Sube el documento (W<span id="labelSemanaAuth">--</span>) para visualizar los cálculos definitivos.
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- PESTAÑA 2: AUDITORÍA DE REGISTROS FACIALES -->
+        <div class="tab-pane fade" id="pills-reloj" role="tabpanel">
+
+            <!-- Barra de Filtros Dinámicos (Simplificada) -->
+            <div class="card p-3 mb-4 border-0 shadow-sm bg-white rounded-3">
+                <form id="formFiltrosReloj" class="row g-3 align-items-end" onsubmit="event.preventDefault(); filtrarRegistrosFaciales();">
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-muted mb-1" th:text="#{filtro.tipo.nomina}"></label>
+                        <select class="form-select form-select-sm bg-light border-primary" id="filtroRelojTipo" th:disabled="${esJefe != true and esNomina != true and esVisorBiometrico != true}">
+                            <option value="SINDICALIZADO" th:text="#{filtro.sindicalizado}"></option>
+                            <option value="ADMINISTRATIVO" th:text="#{filtro.administrativo}"></option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-muted mb-1" th:text="#{filtro.buscar.colaborador}"></label>
+                        <input type="text" class="form-control form-control-sm bg-light" id="filtroRelojBusqueda" th:placeholder="#{filtro.placeholder.colaborador}"
+                               th:value="${esJefe != true and esNomina != true and esVisorBiometrico != true} ? ${session.usuarioLogueado} : ''"
+                               th:readonly="${esJefe != true and esNomina != true and esVisorBiometrico != true}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold text-muted mb-1" th:text="#{filtro.rango.libre}"></label>
+                        <div class="input-group input-group-sm">
+                            <input type="date" class="form-control bg-light" id="filtroRelojInicio" required>
+                            <span class="input-group-text bg-white text-muted" th:text="#{filtro.a}"></span>
+                            <input type="date" class="form-control bg-light" id="filtroRelojFin" required>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-sm btn-primary w-100 fw-bold shadow-sm h-100 py-2">
+                            <i class="bi bi-fingerprint"></i> <span th:text="#{boton.auditar}"></span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Tabla de Resultados -->
+            <div class="card card-flotante p-4 border-top border-4 border-primary">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold text-dark mb-0"><i class="bi bi-fingerprint text-primary me-2"></i><span th:text="#{auditoria.historico}"></span></h5>
+                    <button class="btn btn-sm btn-outline-primary fw-bold" onclick="exportarRelojAExcel()">
+                        <i class="bi bi-file-earmark-excel-fill"></i> <span th:text="#{boton.descargar.vision}"></span>
+                    </button>
+                </div>
+
+                <div class="table-responsive bg-white rounded-3 border">
+                    <table class="table table-sm align-middle mb-0 table-hover text-center" id="tablaRegistrosFaciales">
+                        <thead class="table-light text-secondary small">
+                        <tr>
+                            <th>Nómina</th>
+                            <th class="text-start">Colaborador</th>
+                            <th>Día</th>
+                            <th>Fecha</th>
+                            <th class="text-success"><i class="bi bi-box-arrow-in-right"></i> Entrada</th>
+                            <th class="text-danger"><i class="bi bi-box-arrow-right"></i> Salida</th>
+                            <th>Horas Estancia</th>
+                            <th>Estatus</th>
+                        </tr>
+                        </thead>
+                        <tbody class="small fw-medium" id="tbodyRegistrosFaciales">
+                        <tr>
+                            <td colspan="8" class="text-muted py-5 italic">
+                                <i class="bi bi-robot fs-3 d-block mb-2 opacity-50"></i>
+                                Selecciona tus fechas y presiona "Auditar" para cruzar la información del reloj.
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="pills-io" role="tabpanel">
+
+            <div class="row g-4 mb-4">
+                <!-- 1. Importador de Asistencias (.TXT) -->
+                <div class="col-md-12">
+                    <div class="card card-flotante p-4 h-100 border-start border-4 border-info">
+                        <h6 class="fw-bold text-dark mb-2"><i class="bi bi-upload text-info me-2"></i>Importador de Asistencias (.TXT)</h6>
+                        <p class="text-muted small mb-3">Carga el layout plano del biométrico.</p>
+                        <form data-tipo="importador" action="/prenomina/importar-txt" method="post" enctype="multipart/form-data" class="mt-auto">
+                            <input class="form-control mb-3 bg-light" type="file" name="archivoTxt" accept=".csv, .txt" required>
+                            <button type="submit" class="btn btn-dark w-100 fw-bold"><i class="bi bi-database-fill-add me-2"></i>Procesar Registros</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- EXPORTADOR MIGRADO (Este se queda igualito, no lo toques) -->
+            <section class="card card-flotante p-4 bg-white border-top border-4 border-success">
+                <div class="border-bottom pb-2 mb-4">
+                    <h4 class="h5 mb-1 fw-bold text-dark"><i class="bi bi-download text-success me-2"></i>Descarga de Reportes Semanales (Exportador)</h4>
+                </div>
+
+                <div class="row mb-4 pt-3">
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold text-muted">Segmento a Exportar</label>
+                        <select class="form-select form-select-sm bg-light fw-bold text-success border-success" id="expTipoNomina">
+                            <option value="SINDICALIZADO">Sindicalizados</option>
+                            <option value="ADMINISTRATIVO">Administrativos (WC y BCI)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="row g-4">
+                    <div class="col-lg-6 border-end">
+                        <div class="p-3 rounded-3 bg-light border h-100">
+                            <h5 class="h6 fw-bold text-secondary mb-3"><i class="bi bi-calendar3 me-1"></i> Opción A: Filtrar por Semana Calendar</h5>
+                            <div class="row g-2">
+                                <div class="col-md-7">
+                                    <label for="expSemana" class="form-label small fw-semibold text-muted">Número de Semana</label>
+                                    <input type="number" class="form-control" id="expSemana" placeholder="Ej. 24" min="1" max="53">
+                                </div>
+                                <div class="col-md-5">
+                                    <label for="expAnio" class="form-label small fw-semibold text-muted">Año</label>
+                                    <input type="number" class="form-control" id="expAnio" value="2026">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-6">
+                        <div class="p-3 rounded-3 bg-light border h-100">
+                            <h5 class="h6 fw-bold text-secondary mb-3"><i class="bi bi-calendar-range me-1"></i> Opción B: Rango Libre de Fechas</h5>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <label for="expFechaInicio" class="form-label small fw-semibold text-muted">Fecha Inicio</label>
+                                    <input type="date" class="form-control" id="expFechaInicio">
+                                </div>
+                                <div class="col-6">
+                                    <label for="expFechaFin" class="form-label small fw-semibold text-muted">Fecha Fin</label>
+                                    <input type="date" class="form-control" id="expFechaFin">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex flex-column flex-sm-row justify-content-end gap-3 mt-4 pt-3 border-top">
+                    <button type="button" class="btn btn-outline-success fw-bold px-4 py-2 rounded-3 shadow-sm" onclick="dispararDescarga('prenomina')">
+                        <i class="bi bi-file-earmark-spreadsheet-fill fs-5 me-2"></i> Exportar Prenómina (.CSV)
+                    </button>
+                    <button type="button" class="btn btn-success text-white fw-bold px-4 py-2 rounded-3 shadow-sm" onclick="dispararDescarga('recuperaciones')">
+                        <i class="bi bi-file-earmark-arrow-down-fill fs-5 me-2"></i> Exportar Recuperaciones (.CSV)
+                    </button>
+                </div>
+            </section>
+        </div>
+
+        <div class="tab-pane fade" id="pills-dashboard" role="tabpanel">
+            <div class="card card-flotante p-4 mb-4 border-top border-4 border-warning">
+                <div class="row align-items-end mb-4 g-3 border-bottom pb-3">
+                    <div class="col-md-2">
+                        <h5 class="fw-bold text-dark mb-0"><i class="bi bi-bar-chart-fill text-warning me-2"></i><span th:text="#{metricas.titulo}"></span></h5>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label small fw-bold text-muted mb-1" th:text="#{metricas.rango}"></label>
+                        <div class="input-group input-group-sm shadow-sm">
+                            <input type="date" class="form-control bg-light" id="dashFechaInicio">
+                            <span class="input-group-text bg-white border-0 text-muted" th:text="#{filtro.a}"></span>
+                            <input type="date" class="form-control bg-light" id="dashFechaFin">
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small fw-bold text-muted mb-1" th:text="#{metricas.mundo}"></label>
+                        <select class="form-select form-select-sm bg-light fw-bold border-warning" id="dashTipoNomina">
+                            <option value="SINDICALIZADO" th:text="#{filtro.sindicalizado}"></option>
+                            <option value="ADMINISTRATIVO" th:text="#{filtro.administrativo}"></option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small fw-bold text-muted mb-1" th:text="#{metricas.agrupar}"></label>
+                        <select class="form-select form-select-sm bg-light fw-bold" id="dashAgrupador">
+                            <option value="supervisor" th:text="#{metricas.grupo.supervisor}"></option>
+                            <option value="apu" th:text="#{metricas.grupo.gerente}"></option>
+                            <option value="shift" th:text="#{metricas.grupo.shift}"></option>
+                            <option value="cc" th:text="#{metricas.grupo.cc}"></option>
+                            <option value="wc" th:text="#{metricas.grupo.wc}"></option>
+                        </select>
+                    </div>
+                    <div class="col-md-1">
+                        <button class="btn btn-sm btn-warning w-100 fw-bold shadow-sm h-100" onclick="dispararDashboardFechas()"><i class="bi bi-search"></i></button>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="input-group input-group-sm shadow-sm">
+                            <span class="input-group-text bg-white border-end-0"><i class="bi bi-filter text-muted"></i></span>
+                            <input type="text" class="form-control bg-light border-start-0" id="dashBuscador" th:placeholder="#{metricas.filtro}" onkeyup="filtrarTablaDashboard()">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-4 text-center" id="dashTarjetasGlobales"></div>
+
+                <div class="table-responsive bg-white rounded-3 border">
+                    <table class="table table-sm align-middle mb-0 table-hover text-center" id="tablaDashboard">
+                        <thead class="table-warning text-dark small align-middle" style="font-size: 0.75rem;">
+                        <tr>
+                            <th class="text-start border-end border-warning" id="thAgrupador" onclick="ordenarDashboard(0, 'str')" style="cursor: pointer;"><span th:text="#{metricas.tabla.grupo}"></span> <i class="bi bi-arrow-down-up text-muted ms-1"></i></th>
+                            <th onclick="ordenarDashboard(1, 'int')" style="cursor: pointer;"><span th:text="#{metricas.tabla.plantilla}"></span> <i class="bi bi-arrow-down-up text-muted ms-1"></i></th>
+                            <th onclick="ordenarDashboard(2, 'float')" style="cursor: pointer;" class="text-danger"><span th:text="#{metricas.tabla.faltas}"></span> <i class="bi bi-arrow-down-up text-muted ms-1"></i></th>
+                            <th onclick="ordenarDashboard(3, 'float')" style="cursor: pointer;" class="text-primary"><span th:text="#{metricas.tabla.horas}"></span> <i class="bi bi-arrow-down-up text-muted ms-1"></i></th>
+                            <th onclick="ordenarDashboard(4, 'int')" style="cursor: pointer;" class="text-success"><span th:text="#{metricas.tabla.vacaciones}"></span> <i class="bi bi-arrow-down-up text-muted ms-1"></i></th>
+                            <th onclick="ordenarDashboard(5, 'float')" style="cursor: pointer;"><span th:text="#{metricas.tabla.tedobles}"></span> <i class="bi bi-arrow-down-up text-muted ms-1"></i></th>
+                            <th onclick="ordenarDashboard(6, 'float')" style="cursor: pointer;"><span th:text="#{metricas.tabla.tetriples}"></span> <i class="bi bi-arrow-down-up text-muted ms-1"></i></th>
+                            <th onclick="ordenarDashboard(7, 'float')" style="cursor: pointer;" class="bg-warning bg-opacity-25 border-start border-warning"><span th:text="#{metricas.tabla.totalte}"></span> <i class="bi bi-arrow-down-up text-muted ms-1"></i></th>
+                        </tr>
+                        </thead>
+                        <tbody class="small fw-medium" id="tbodyDashboard">
+                        <tr>
+                            <td colspan="8" class="text-muted py-5 italic text-center">
+                                <i class="bi bi-bar-chart fs-3 d-block mb-2 opacity-50"></i>
+                                Selecciona tus fechas y presiona buscar para extraer métricas.
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</main>
+<!-- MODAL DE CARGA (SPINNER) PARA IMPORTACIONES -->
+<div class="modal fade" id="modalProcesando" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 bg-transparent shadow-none">
+            <div class="modal-body text-center">
+                <div class="spinner-border text-warning mb-3" style="width: 4rem; height: 4rem; border-width: 0.35em;" role="status">
+                    <span class="visually-hidden">Cargando...</span>
+                </div>
+                <h4 class="text-white fw-bold text-shadow" th:text="#{modal.procesando.titulo}"></h4>
+                <p class="text-white-50 fw-semibold text-shadow" th:text="#{modal.procesando.desc}"></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Efecto de sombra para el texto sobre fondo oscuro */
+    .text-shadow { text-shadow: 1px 1px 4px rgba(0,0,0,0.8); }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script th:inline="javascript">
+    let matrizGlobalPrenomina = [];
+    let matrizGlobalAutorizada = []; // ✨ MEMORIA PARA FALTAS Y TE PULIDOS
+    let vistaActualGlobal = 'horas';
+
+    document.addEventListener("DOMContentLoaded", function() {
+        const badgeRango = document.getElementById('rangoFechasSemana');
+
+        // Modal Spinner para importaciones
+        const formsImportacion = document.querySelectorAll('form[data-tipo="importador"]');
+        const modalSpinner = new bootstrap.Modal(document.getElementById('modalProcesando'));
+        formsImportacion.forEach(form => {
+            form.addEventListener('submit', () => modalSpinner.show());
+        });
+
+        // Configuración inicial de semana actual
+        establecerSemanaActual();
+        dispararBusquedaSemana();
+
+        // ✨ INYECCIÓN: Despertar el visor individual
+        inicializarSemanasMiPrenomina();
+    });
+
+    function establecerSemanaActual() {
+        const now = new Date();
+        const d = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+        const dayNum = d.getUTCDay() || 7;
+        d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+        const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+
+        document.getElementById('semanaFiltroNum').value = weekNo;
+        document.getElementById('semanaFiltroAnio').value = d.getUTCFullYear();
+    }
+
+    function dispararBusquedaSemana() {
+        const numSemana = document.getElementById('semanaFiltroNum').value;
+        const anio = document.getElementById('semanaFiltroAnio').value;
+        const tipoNom = document.getElementById('filtroTipoNomina').value;
+        const tipoNomAuth = document.getElementById('filtroTipoNominaAuth').value;
+
+        if(!numSemana || !anio) return;
+
+        const yearWeek = `${anio}-W${String(numSemana).padStart(2, '0')}`;
+        const { inicioIso, finIso, etiquetaLimpia } = calcularRangoSemanaISO(yearWeek);
+
+        document.getElementById('rangoFechasSemana').innerHTML = `<i class="bi bi-calendar-range me-1"></i> ${etiquetaLimpia}`;
+        ejecutarRecargaMaestra(yearWeek, inicioIso, finIso, tipoNom);
+        cargarPrenominaAutorizada(numSemana, tipoNomAuth);
+    }
+
+    function calcularRangoSemanaISO(yearWeek) {
+        const [yearStr, weekStr] = yearWeek.split('-W');
+        const simple = new Date(parseInt(yearStr, 10), 0, 1 + (parseInt(weekStr, 10) - 1) * 7);
+        const dow = simple.getDay();
+        const ISOweekStart = simple;
+
+        if (dow <= 4) { ISOweekStart.setDate(simple.getDate() - simple.getDay() + 1); }
+        else { ISOweekStart.setDate(simple.getDate() + 8 - simple.getDay()); }
+
+        const lunes = new Date(ISOweekStart);
+        const domingo = new Date(ISOweekStart);
+        domingo.setDate(lunes.getDate() + 6);
+
+        const opciones = { day: '2-digit', month: 'short' };
+        const etiquetaLimpia = `LUNES ${lunes.toLocaleDateString('es-MX', opciones)} AL DOMINGO ${domingo.toLocaleDateString('es-MX', opciones)}`.toUpperCase();
+
+        const inicioIso = lunes.getFullYear() + "-" + String(lunes.getMonth() + 1).padStart(2, '0') + "-" + String(lunes.getDate()).padStart(2, '0');
+        const finIso = domingo.getFullYear() + "-" + String(domingo.getMonth() + 1).padStart(2, '0') + "-" + String(domingo.getDate()).padStart(2, '0');
+
+        // INYECCIÓN DE FECHAS EN LOS HEADERS
+        document.getElementById('thLUN').innerText = String(lunes.getDate()).padStart(2, '0');
+        document.getElementById('thMAR').innerText = String(new Date(lunes.getTime() + 86400000 * 1).getDate()).padStart(2, '0');
+        document.getElementById('thMIE').innerText = String(new Date(lunes.getTime() + 86400000 * 2).getDate()).padStart(2, '0');
+        document.getElementById('thJUE').innerText = String(new Date(lunes.getTime() + 86400000 * 3).getDate()).padStart(2, '0');
+        document.getElementById('thVIE').innerText = String(new Date(lunes.getTime() + 86400000 * 4).getDate()).padStart(2, '0');
+        document.getElementById('thSAB').innerText = String(new Date(lunes.getTime() + 86400000 * 5).getDate()).padStart(2, '0');
+        document.getElementById('thDOM').innerText = String(domingo.getDate()).padStart(2, '0');
+
+        return { inicioIso, finIso, etiquetaLimpia };
+    }
+
+    function ejecutarRecargaMaestra(semanaIso, fechaInicio, fechaFin, tipoNom) {
+        const tbody = document.querySelector('#tbodyPrenominaViva');
+        tbody.innerHTML = `<tr><td colspan="29" class="text-muted py-5 text-center"><div class="spinner-border text-corporativo mb-2" role="status"></div><br>` + [[#{js.cargando.tiempos}]] + `</td></tr>`;
+
+        fetch(`/api/prenomina/datos-semana?inicio=${fechaInicio}&fin=${fechaFin}&tipo=${tipoNom}&jefeId=${document.getElementById('nominaUsuarioGlobal').value}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="29" class="text-muted py-5 italic text-center"><i class="bi bi-inbox fs-3 d-block mb-2"></i>Sin registros para esta semana.</td></tr>`;
+                    matrizGlobalPrenomina = [];
+                    return;
+                }
+                matrizGlobalPrenomina = data.sort((a, b) => parseInt(a.nomina) - parseInt(b.nomina));
+                renderizarTablaPrenomina();
+            })
+            .catch(err => {
+                tbody.innerHTML = `<tr><td colspan="29" class="text-danger py-5 text-center"><i class="bi bi-exclamation-triangle-fill fs-3 d-block mb-2"></i>Error al consultar la prenómina.</td></tr>`;
+            });
+    }
+
+    function renderizarTablaPrenomina(datosFiltrados = matrizGlobalPrenomina) {
+        const tbody = document.querySelector('#tbodyPrenominaViva');
+        tbody.innerHTML = '';
+
+        if (datosFiltrados.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="29" class="text-muted py-5 text-center">No hay coincidencias con tu búsqueda.</td></tr>`;
+            return;
+        }
+
+        const switchBtn = document.getElementById('switchDetalles');
+        const claseVisibilidad = (switchBtn && switchBtn.checked) ? '' : 'd-none';
+
+        datosFiltrados.forEach(emp => {
+            // Lógica con inyección de Turno y Día para evaluar descansos
+           const formatearCasilla = (valor, diaClave, turnoDom, esVacacion, incidencia) => {
+                if (valor === 'CI') { return '<span class="text-danger fw-bold" title="Checada Incompleta">CI</span>'; }
+
+                let esDescanso = false;
+                let turnoUpper = turnoDom ? String(turnoDom).toUpperCase() : "";
+                if (diaClave === 'DOM') esDescanso = true;
+                if (diaClave === 'SAB' && (turnoUpper.includes('MIXTO') || turnoUpper.includes('3RO') || turnoUpper.includes('12HRS'))) { esDescanso = true; }
+
+                if (esVacacion) {
+                    if (typeof valor === 'number' && valor > 0) {
+                        return `<span class="bg-warning text-dark fw-bold px-1 rounded shadow-sm border border-warning" title="¡Alerta! Tiempo de ${valor}h en día vacacional">V/A</span>`;
+                    }
+                    return esDescanso ? '<span class="text-warning fw-bold">D</span>' : '<span class="text-primary fw-bold fs-6" title="Vacación Aprobada">V</span>';
+                }
+
+                if (incidencia && incidencia.trim() !== '') {
+                    return `<span class="badge bg-secondary bg-opacity-10 text-dark border border-secondary fw-bold" title="Incidencia aprobada">${incidencia}</span>`;
+                }
+
+                if (vistaActualGlobal === 'horas') {
+                    return (typeof valor === 'number' && valor > 0) ? valor.toFixed(2) : '-';
+                } else {
+                    if (typeof valor === 'number' && valor > 0) return '<span class="text-success fw-bold">A</span>';
+                    if (esDescanso) return '<span class="text-warning fw-bold">D</span>';
+                    return '<span class="text-danger fw-bold">F</span>';
+                }
+            };
+
+        const formatearTE = (valorExtra, deudaTxt) => {
+            const extra = typeof valorExtra === 'number' ? valorExtra : 0;
+            const deuda = typeof deudaTxt === 'number' ? deudaTxt : 0;
+
+            if (deuda > 0) {
+                const balance = extra - deuda;
+                if (balance === 0) {
+                    return `<span class="fw-bold px-1 rounded shadow-sm" style="background-color: #fce4ec; color: #d63384;" title="TXT Saldado al 100%">0.00</span>`;
+                } else if (balance < 0) {
+                    return `<span class="text-danger fw-bold bg-danger bg-opacity-10 px-1 rounded shadow-sm" title="Deuda TXT: Faltan ${Math.abs(balance).toFixed(2)}h">${balance.toFixed(2)}</span>`;
+                } else {
+                    return `<span class="text-primary fw-bold px-1" title="TXT Saldado. A favor: ${balance.toFixed(2)}h">${balance.toFixed(2)}</span>`;
+                }
+            }
+            return extra > 0 ? extra.toFixed(2) : '-';
+        };
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+               <td class="font-monospace fw-bold text-secondary">${emp.nomina}</td>
+                <td class="text-start fw-bold text-dark">${emp.nombre}</td>
+                <td class="col-detalle ${claseVisibilidad}">${emp.cc || '-'}</td>
+                <td class="small text-truncate col-detalle ${claseVisibilidad}" style="max-width: 120px;" title="${emp.nombreCc || ''}">${emp.nombreCc || '-'}</td>
+                <td class="font-monospace col-detalle ${claseVisibilidad}">${emp.wc || '-'}</td>
+                <td class="small text-truncate col-detalle ${claseVisibilidad}" style="max-width: 120px;" title="${emp.nombreWc || ''}">${emp.nombreWc || '-'}</td>
+
+                <td class="col-detalle ${claseVisibilidad}">${emp.apu || '-'}</td>
+                <td class="small text-truncate col-detalle ${claseVisibilidad}" style="max-width: 120px;" title="${emp.supervisor || ''}">${emp.supervisor || '-'}</td>
+                <td class="col-detalle ${claseVisibilidad}">${emp.shift || '-'}</td>
+
+                <td><span class="badge bg-primary bg-opacity-10 text-primary border border-primary">${emp.turno}</span></td>
+
+                <td class="${vistaActualGlobal === 'horas' ? 'bg-success bg-opacity-10' : ''}">${formatearCasilla(emp.LUN, 'LUN', emp.turno, emp.vacLUN, emp.incLUN)}</td>
+                <td class="bg-info bg-opacity-10 text-dark fw-bold border-end border-2" style="font-size:0.7rem;">${formatearTE(emp.teLUN, emp.deudaLUN)}</td>
+
+                <td class="${vistaActualGlobal === 'horas' ? 'bg-success bg-opacity-10' : ''}">${formatearCasilla(emp.MAR, 'MAR', emp.turno, emp.vacMAR, emp.incMAR)}</td>
+                <td class="bg-info bg-opacity-10 text-dark fw-bold border-end border-2" style="font-size:0.7rem;">${formatearTE(emp.teMAR, emp.deudaMAR)}</td>
+
+                <td class="${vistaActualGlobal === 'horas' ? 'bg-success bg-opacity-10' : ''}">${formatearCasilla(emp.MIE, 'MIE', emp.turno, emp.vacMIE, emp.incMIE)}</td>
+                <td class="bg-info bg-opacity-10 text-dark fw-bold border-end border-2" style="font-size:0.7rem;">${formatearTE(emp.teMIE, emp.deudaMIE)}</td>
+
+                <td class="${vistaActualGlobal === 'horas' ? 'bg-success bg-opacity-10' : ''}">${formatearCasilla(emp.JUE, 'JUE', emp.turno, emp.vacJUE, emp.incJUE)}</td>
+                <td class="bg-info bg-opacity-10 text-dark fw-bold border-end border-2" style="font-size:0.7rem;">${formatearTE(emp.teJUE, emp.deudaJUE)}</td>
+
+                <td class="${vistaActualGlobal === 'horas' ? 'bg-success bg-opacity-10' : ''}">${formatearCasilla(emp.VIE, 'VIE', emp.turno, emp.vacVIE, emp.incVIE)}</td>
+                <td class="bg-info bg-opacity-10 text-dark fw-bold border-end border-2" style="font-size:0.7rem;">${formatearTE(emp.teVIE, emp.deudaVIE)}</td>
+
+                <td class="${vistaActualGlobal === 'horas' ? 'bg-success bg-opacity-10' : ''}">${formatearCasilla(emp.SAB, 'SAB', emp.turno, emp.vacSAB, emp.incSAB)}</td>
+                <td class="bg-info bg-opacity-10 text-dark fw-bold border-end border-2" style="font-size:0.7rem;">${formatearTE(emp.teSAB, emp.deudaSAB)}</td>
+
+                <td class="${vistaActualGlobal === 'horas' ? 'bg-warning bg-opacity-10' : ''}">${formatearCasilla(emp.DOM, 'DOM', emp.turno, emp.vacDOM, emp.incDOM)}</td>
+                <td class="bg-info bg-opacity-10 text-dark fw-bold border-end border-2" style="font-size:0.7rem;">${formatearTE(emp.teDOM, emp.deudaDOM)}</td>
+
+                <td class="bg-warning bg-opacity-25 text-dark fw-bold border-end border-dark">${emp.totalTE ? emp.totalTE.toFixed(2) : '0.00'}</td>
+                <td class="bg-danger bg-opacity-10 text-danger fw-bold">${emp.totalFaltas || 0}</td>
+
+                <!-- ✨ CELDA DE TOTAL HRS -->
+                <td class="bg-primary bg-opacity-10 text-primary fw-bold">${emp.totalHrs > 0 ? emp.totalHrs.toFixed(2) : '0.00'}</td>
+
+                <td class="small text-truncate text-secondary" style="max-width: 140px;" title="${emp.detalleTxt || ''}">${emp.detalleTxt || '-'}</td>
+                <td class="small text-truncate fw-bold text-dark" style="max-width: 120px;" title="${emp.quienAutoriza || ''}">${emp.quienAutoriza || '-'}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function cambiarVistaPrenomina(tipoVista) {
+        vistaActualGlobal = tipoVista;
+        renderizarTablaPrenomina();
+    }
+
+    function filtrarTablaPrenomina() {
+        const input = document.getElementById('buscadorPrenomina').value.toLowerCase();
+        const filtrados = matrizGlobalPrenomina.filter(emp => {
+            const cadenaBuscable = `${emp.nomina} ${emp.nombre} ${emp.cc} ${emp.nombreCc} ${emp.wc} ${emp.nombreWc} ${emp.apu} ${emp.supervisor} ${emp.detalleTxt || ''} ${emp.quienAutoriza || ''}`.toLowerCase();
+            return cadenaBuscable.includes(input);
+        });
+        renderizarTablaPrenomina(filtrados);
+    }
+
+    let ordenAscendenteGlobal = true;
+    function ordenarPrenomina(indiceColumna, tipoDato) {
+        const tbody = document.getElementById("tbodyPrenominaViva");
+        const filas = Array.from(tbody.querySelectorAll("tr"));
+
+        if(filas.length === 0 || filas[0].innerText.includes("espera")) return;
+
+        filas.sort((a, b) => {
+            let valorA = a.cells[indiceColumna].innerText.trim();
+            let valorB = b.cells[indiceColumna].innerText.trim();
+
+            if (tipoDato === 'int') {
+                valorA = parseInt(valorA.replace(/[^0-9-]/g, '')) || 0;
+                valorB = parseInt(valorB.replace(/[^0-9-]/g, '')) || 0;
+                return ordenAscendenteGlobal ? valorA - valorB : valorB - valorA;
+            } else if (tipoDato === 'float') {
+                valorA = parseFloat(valorA) || 0;
+                valorB = parseFloat(valorB) || 0;
+                return ordenAscendenteGlobal ? valorA - valorB : valorB - valorA;
+            } else {
+                return ordenAscendenteGlobal ? valorA.localeCompare(valorB) : valorB.localeCompare(valorA);
+            }
+        });
+
+        ordenAscendenteGlobal = !ordenAscendenteGlobal;
+        tbody.innerHTML = '';
+        filas.forEach(fila => tbody.appendChild(fila));
+    }
+
+    function toggleDetalles() {
+        const celdas = document.querySelectorAll('.col-detalle');
+        const switchBtn = document.getElementById('switchDetalles');
+        celdas.forEach(celda => {
+            if(switchBtn.checked) {
+                celda.classList.remove('d-none');
+            } else {
+                celda.classList.add('d-none');
+            }
+        });
+    }
+
+    // ✨ LÓGICA PARA LA PESTAÑA PRENÓMINA AUTORIZADA ✨
+
+    function toggleDetallesAutorizada() {
+        const celdas = document.querySelectorAll('.col-detalle-auth');
+        const switchBtn = document.getElementById('switchDetallesAutorizada');
+        celdas.forEach(celda => {
+            if(switchBtn.checked) {
+                celda.classList.remove('d-none');
+            } else {
+                celda.classList.add('d-none');
+            }
+        });
+    }
+
+    function filtrarTablaAutorizada() {
+        const input = document.getElementById('buscadorPrenominaFinal').value.toLowerCase();
+        const filas = document.querySelectorAll("#tbodyPrenominaAutorizada tr");
+
+        if(filas.length === 0 || filas[0].innerText.includes("Esperando")) return;
+
+        filas.forEach(fila => {
+            const textoFila = fila.innerText.toLowerCase();
+            if (textoFila.includes(input)) {
+                fila.style.display = "";
+            } else {
+                fila.style.display = "none";
+            }
+        });
+    }
+
+    let ordenAscendenteAuth = true;
+    function ordenarAutorizada(indiceColumna, tipoDato) {
+        const tbody = document.getElementById("tbodyPrenominaAutorizada");
+        const filas = Array.from(tbody.querySelectorAll("tr"));
+
+        if(filas.length === 0 || filas[0].innerText.includes("Esperando")) return;
+
+        filas.sort((a, b) => {
+            let valorA = a.cells[indiceColumna].innerText.trim();
+            let valorB = b.cells[indiceColumna].innerText.trim();
+
+            if (tipoDato === 'int') {
+                valorA = parseInt(valorA.replace(/[^0-9-]/g, '')) || 0;
+                valorB = parseInt(valorB.replace(/[^0-9-]/g, '')) || 0;
+                return ordenAscendenteAuth ? valorA - valorB : valorB - valorA;
+            } else if (tipoDato === 'float') {
+                valorA = parseFloat(valorA) || 0;
+                valorB = parseFloat(valorB) || 0;
+                return ordenAscendenteAuth ? valorA - valorB : valorB - valorA;
+            } else {
+                return ordenAscendenteAuth ? valorA.localeCompare(valorB) : valorB.localeCompare(valorA);
+            }
+        });
+
+        ordenAscendenteAuth = !ordenAscendenteAuth;
+        tbody.innerHTML = '';
+        filas.forEach(fila => tbody.appendChild(fila));
+    }
+
+    // ✨ CONSUMO Y RENDERIZADO DE LA PRENÓMINA AUTORIZADA ✨
+
+    function cargarPrenominaAutorizada(semana, tipoNom) {
+        const tbody = document.getElementById('tbodyPrenominaAutorizada');
+        const labelSemana = document.getElementById('labelSemanaAuth');
+        if(labelSemana) labelSemana.innerText = semana;
+
+        tbody.innerHTML = `<tr><td colspan="28" class="text-muted py-5 text-center"><div class="spinner-border text-success mb-2" role="status"></div><br>Buscando prenómina autorizada...</td></tr>`;
+
+        fetch(`/api/prenomina/autorizada?semana=${semana}&tipo=${tipoNom}&jefeId=${document.getElementById('nominaUsuarioGlobal').value}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.length === 0) {
+                    matrizGlobalAutorizada = [];
+                    tbody.innerHTML = `<tr><td colspan="28" class="text-muted py-5 italic text-center"><i class="bi bi-inbox fs-3 d-block mb-2"></i>No hay prenómina autorizada cargada para la semana ${semana}.</td></tr>`;
+                    return;
+                }
+
+                matrizGlobalAutorizada = data; // ✨ GUARDAMOS EN RAM
+                renderizarAutorizada(data);
+            })
+            .catch(err => {
+                tbody.innerHTML = `<tr><td colspan="28" class="text-danger py-5 text-center"><i class="bi bi-exclamation-triangle-fill fs-3 d-block mb-2"></i>Error al consultar la tabla final.</td></tr>`;
+            });
+    }
+
+    function renderizarAutorizada(datos) {
+        const tbody = document.getElementById('tbodyPrenominaAutorizada');
+        tbody.innerHTML = '';
+        const switchBtn = document.getElementById('switchDetallesAutorizada');
+        const claseVisibilidad = (switchBtn && switchBtn.checked) ? '' : 'd-none';
+
+        datos.forEach(emp => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="font-monospace fw-bold text-secondary">${emp.nomina}</td>
+                <td class="text-start fw-bold text-dark">${emp.nombre}</td>
+
+                <td class="col-detalle-auth ${claseVisibilidad}">-</td>
+                <td class="col-detalle-auth ${claseVisibilidad}">-</td>
+                <td class="col-detalle-auth ${claseVisibilidad}">-</td>
+                <td class="col-detalle-auth ${claseVisibilidad}">-</td>
+                <td class="col-detalle-auth ${claseVisibilidad}">-</td>
+                <td class="col-detalle-auth ${claseVisibilidad}">-</td>
+                <td class="col-detalle-auth ${claseVisibilidad}">-</td>
+
+                <td><span class="badge bg-warning bg-opacity-25 text-dark border border-warning">${emp.turno || ''}</span></td>
+
+                <td class="bg-success bg-opacity-10">${emp.asisLun || '-'}</td><td class="bg-info bg-opacity-10 fw-bold" style="font-size:0.7rem;">${emp.teLun > 0 ? emp.teLun : '-'}</td>
+                <td class="bg-success bg-opacity-10">${emp.asisMar || '-'}</td><td class="bg-info bg-opacity-10 fw-bold" style="font-size:0.7rem;">${emp.teMar > 0 ? emp.teMar : '-'}</td>
+                <td class="bg-success bg-opacity-10">${emp.asisMie || '-'}</td><td class="bg-info bg-opacity-10 fw-bold" style="font-size:0.7rem;">${emp.teMie > 0 ? emp.teMie : '-'}</td>
+                <td class="bg-success bg-opacity-10">${emp.asisJue || '-'}</td><td class="bg-info bg-opacity-10 fw-bold" style="font-size:0.7rem;">${emp.teJue > 0 ? emp.teJue : '-'}</td>
+                <td class="bg-success bg-opacity-10">${emp.asisVie || '-'}</td><td class="bg-info bg-opacity-10 fw-bold" style="font-size:0.7rem;">${emp.teVie > 0 ? emp.teVie : '-'}</td>
+                <td class="bg-success bg-opacity-10">${emp.asisSab || '-'}</td><td class="bg-info bg-opacity-10 fw-bold" style="font-size:0.7rem;">${emp.teSab > 0 ? emp.teSab : '-'}</td>
+                <td class="bg-warning bg-opacity-10 text-danger">${emp.asisDom || '-'}</td><td class="bg-info bg-opacity-10 fw-bold" style="font-size:0.7rem;">${emp.teDom > 0 ? emp.teDom : '-'}</td>
+
+                <td class="bg-danger bg-opacity-10 fw-bold text-danger">${emp.totalFaltas || 0}</td>
+                <td class="bg-secondary bg-opacity-25 fw-bold text-dark">${emp.totalTe > 0 ? emp.totalTe : '0.00'}</td>
+                <td class="bg-primary bg-opacity-10 fw-bold text-primary">-</td>
+
+                <td class="small text-truncate text-secondary" style="max-width: 150px;" title="${emp.observaciones || ''}">${emp.observaciones || ''}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function filtrarRegistrosFaciales() {
+        const inicio = document.getElementById('filtroRelojInicio').value;
+        const fin = document.getElementById('filtroRelojFin').value;
+        const busqueda = document.getElementById('filtroRelojBusqueda').value.toLowerCase();
+        const tipo = document.getElementById('filtroRelojTipo').value;
+
+        if(!inicio || !fin) {
+            alert([[#{js.alerta.fechas}]]);
+            return;
+        }
+
+        const tbody = document.getElementById('tbodyRegistrosFaciales');
+        tbody.innerHTML = `<tr><td colspan="8" class="text-muted py-5 text-center"><div class="spinner-border text-primary mb-2"></div><br>Extrayendo checadas brutas...</td></tr>`;
+
+        fetch(`/api/prenomina/auditoria-reloj?inicio=${inicio}&fin=${fin}&tipo=${tipo}&jefeId=${document.getElementById('nominaUsuarioGlobal').value}`)
+            .then(res => res.json())
+            .then(data => {
+                tbody.innerHTML = '';
+                const filtrados = data.filter(emp => `${emp.nomina} ${emp.nombre}`.toLowerCase().includes(busqueda));
+                if(filtrados.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="8" class="text-muted py-5 text-center">No hay registros faciales para este filtro.</td></tr>`;
+                    return;
+                }
+                const diasSemana = ["", "LUN", "MAR", "MIE", "JUE", "VIE", "SAB", "DOM"];
+                filtrados.forEach(reg => {
+                    let badgeEstatus = '';
+                    if(reg.estatus === 'CI') badgeEstatus = '<span class="badge bg-danger bg-opacity-10 text-danger border border-danger">Incompleta (CI)</span>';
+                    else if(reg.estatus === 'ATIPICO') badgeEstatus = '<span class="badge bg-warning bg-opacity-10 text-dark border border-warning">Atípico</span>';
+                    else badgeEstatus = '<span class="badge bg-success bg-opacity-10 text-success border border-success">Emparejado</span>';
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td class="font-monospace fw-bold text-secondary">${reg.nomina}</td>
+                        <td class="text-start fw-bold text-dark">${reg.nombre}</td>
+                        <td class="fw-bold text-muted">${diasSemana[reg.dia]}</td>
+                        <td>${reg.fecha}</td>
+                        <td class="text-success fw-bold fs-6">${reg.entradaCruda}</td>
+                        <td class="text-danger fw-bold fs-6">${reg.salidaCruda}</td>
+                        <td class="fw-bold text-primary">${reg.horasEfectivas ? reg.horasEfectivas.toFixed(2) : '0.00'}</td>
+                        <td>${badgeEstatus}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            })
+            .catch(err => {
+                tbody.innerHTML = `<tr><td colspan="8" class="text-danger py-5 text-center"><i class="bi bi-exclamation-triangle me-2"></i>Error de conexión.</td></tr>`;
+            });
+    }
+
+    function dispararDescarga(tipo) {
+        const semana = document.getElementById('expSemana').value;
+        const anio = document.getElementById('expAnio').value;
+        const inicio = document.getElementById('expFechaInicio').value;
+        const fin = document.getElementById('expFechaFin').value;
+        const tipoNomina = document.getElementById('expTipoNomina').value;
+
+        let url = `/api/prenomina/exportar?tipo=${tipo}&tipoNomina=${tipoNomina}`;
+
+        if (inicio && fin) {
+            url += `&inicio=${inicio}&fin=${fin}`;
+        } else if (semana && anio) {
+            url += `&semana=${semana}&anio=${anio}`;
+        } else {
+            alert("Selecciona un número de semana o un rango de fechas para exportar.");
+            return;
+        }
+        window.location.href = url;
+    }
+
+    function exportarRelojAExcel() {
+        const filas = document.querySelectorAll("#tablaRegistrosFaciales tr");
+        let csvContent = "\uFEFF"; // BOM para que Excel respete los acentos
+
+        let tieneDatos = false;
+
+        filas.forEach((fila, index) => {
+            // Ignorar la fila de estado vacío o de carga
+            if (fila.innerText.includes("Selecciona tus fechas") || fila.innerText.includes("Extrayendo")) return;
+
+            let celdas = fila.querySelectorAll("th, td");
+            let filaCsv = [];
+
+            celdas.forEach(celda => {
+                // Limpiar saltos de línea visuales y escapar comillas
+                let texto = celda.innerText.replace(/(\r\n|\n|\r)/gm, " ").replace(/"/g, '""').trim();
+                filaCsv.push(`"${texto}"`);
+            });
+
+            csvContent += filaCsv.join(",") + "\r\n";
+
+            // Si hay más de una fila (además del thead), consideramos que hay datos
+            if (index > 0) tieneDatos = true;
+        });
+
+        if (!tieneDatos) {
+            alert("No hay registros filtrados para exportar.");
+            return;
+        }
+
+        // Crear el archivo en memoria y forzar la descarga
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `Auditoria_Biometrico_${new Date().toISOString().split('T')[0]}.csv`;
+        link.style.display = "none";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+// ✨ MOTOR DEL DASHBOARD Y MÉTRICAS (INDEPENDIENTE Y CRUCE AUTORIZADO) ✨
+    function obtenerSemanaISO(fechaStr) {
+        // Separación manual para evitar el desfase de zona horaria local
+        const partes = fechaStr.split('-');
+        const d = new Date(partes[0], partes[1] - 1, partes[2]);
+        d.setHours(0, 0, 0, 0);
+        d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+        const yearStart = new Date(d.getFullYear(), 0, 1);
+        return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+    }
+
+    function dispararDashboardFechas() {
+        const inicio = document.getElementById('dashFechaInicio').value;
+        const fin = document.getElementById('dashFechaFin').value;
+        const tipoNom = document.getElementById('dashTipoNomina').value;
+
+        if (!inicio || !fin) {
+            alert("Por favor, selecciona un rango de fechas para generar las métricas.");
+            return;
+        }
+
+        const tbody = document.getElementById('tbodyDashboard');
+        tbody.innerHTML = `<tr><td colspan="8" class="text-muted py-5 text-center"><div class="spinner-border text-warning mb-2"></div><br>` + [[#{js.cruzando.bd}]] + `</td></tr>`;
+
+        const semanaNum = obtenerSemanaISO(inicio);
+
+        Promise.all([
+            fetch(`/api/prenomina/datos-semana?inicio=${inicio}&fin=${fin}&tipo=${tipoNom}&jefeId=${document.getElementById('nominaUsuarioGlobal').value}`).then(res => res.json()),
+            fetch(`/api/prenomina/autorizada?semana=${semanaNum}&tipo=${tipoNom}&jefeId=${document.getElementById('nominaUsuarioGlobal').value}`).then(res => res.json()).catch(() => [])
+        ])
+        .then(([datosCrud, datosAuth]) => {
+            matrizGlobalAutorizada = Array.isArray(datosAuth) ? datosAuth : [];
+            procesarYRenderizarDashboard(datosCrud);
+        })
+        .catch(err => {
+            console.error("🔥 Error crítico en Dashboard:", err);
+            tbody.innerHTML = `<tr><td colspan="8" class="text-danger py-5 text-center"><i class="bi bi-exclamation-triangle me-2"></i>Error al consultar métricas. Verifica la consola F12.</td></tr>`;
+        });
+    }
+
+    function procesarYRenderizarDashboard(datos) {
+        const agrupadorKey = document.getElementById('dashAgrupador').value;
+        const tbody = document.getElementById('tbodyDashboard');
+
+        if (!datos || datos.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-muted py-5 text-center">No hay registros para este periodo.</td></tr>`;
+            document.getElementById('dashTarjetasGlobales').innerHTML = '';
+            return;
+        }
+
+        const metricas = {};
+        let totalesGlobales = { plantilla: 0, faltas: 0, horas: 0, vac: 0, teDobles: 0, teTriples: 0, teTotal: 0 };
+
+        datos.forEach(emp => {
+            let claveGrupo = emp[agrupadorKey] || 'Sin Asignar';
+            if (agrupadorKey === 'cc') claveGrupo = `${emp.cc} - ${emp.nombreCc}`;
+            if (agrupadorKey === 'wc') claveGrupo = `${emp.wc} - ${emp.nombreWc}`;
+
+            if (!metricas[claveGrupo]) {
+                metricas[claveGrupo] = { plantilla: 0, faltas: 0, horas: 0, vac: 0, teDobles: 0, teTriples: 0, teTotal: 0 };
+            }
+
+            // 1. Horas Trabajadas (Intocables del reloj biométrico)
+            const horasFisicas = parseFloat(emp.totalHrs) || 0;
+
+            // 2. Cruce blindado: convertimos a entero para evitar fallos ("012" vs "12")
+            const empAuth = matrizGlobalAutorizada.find(a => parseInt(a.nomina) === parseInt(emp.nomina));
+
+            let faltasReales = 0;
+            let teReal = 0;
+            let diasVacaciones = 0;
+
+            if (empAuth) {
+                // Atrapamos variaciones de mayúsculas en el JSON (totalTe vs totalTE)
+                faltasReales = parseFloat(empAuth.totalFaltas) || 0;
+                teReal = parseFloat(empAuth.totalTe || empAuth.totalTE) || 0;
+
+                const diasAuth = [empAuth.asisLun, empAuth.asisMar, empAuth.asisMie, empAuth.asisJue, empAuth.asisVie, empAuth.asisSab, empAuth.asisDom];
+                diasVacaciones = diasAuth.filter(dia => dia !== null && dia !== undefined && String(dia).toUpperCase().includes('V')).length;
+            } else if (matrizGlobalAutorizada.length === 0) {
+                // ⚠️ Respaldo: Si la tabla autorizada no se ha subido, mostramos los datos crudos para no dejar la planta en ceros
+                faltasReales = parseFloat(emp.totalFaltas) || 0;
+                teReal = parseFloat(emp.totalTE) || 0;
+                ['LUN', 'MAR', 'MIE', 'JUE', 'VIE', 'SAB', 'DOM'].forEach(dia => {
+                    if (emp[`vac${dia}`] === true) diasVacaciones++;
+                });
+            } else {
+                // Si el Excel SÍ se subió pero borraste a este operador, se queda en ceros reales
+                faltasReales = 0;
+                teReal = 0;
+                diasVacaciones = 0;
+            }
+
+            const dobles = teReal > 9 ? 9 : teReal;
+            const triples = teReal > 9 ? teReal - 9 : 0;
+
+            metricas[claveGrupo].plantilla += 1;
+            metricas[claveGrupo].faltas += faltasReales;
+            metricas[claveGrupo].horas += horasFisicas;
+            metricas[claveGrupo].vac += diasVacaciones;
+            metricas[claveGrupo].teDobles += dobles;
+            metricas[claveGrupo].teTriples += triples;
+            metricas[claveGrupo].teTotal += teReal;
+
+            totalesGlobales.plantilla += 1;
+            totalesGlobales.faltas += faltasReales;
+            totalesGlobales.horas += horasFisicas;
+            totalesGlobales.vac += diasVacaciones;
+            totalesGlobales.teDobles += dobles;
+            totalesGlobales.teTriples += triples;
+            totalesGlobales.teTotal += teReal;
+        });
+
+        document.getElementById('dashTarjetasGlobales').innerHTML = `
+            <div class="col"><div class="p-3 bg-light rounded border fw-bold"><div class="small text-muted">` + [[#{metricas.tabla.plantilla}]] + `</div><div class="fs-4">${totalesGlobales.plantilla}</div></div></div>
+            <div class="col"><div class="p-3 bg-danger bg-opacity-10 rounded border border-danger fw-bold text-danger"><div class="small">` + [[#{metricas.tabla.faltas}]] + `</div><div class="fs-4">${totalesGlobales.faltas}</div></div></div>
+            <div class="col"><div class="p-3 bg-primary bg-opacity-10 rounded border border-primary fw-bold text-primary"><div class="small">` + [[#{metricas.tabla.horas}]] + `</div><div class="fs-4">${totalesGlobales.horas.toFixed(2)}</div></div></div>
+            <div class="col"><div class="p-3 bg-success bg-opacity-10 rounded border border-success fw-bold text-success"><div class="small">` + [[#{metricas.tabla.vacaciones}]] + `</div><div class="fs-4">${totalesGlobales.vac}</div></div></div>
+            <div class="col"><div class="p-3 bg-warning bg-opacity-25 rounded border border-warning fw-bold text-dark"><div class="small">` + [[#{metricas.tabla.totalte}]] + `</div><div class="fs-4">${totalesGlobales.teTotal.toFixed(2)}</div></div></div>
+        `;
+
+        tbody.innerHTML = '';
+        const selectAgrupador = document.getElementById('dashAgrupador');
+        const thAgrupador = document.getElementById('thAgrupador');
+        if(thAgrupador && selectAgrupador) thAgrupador.innerHTML = `${selectAgrupador.options[selectAgrupador.selectedIndex].text.toUpperCase()} <i class="bi bi-arrow-down-up text-muted ms-1"></i>`;
+
+        Object.keys(metricas).sort().forEach(grupo => {
+            const m = metricas[grupo];
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="text-start fw-bold text-dark">${grupo}</td>
+                <td class="fw-bold text-secondary">${m.plantilla}</td>
+                <td class="fw-bold text-danger bg-danger bg-opacity-10">${m.faltas}</td>
+                <td class="fw-bold text-primary">${m.horas.toFixed(2)}</td>
+                <td class="fw-bold text-success">${m.vac}</td>
+                <td class="fw-bold">${m.teDobles.toFixed(2)}</td>
+                <td class="fw-bold">${m.teTriples.toFixed(2)}</td>
+                <td class="fw-bold bg-warning bg-opacity-10 border-start border-warning">${m.teTotal.toFixed(2)}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function filtrarTablaDashboard() {
+        const input = document.getElementById('dashBuscador').value.toLowerCase();
+        document.querySelectorAll("#tbodyDashboard tr").forEach(fila => {
+            fila.style.display = fila.innerText.toLowerCase().includes(input) ? "" : "none";
+        });
+    }
+
+    let ordenDashAsc = true;
+    function ordenarDashboard(columna, tipo) {
+        const tbody = document.getElementById("tbodyDashboard");
+        const filas = Array.from(tbody.querySelectorAll("tr"));
+        if(filas.length === 0 || filas[0].innerText.includes("Selecciona")) return;
+
+        filas.sort((a, b) => {
+            let valA = a.cells[columna].innerText.trim();
+            let valB = b.cells[columna].innerText.trim();
+            if (tipo === 'int' || tipo === 'float') {
+                return ordenDashAsc ? (parseFloat(valA) || 0) - (parseFloat(valB) || 0) : (parseFloat(valB) || 0) - (parseFloat(valA) || 0);
+            }
+            return ordenDashAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        });
+        ordenDashAsc = !ordenDashAsc;
+        tbody.innerHTML = '';
+        filas.forEach(fila => tbody.appendChild(fila));
+    }
+
+    function inicializarSemanasMiPrenomina() {
+        const select1 = document.getElementById('miPrenominaSemanaSelect');
+        const select2 = document.getElementById('misRegistrosSemanaSelect');
+
+        const d = new Date();
+        d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+        const currentWeek = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+        let currentYear = d.getUTCFullYear();
+
+        let html = '';
+        for (let i = 0; i < 10; i++) {
+            let w = currentWeek - i;
+            let y = currentYear;
+            if (w <= 0) { w += 52; y--; }
+            html += `<option value="${String(w).padStart(2, '0')}" data-year="${y}">Semana ${w} - ${y}</option>`;
+        }
+
+        if (select1) { select1.innerHTML = html; cargarMiPrenomina(); }
+        if (select2) { select2.innerHTML = html; cargarMisRegistros(); }
+    }
+
+    function cargarMisRegistros() {
+        const select = document.getElementById('misRegistrosSemanaSelect');
+        const miNomina = document.getElementById('nominaUsuarioGlobal').value;
+        if(!select || !miNomina) return;
+
+        const w = select.value;
+        const y = select.options[select.selectedIndex].getAttribute('data-year');
+        const { inicioIso, finIso } = calcularRangoSemanaISO(`${y}-W${w}`);
+
+        const tbody = document.getElementById('tbodyMisRegistros');
+        tbody.innerHTML = `<tr><td colspan="6" class="text-muted py-5 text-center"><div class="spinner-border spinner-border-sm text-primary mb-2"></div><br>` + [[#{js.extrayendo.reloj}]] + `</td></tr>`;
+
+        fetch(`/api/prenomina/auditoria-reloj?inicio=${inicioIso}&fin=${finIso}&tipo=SINDICALIZADO&jefeId=${miNomina}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.length === 0) return fetch(`/api/prenomina/auditoria-reloj?inicio=${inicioIso}&fin=${finIso}&tipo=ADMINISTRATIVO&jefeId=${miNomina}`).then(r => r.json());
+            return data;
+        })
+        .then(data => {
+            tbody.innerHTML = '';
+            const misChecadas = data.filter(emp => String(emp.nomina) === String(miNomina));
+
+            if(misChecadas.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-muted py-5 text-center">` + [[#{js.sin.checadas}]] + `</td></tr>`;
+                return;
+            }
+
+            const diasSemana = ["", "LUN", "MAR", "MIE", "JUE", "VIE", "SAB", "DOM"];
+            misChecadas.forEach(reg => {
+                let badgeEstatus = reg.estatus === 'CI' ? '<span class="badge bg-danger bg-opacity-10 text-danger border border-danger">Incompleta (CI)</span>' :
+                                   reg.estatus === 'ATIPICO' ? '<span class="badge bg-warning bg-opacity-10 text-dark border border-warning">Atípico</span>' :
+                                   '<span class="badge bg-success bg-opacity-10 text-success border border-success">Emparejado</span>';
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td class="fw-bold text-muted">${diasSemana[reg.dia]}</td>
+                        <td>${reg.fecha}</td>
+                        <td class="text-success fw-bold fs-6">${reg.entradaCruda}</td>
+                        <td class="text-danger fw-bold fs-6">${reg.salidaCruda}</td>
+                        <td class="fw-bold text-primary">${reg.horasEfectivas ? reg.horasEfectivas.toFixed(2) : '0.00'}</td>
+                        <td>${badgeEstatus}</td>
+                    </tr>
+                `;
+            });
+        })
+        .catch(err => {
+            tbody.innerHTML = `<tr><td colspan="6" class="text-danger py-5 text-center"><i class="bi bi-wifi-off me-2"></i>Error de red con el biométrico.</td></tr>`;
+        });
+    }
+
+    function cargarMisRegistros() {
+        const select = document.getElementById('misRegistrosSemanaSelect');
+        const miNomina = document.getElementById('nominaUsuarioGlobal').value;
+        if(!select || !miNomina) return;
+
+        const w = select.value;
+        const y = select.options[select.selectedIndex].getAttribute('data-year');
+        const { inicioIso, finIso } = calcularRangoSemanaISO(`${y}-W${w}`);
+
+        const tbody = document.getElementById('tbodyMisRegistros');
+        tbody.innerHTML = `<tr><td colspan="6" class="text-muted py-5 text-center"><div class="spinner-border spinner-border-sm text-primary mb-2"></div><br>Extrayendo reloj biométrico...</td></tr>`;
+
+        // Cruce furtivo: Le pedimos todas las de Sindicalizados de esa semana y filtramos por memoria del navegador
+        fetch(`/api/prenomina/auditoria-reloj?inicio=${inicioIso}&fin=${finIso}&tipo=SINDICALIZADO`)
+        .then(res => res.json())
+        .then(data => {
+            // Si regresa vacío, el operador tal vez es ADMINISTRATIVO
+            if (data.length === 0) {
+                return fetch(`/api/prenomina/auditoria-reloj?inicio=${inicioIso}&fin=${finIso}&tipo=ADMINISTRATIVO`).then(r => r.json());
+            }
+            return data;
+        })
+        .then(data => {
+            tbody.innerHTML = '';
+            const misChecadas = data.filter(emp => String(emp.nomina) === String(miNomina));
+
+            if(misChecadas.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-muted py-5 text-center">No hay registros faciales mapeados en esta semana.</td></tr>`;
+                return;
+            }
+
+            const diasSemana = ["", "LUN", "MAR", "MIE", "JUE", "VIE", "SAB", "DOM"];
+            misChecadas.forEach(reg => {
+                let badgeEstatus = reg.estatus === 'CI' ? '<span class="badge bg-danger bg-opacity-10 text-danger border border-danger">Incompleta (CI)</span>' :
+                                   reg.estatus === 'ATIPICO' ? '<span class="badge bg-warning bg-opacity-10 text-dark border border-warning">Atípico</span>' :
+                                   '<span class="badge bg-success bg-opacity-10 text-success border border-success">Emparejado</span>';
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td class="fw-bold text-muted">${diasSemana[reg.dia]}</td>
+                        <td>${reg.fecha}</td>
+                        <td class="text-success fw-bold fs-6">${reg.entradaCruda}</td>
+                        <td class="text-danger fw-bold fs-6">${reg.salidaCruda}</td>
+                        <td class="fw-bold text-primary">${reg.horasEfectivas ? reg.horasEfectivas.toFixed(2) : '0.00'}</td>
+                        <td>${badgeEstatus}</td>
+                    </tr>
+                `;
+            });
+        })
+        .catch(err => {
+            tbody.innerHTML = `<tr><td colspan="6" class="text-danger py-5 text-center"><i class="bi bi-wifi-off me-2"></i>Error de red con el biométrico.</td></tr>`;
+        });
+    }
+
+    function cargarMiPrenomina() {
+        const select = document.getElementById('miPrenominaSemanaSelect');
+        if(!select) return;
+
+        // Extraer año y semana para calcular los días exactos
+        const w = select.value;
+        const y = select.options[select.selectedIndex].getAttribute('data-year');
+        const { etiquetaLimpia, inicioIso } = calcularRangoSemanaISO(`${y}-W${w}`);
+
+        // Reflejar la etiqueta del rango en la interfaz
+        document.getElementById('miPrenominaRangoLabel').innerText = etiquetaLimpia;
+
+        const container = document.getElementById('miPrenominaDiasContainer');
+        container.innerHTML = '<div class="text-center text-muted py-3"><div class="spinner-border spinner-border-sm text-corporativo me-2"></div>' + [[#{js.construyendo.recibo}]] + '</div>';
+
+        fetch(`/api/prenomina/individual?semana=${w}`)
+            .then(res => res.json())
+            .then(data => {
+                if(!data.nomina) {
+                    container.innerHTML = '<div class="text-center py-4 text-muted"><i class="bi bi-inbox fs-1 opacity-50 d-block mb-2"></i>' + [[#{js.recibo.nodisponible}]] + '</div>';
+                    document.getElementById('miTurnoLabel').innerText = '--';
+                    document.getElementById('miTotalFaltas').innerText = '0.00';
+                    document.getElementById('miTotalTE').innerText = '0.00';
+                    document.getElementById('miObservacionesLabel').innerText = [[#{miprenomina.sin.obs}]];
+                    return;
+                }
+
+                document.getElementById('miTurnoLabel').innerText = data.turno || 'S/T';
+                document.getElementById('miTotalFaltas').innerText = data.totalFaltas || '0';
+                document.getElementById('miTotalTE').innerText = data.totalTe || '0.00';
+                document.getElementById('miObservacionesLabel').innerText = data.observaciones || [[#{miprenomina.sin.obs}]];
+                // Base Date calculada desde inicioIso
+                const dBase = new Date(inicioIso + 'T12:00:00'); // Evita zona horaria
+
+                const getFechaNum = (offset) => {
+                    const tempD = new Date(dBase);
+                    tempD.setDate(tempD.getDate() + offset);
+                    return String(tempD.getDate()).padStart(2, '0');
+                };
+
+                const dias = [
+                    { label: 'Lunes ' + getFechaNum(0), asis: data.asisLun, te: data.teLun },
+                    { label: 'Martes ' + getFechaNum(1), asis: data.asisMar, te: data.teMar },
+                    { label: 'Miércoles ' + getFechaNum(2), asis: data.asisMie, te: data.teMie },
+                    { label: 'Jueves ' + getFechaNum(3), asis: data.asisJue, te: data.teJue },
+                    { label: 'Viernes ' + getFechaNum(4), asis: data.asisVie, te: data.teVie },
+                    { label: 'Sábado ' + getFechaNum(5), asis: data.asisSab, te: data.teSab },
+                    { label: 'Domingo ' + getFechaNum(6), asis: data.asisDom, te: data.teDom }
+                ];
+
+                container.innerHTML = '';
+                dias.forEach(d => {
+                    let badgeClass = 'bg-light text-dark border';
+                    let asisText = d.asis || '-';
+
+                    if(asisText === 'A') badgeClass = 'bg-success bg-opacity-10 text-success border-success';
+                    if(asisText === 'F') badgeClass = 'bg-danger bg-opacity-10 text-danger border-danger';
+                    if(asisText === 'D') badgeClass = 'bg-warning bg-opacity-10 text-dark border-warning';
+                    if(asisText.includes('V') || asisText.includes('P') || asisText === 'TXT' || asisText === 'HO' || asisText === 'C') badgeClass = 'bg-primary bg-opacity-10 text-primary border-primary';
+
+                    container.innerHTML += `
+                        <div class="d-flex justify-content-between align-items-center border-bottom pb-2">
+                            <span class="fw-bold text-dark small">${d.label}</span>
+                            <div class="d-flex align-items-center gap-3">
+                                <span class="badge ${badgeClass} rounded-pill" style="width: 35px;">${asisText}</span>
+                                <span class="text-corporativo fw-bold font-monospace" style="width: 45px; text-align: right;">${d.te > 0 ? d.te.toFixed(2) : '0.00'}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+            })
+            .catch(() => {
+                container.innerHTML = '<div class="text-center text-danger py-3"><i class="bi bi-wifi-off me-1"></i> Falla de conexión con RH.</div>';
+            });
+    }
+
+    function exportarRelojAExcel() {
+        const filas = document.querySelectorAll("#tablaRegistrosFaciales tr");
+        let csvContent = "\uFEFF"; // BOM para que Excel respete los acentos
+
+        let tieneDatos = false;
+
+        filas.forEach((fila, index) => {
+            // Ignorar la fila de estado vacío o de carga
+            if (fila.innerText.includes("Selecciona tus fechas") || fila.innerText.includes("Extrayendo")) return;
+
+            let celdas = fila.querySelectorAll("th, td");
+            let filaCsv = [];
+
+            celdas.forEach(celda => {
+                // Limpiar saltos de línea visuales y escapar comillas
+                let texto = celda.innerText.replace(/(\r\n|\n|\r)/gm, " ").replace(/"/g, '""').trim();
+                filaCsv.push(`"${texto}"`);
+            });
+
+            csvContent += filaCsv.join(",") + "\r\n";
+
+            if (index > 0) tieneDatos = true;
+        });
+
+        if (!tieneDatos) {
+            alert([[#{js.alerta.exportar}]]);
+            return;
+        }
+
+        // Crear el archivo en memoria y forzar la descarga
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `Auditoria_Biometrico_${new Date().toISOString().split('T')[0]}.csv`;
+        link.style.display = "none";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+</script>
+</body>
+</html>

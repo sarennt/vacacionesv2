@@ -29,22 +29,27 @@
     <ul class="nav nav-pills nav-fill bg-white shadow-sm rounded-4 p-2 mb-4" id="pills-tab" role="tablist">
         <li class="nav-item" role="presentation">
             <button class="nav-link active rounded-3 fw-bold" id="pills-pendientes-tab" data-bs-toggle="pill" data-bs-target="#pills-pendientes" type="button" role="tab">
-                <i class="bi bi-ui-checks me-2"></i>Solicitudes
+                <i class="bi bi-ui-checks me-2"></i><span th:text="#{tab.solicitudes}"></span>
             </button>
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link rounded-3 fw-bold" id="pills-plantilla-tab" data-bs-toggle="pill" data-bs-target="#pills-plantilla" type="button" role="tab">
-                <i class="bi bi-people-fill me-2"></i>Mi Plantilla
+                <i class="bi bi-people-fill me-2"></i><span th:text="#{tab.plantilla}"></span>
             </button>
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link rounded-3 fw-bold text-dark bg-warning bg-opacity-10 border border-warning border-opacity-25" id="pills-txt-col-tab" data-bs-toggle="pill" data-bs-target="#pills-txt-col" type="button" role="tab">
-                <i class="bi bi-stopwatch-fill me-2 text-warning"></i>TXT Colectivo
+                <i class="bi bi-stopwatch-fill me-2 text-warning"></i><span th:text="#{tab.txt.colectivo}"></span>
             </button>
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link rounded-3 fw-bold" id="pills-calendario-tab" data-bs-toggle="pill" data-bs-target="#pills-calendario" type="button" role="tab">
-                <i class="bi bi-calendar-week me-2"></i>Calendario
+                <i class="bi bi-calendar-week me-2"></i><span th:text="#{tab.calendario}"></span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-3 fw-bold" id="pills-visor-tab" data-bs-toggle="pill" data-bs-target="#pills-visor" type="button" role="tab">
+                <i class="bi bi-display me-2"></i><span th:text="#{tab.visor}"></span>
             </button>
         </li>
     </ul>
@@ -55,17 +60,17 @@
 
             <div class="alert d-flex align-items-center mb-4 border-0 rounded-3 shadow-sm bg-white p-3" style="border-left: 5px solid #002f6c !important;">
                 <div class="flex-grow-1">
-                    <h5 class="fw-bold text-dark mb-0">Bandeja Unificada de Incidencias Pendientes
+                    <h5 class="fw-bold text-dark mb-0"><span th:text="#{bandeja.permisos.titulo}"></span>
                         <span class="badge bg-dark ms-2" th:text="${(permisosPendientes != null ? permisosPendientes.size() : 0) + (rangosDinamicosPendientes != null ? rangosDinamicosPendientes.size() : 0)}">0</span>
                     </h5>
-                    <small class="text-muted">Revisa, autoriza o rechaza los permisos individuales, Tiempos por Tiempo (TXT), Home Office (HO) y Paros Técnicos (PT) de tu equipo.</small>
+                    <small class="text-muted" th:text="#{bandeja.permisos.subtitulo}"></small>
                 </div>
             </div>
 
             <div th:if="${(permisosPendientes != null and !permisosPendientes.isEmpty()) or (rangosDinamicosPendientes != null and !rangosDinamicosPendientes.isEmpty())}" class="d-flex align-items-center mb-3 bg-white p-2 px-3 rounded-3 shadow-sm border">
                 <div class="form-check m-0">
                     <input class="form-check-input fs-5 shadow-sm border-secondary" type="checkbox" id="masterCheckSolicitudes" onclick="toggleAllSolicitudesCheck(this)">
-                    <label class="form-check-label fw-bold text-dark small ms-2 align-middle" for="masterCheckSolicitudes" style="cursor:pointer; user-select:none;">Seleccionar Todas las Solicitudes</label>
+                    <label class="form-check-label fw-bold text-dark small ms-2 align-middle" for="masterCheckSolicitudes" style="cursor:pointer; user-select:none;" th:text="#{bandeja.sel.todas}"></label>
                 </div>
             </div>
 
@@ -94,12 +99,12 @@
                                             <hr class="text-muted opacity-25">
                                             <div class="row g-3">
                                                 <div class="col-12 col-md-5">
-                                                    <p class="text-muted fw-bold small mb-1">Fecha de Incidencia</p>
+                                                    <p class="text-muted fw-bold small mb-1" th:text="#{tarjeta.fecha.incidencia}"></p>
                                                     <p class="mb-0 fw-medium text-dark"><i class="bi bi-calendar-x text-danger me-1"></i>
                                                         <span th:text="${#temporals.format(solicitud.fechaIncidencia, 'dd MMM yyyy')}"></span>
                                                     </p>
                                                     <div class="mt-2">
-                                                        <small class="text-muted fw-bold d-block mb-1" style="font-size: 0.72rem;">Plan de Reposición:</small>
+                                                        <small class="text-muted fw-bold d-block mb-1" style="font-size: 0.72rem;" th:text="#{tarjeta.reposicion}"></small>
                                                         <div th:each="pago : ${solicitud.desglosesPago}" class="mb-1" style="font-size: 0.75rem;">
                                                             <i class="bi bi-calendar-check text-success me-1"></i>
                                                             <span th:text="${pago.fechaPago}"></span>
@@ -108,14 +113,14 @@
                                                     </div>
                                                 </div>
                                                 <div class="col-6 col-md-3 border-start">
-                                                    <p class="text-muted fw-bold small mb-1">Turno</p>
+                                                    <p class="text-muted fw-bold small mb-1" th:text="#{tarjeta.turno}"></p>
                                                     <p class="mb-0 fw-medium text-dark"><i class="bi bi-clock-history text-info me-1"></i>
                                                         <span th:text="${solicitud.turno != null ? solicitud.turno.nombreTurno : 'No especificado'}"></span>
                                                     </p>
                                                 </div>
                                                 <div class="col-6 col-md-4 border-start">
-                                                    <p class="text-muted fw-bold small mb-1">Motivo / Notas</p>
-                                                    <p class="mb-0 fw-medium text-dark italic small" th:text="${solicitud.justificacionSupervisor ?: 'Sin comentarios registrados'}"></p>
+                                                    <p class="text-muted fw-bold small mb-1" th:text="#{tarjeta.motivo.notas}"></p>
+                                                    <p class="mb-0 fw-medium text-dark italic small" th:text="${solicitud.justificacionSupervisor ?: #messages.msg('tabla.sincomentarios')}"></p>
                                                 </div>
                                             </div>
                                         </div>
@@ -156,24 +161,24 @@
                                             <hr class="text-muted opacity-25">
                                             <div class="row g-3">
                                                 <div class="col-12 col-md-4">
-                                                    <p class="text-muted fw-bold small mb-1">Periodo del Permiso</p>
+                                                    <p class="text-muted fw-bold small mb-1" th:text="#{tarjeta.periodo.permiso}"></p>
                                                     <p class="mb-0 fw-medium text-dark" style="font-size:0.9rem;"><i class="bi bi-calendar-range text-corporativo me-1"></i>
                                                         <span th:text="${#temporals.format(rango.fechaInicio, 'dd/MM/yyyy')}"></span> al <span th:text="${#temporals.format(rango.fechaFin, 'dd/MM/yyyy')}"></span>
                                                     </p>
                                                 </div>
                                                 <div class="col-6 col-md-2 border-start">
-                                                    <p class="text-muted fw-bold small mb-1">Turno</p>
+                                                    <p class="text-muted fw-bold small mb-1" th:text="#{tarjeta.turno}"></p>
                                                     <p class="mb-0 fw-medium text-dark"><i class="bi bi-clock-history text-info me-1"></i>
                                                         <span th:text="${rango.turno != null ? rango.turno.nombreTurno : 'N/A'}"></span>
                                                     </p>
                                                 </div>
                                                 <div class="col-6 col-md-2 border-start">
-                                                    <p class="text-muted fw-bold small mb-1">Días Hábiles</p>
-                                                    <p class="mb-0 fw-bold text-dark"><i class="bi bi-sun-fill text-warning me-1"></i> <span th:text="${rango.diasTotalesCalculados}"></span> días</p>
+                                                    <p class="text-muted fw-bold small mb-1" th:text="#{tarjeta.dias.habiles}"></p>
+                                                    <p class="mb-0 fw-bold text-dark"><i class="bi bi-sun-fill text-warning me-1"></i> <span th:text="${rango.diasTotalesCalculados}"></span> <span th:text="#{tabla.dias}"></span></p>
                                                 </div>
                                                 <div class="col-12 col-md-4 border-start mt-3 mt-md-0">
-                                                    <p class="text-muted fw-bold small mb-1">Evidencia / Justificación</p>
-                                                    <p class="mb-0 fw-medium text-dark italic small text-truncate" th:text="${rango.comentarioJefe ?: 'Sin notas registradas'}"></p>
+                                                    <p class="text-muted fw-bold small mb-1" th:text="#{tarjeta.evidencia}"></p>
+                                                    <p class="mb-0 fw-medium text-dark italic small text-truncate" th:text="${rango.comentarioJefe ?: #messages.msg('tabla.sincomentarios')}"></p>
                                                 </div>
                                             </div>
                                         </div>
@@ -184,7 +189,7 @@
                                                 <input type="hidden" name="idSolicitud" th:value="${rango.id}" />
                                                 <input type="hidden" name="aprobado" value="true" />
                                                 <button type="submit" class="btn btn-success btn-sm px-3 py-2 shadow-sm fw-bold d-flex align-items-center gap-1">
-                                                    <i class="bi bi-check-circle-fill"></i> Aprobar
+                                                    <i class="bi bi-check-circle-fill"></i> <span th:text="#{boton.aprobar}"></span>
                                                 </button>
                                             </form>
                                             <form th:action="@{/jefe/permisos/responder-rango}" method="post">
@@ -192,7 +197,7 @@
                                                 <input type="hidden" name="idSolicitud" th:value="${rango.id}" />
                                                 <input type="hidden" name="aprobado" value="false" />
                                                 <button type="submit" class="btn btn-outline-danger btn-sm px-3 py-2 fw-bold d-flex align-items-center gap-1">
-                                                    <i class="bi bi-x-circle-fill"></i> Rebotar
+                                                    <i class="bi bi-x-circle-fill"></i> <span th:text="#{boton.rebotar}"></span>
                                                 </button>
                                             </form>
                                         </div>
@@ -205,51 +210,109 @@
                     <div th:if="${(permisosPendientes == null or permisosPendientes.isEmpty()) and (rangosDinamicosPendientes == null or rangosDinamicosPendientes.isEmpty())}"
                          class="text-center tragedies-box py-5 bg-white rounded-4 shadow-sm border border-dashed mb-4">
                         <i class="bi bi-inbox-fill text-muted display-4"></i>
-                        <h5 class="fw-bold text-dark mt-3 mb-1">¡Bandeja Limpia!</h5>
-                        <p class="text-muted small mb-0">No tienes incidencias, TXT, ni paros técnicos pendientes de validación por el momento.</p>
+                        <h5 class="fw-bold text-dark mt-3 mb-1" th:text="#{bandeja.vacia.titulo}"></h5>
+                        <p class="text-muted small mb-0" th:text="#{bandeja.permisos.vacia.desc}"></p>
                     </div>
                 </div>
 
                 <div class="col-12 col-lg-4">
                     <div class="card bg-dark text-white p-4 shadow-sm border-0 mb-4" style="border-radius: 1rem;">
-                        <h5 class="fw-bold mb-4">Métricas de Área</h5>
+                        <h5 class="fw-bold mb-4" th:text="#{metricas.titulo}"></h5>
                         <div class="mb-3">
-                            <p class="text-white-50 mb-1 fw-bold small">Permisos procesados (Mes)</p>
+                            <p class="text-white-50 mb-1 fw-bold small" th:text="#{metricas.procesados}"></p>
                             <h2 class="display-6 fw-bold mb-0" th:text="${permisosAprobadosMes ?: 0}">0</h2>
                         </div>
                         <hr class="border-white opacity-25">
                         <div class="mt-3">
-                            <p class="text-white-50 mb-1 fw-bold small">Ausencias por Permiso (Próximos 7 días)</p>
-                            <p class="fs-5 mb-0"><i class="bi bi-person-dash-fill me-2 text-warning"></i> <span th:text="${ausenciasPermisosManana ?: 0}">0</span> operadores</p>
+                            <p class="text-white-50 mb-1 fw-bold small" th:text="#{metricas.ausencias}"></p>
+                            <p class="fs-5 mb-0"><i class="bi bi-person-dash-fill me-2 text-warning"></i> <span th:text="${ausenciasPermisosManana ?: 0}">0</span> <span th:text="#{metricas.operadores}"></span></p>
                         </div>
                     </div>
                 </div>
+
             </div>
+
+            <!-- ✨ AQUÍ ENTRA LA TABLA DE REVOCACIÓN PARA SUPERVISORES -->
+            <div th:if="${jefe.rolJerarquico != null and jefe.rolJerarquico.trim().toUpperCase() == 'SUPERVISOR'}" class="col-12 mt-4">
+                <div class="alert d-flex align-items-center mb-3 border-0 rounded-3 shadow-sm bg-white p-3" style="border-left: 5px solid #ffc107 !important;">
+                    <div class="flex-grow-1">
+                        <h5 class="fw-bold text-dark mb-0"><i class="bi bi-arrow-counterclockwise text-warning me-2"></i><span th:text="#{rev.permisos.titulo}"></span></h5>
+                        <small class="text-muted" th:text="#{rev.permisos.desc}"></small>
+                    </div>
+                </div>
+
+                <div class="table-responsive bg-white rounded-4 border shadow-sm">
+                    <table class="table table-sm align-middle mb-0 table-hover text-start" style="font-size: 0.88rem;">
+                        <thead class="table-light text-secondary">
+                        <tr>
+                            <th class="py-2 px-3" th:text="#{tabla.colaborador}"></th>
+                            <th th:text="#{tabla.permisos.fecha}"></th>
+                            <th th:text="#{tabla.tipo.horas}"></th>
+                            <th class="text-center" th:text="#{tabla.estatus}"></th>
+                            <th th:text="#{tabla.notas.previas}"></th>
+                            <th class="text-end px-3" th:text="#{tabla.accion}"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="sol : ${historialDecisionesPermisos}">
+                            <td class="px-3 py-2.5">
+                                <span class="fw-bold d-block text-dark" th:text="${sol.empleado.nombreCompleto}">Operador</span>
+                                <small class="text-muted font-monospace">#<span th:text="${sol.empleado.nomina}"></span></small>
+                            </td>
+                            <td>
+                                <i class="bi bi-calendar-x text-danger me-1"></i>
+                                <span th:text="${#temporals.format(sol.fechaIncidencia, 'dd/MM/yyyy')}"></span>
+                            </td>
+                            <td>
+                                <span class="badge bg-light text-dark border fw-bold" th:text="${sol.tipoPermiso.codigo}"></span>
+                                <small class="text-muted d-block" th:if="${sol.esPorHoras}" th:text="${sol.horasPermiso} + ' hrs'"></small>
+                            </td>
+                            <td class="text-center">
+                    <span class="badge px-3 py-1.5 rounded-pill font-monospace"
+                          th:classappend="${sol.estatus == 'APROBADO'} ? 'bg-success bg-opacity-10 text-success border border-success' : 'bg-danger bg-opacity-10 text-danger border border-danger'"
+                          th:text="${sol.estatus}"></span>
+                            </td>
+                            <td class="text-muted italic text-truncate" style="max-width: 180px;" th:text="${sol.justificacionSupervisor ?: #messages.msg('tabla.sincomentarios')}"></td>
+                            <td class="text-end px-3">
+                                <button type="button" class="btn btn-xs btn-warning fw-bold text-dark rounded-pill px-3 shadow-sm"
+                                        th:attr="onclick=|abrirModalOverridePermiso('${sol.id}', '${sol.empleado.nombreCompleto}', '${sol.estatus}')|">
+                                    <i class="bi bi-arrow-repeat"></i> <span th:text="#{boton.revocar}"></span>
+                                </button>
+                            </td>
+                        </tr>
+                        <tr th:if="${historialDecisionesPermisos == null or historialDecisionesPermisos.isEmpty()}">
+                            <td colspan="6" class="text-center text-muted py-4"><i class="bi bi-info-circle me-1"></i> <span th:text="#{tabla.permisos.vacia}"></span></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
         </div>
 
         <div class="tab-pane fade" id="pills-plantilla" role="tabpanel">
             <div class="card p-4 border-0 shadow-sm" style="border-radius: 1rem;">
                 <div class="sticky-top bg-white pt-2 pb-3 mb-4 border-bottom" style="top: 80px; z-index: 1010;">
                     <div class="d-flex justify-content-between align-items-center mb-3">
-                        <h5 class="fw-bold text-dark mb-0">Directorio del Área <span class="badge bg-dark ms-2 rounded-pill" id="contadorPlantilla" th:text="${plantilla != null ? plantilla.size() : 0}">0</span></h5>
+                        <h5 class="fw-bold text-dark mb-0"><span th:text="#{plantilla.titulo}"></span> <span class="badge bg-dark ms-2 rounded-pill" id="contadorPlantilla" th:text="${plantilla != null ? plantilla.size() : 0}">0</span></h5>
                     </div>
                     <div class="row g-2">
                         <div class="col-md-5">
-                            <input type="text" id="buscadorPlantilla" class="form-control bg-light" placeholder="Buscar por Nombre, Nómina, Puesto, CC o WC...">
+                            <input type="text" id="buscadorPlantilla" class="form-control bg-light" th:placeholder="#{plantilla.buscar.placeholder}">
                         </div>
                         <div class="col-md-4">
                             <select id="selectorOrdenamiento" class="form-select bg-light fw-bold" onchange="ordenarPlantillaLista()">
-                                <option value="nomina">Número de Nómina</option>
-                                <option value="puesto">Puesto / Posición</option>
-                                <option value="cc">Centro de Costo (CC)</option>
-                                <option value="wc">Work Center (WC)</option>
-                                <option value="antiguedad">Fecha de Antigüedad</option>
+                                <option value="nomina" th:text="#{plantilla.ordenar.nomina}"></option>
+                                <option value="puesto" th:text="#{plantilla.ordenar.puesto}"></option>
+                                <option value="cc" th:text="#{plantilla.ordenar.cc}"></option>
+                                <option value="wc" th:text="#{plantilla.ordenar.wc}"></option>
+                                <option value="antiguedad" th:text="#{plantilla.ordenar.antiguedad}"></option>
                             </select>
                         </div>
                         <div class="col-md-3">
                             <select id="selectorDireccion" class="form-select bg-light fw-bold" onchange="ordenarPlantillaLista()">
-                                <option value="asc">Menor a Mayor (A-Z)</option>
-                                <option value="desc">Mayor a Menor (Z-A)</option>
+                                <option value="asc" th:text="#{plantilla.dir.asc}"></option>
+                                <option value="desc" th:text="#{plantilla.dir.desc}"></option>
                             </select>
                         </div>
                     </div>
@@ -260,22 +323,22 @@
                         <div class="flex-grow-1">
                             <h6 class="mb-0 fw-bold text-dark nombre-empleado" th:text="${miembro.nombreCompleto}">Nombre</h6>
                             <small class="text-muted d-block mt-1">
-                                <span class="puesto-empleado fw-bold text-primary" th:text="${miembro.puesto ?: 'Operador'}">Puesto</span> | Nómina: #<span class="nomina-empleado" th:text="${miembro.nomina}"></span>
+                                <span class="puesto-empleado fw-bold text-primary" th:text="${miembro.puesto ?: #messages.msg('plantilla.puesto')}"></span> | <span th:text="#{tarjeta.nomina}"></span> #<span class="nomina-empleado" th:text="${miembro.nomina}"></span>
                             </small>
                             <small class="text-muted d-block mt-1" style="font-size:0.75rem;">
                                 CC: <span class="cc-empleado" th:text="${miembro.centroCosto != null ? miembro.centroCosto.id : 'N/A'}"></span> |
                                 WC: <span class="wc-empleado" th:text="${miembro.workCenter != null ? miembro.workCenter.id : 'Sin Asignar'}"></span>
                             </small>
                             <small class="text-muted d-block mt-1" style="font-size:0.72rem;">
-                                <i class="bi bi-clock-history me-1"></i> Antigüedad:
+                                <i class="bi bi-clock-history me-1"></i> <span th:text="#{plantilla.antiguedad}"></span>
                                 <span class="antiguedad-date-val fw-bold text-dark" th:text="${miembro.fechaIngreso != null ? #temporals.format(miembro.fechaIngreso, 'dd/MM/yyyy') : '01/01/2000'}"></span>
                             </small>
                         </div>
                         <div class="d-flex align-items-center gap-3">
                             <div th:if="${jefe.rolJerarquico != null and jefe.rolJerarquico.trim().toUpperCase() == 'SUPERVISOR'}">
                                 <button type="button" class="btn btn-sm btn-outline-warning fw-bold rounded-pill px-3 shadow-sm d-flex align-items-center gap-1"
-                                        th:attr="onclick=|abrirModalRecuperacion('${miembro.nomina}', '${miembro.nombreCompleto}')|">
-                                    <i class="bi bi-calendar-x-fill"></i> Recuperar Falta Extraordinaria
+                                        th:attr="onclick=|abrirModalRecuperacion('${miembro.nomina}', '${miembro.nombreCompleto}', '${miembro.tipoEmpleado}')|">
+                                    <i class="bi bi-calendar-x-fill"></i> <span th:text="#{plantilla.btn.recuperar}"></span>
                                 </button>
                             </div>
                         </div>
@@ -287,16 +350,16 @@
         <div class="tab-pane fade" id="pills-txt-col" role="tabpanel">
             <div class="card p-4 border-0 shadow-sm" style="border-radius: 1rem;">
                 <div class="border-bottom pb-3 mb-4">
-                    <h5 class="fw-bold text-dark mb-1"><i class="bi bi-stopwatch-fill text-warning me-2"></i>Módulo de Tiempo por Tiempo (TXT) Colectivo</h5>
-                    <p class="text-muted small mb-0">Asigna permisos TXT de forma masiva a toda una línea operativa. El sistema validará colisiones automáticamente.</p>
+                    <h5 class="fw-bold text-dark mb-1"><i class="bi bi-stopwatch-fill text-warning me-2"></i><span th:text="#{txtcol.titulo}"></span></h5>
+                    <p class="text-muted small mb-0" th:text="#{txtcol.desc}"></p>
                 </div>
 
                 <div class="mb-4 bg-light p-3 rounded-3 border shadow-sm mx-0">
                     <label class="form-label fw-bold text-dark small mb-3 d-flex justify-content-between align-items-center">
-                        <span><span class="badge bg-dark me-1">Paso 1</span> Selecciona la Línea (WC) para cargar al personal</span>
+                        <span><span class="badge bg-dark me-1" th:text="#{txtcol.paso1}"></span> <span th:text="#{txtcol.paso1.desc}"></span></span>
                         <div class="form-check form-switch m-0 fs-6">
                             <input class="form-check-input" type="checkbox" id="masterCheckWcTxtCol" style="cursor: pointer;" onclick="toggleAllWcTxtCol(this)">
-                            <label class="form-check-label text-muted small fw-bold" for="masterCheckWcTxtCol" style="cursor: pointer; user-select: none;">Seleccionar Todos los WC</label>
+                            <label class="form-check-label text-muted small fw-bold" for="masterCheckWcTxtCol" style="cursor: pointer; user-select: none;" th:text="#{txtcol.sel.todos}"></label>
                         </div>
                     </label>
                     <div class="d-flex flex-wrap gap-2 bg-white p-3 rounded border shadow-sm" style="max-height: 120px; overflow-y: auto;">
@@ -312,15 +375,15 @@
                 <div class="row g-4 mb-4 bg-white p-3 rounded-3 border shadow-sm mx-0">
                     <div class="col-md-6 border-end">
                         <label class="form-label fw-bold text-dark small d-flex justify-content-between align-items-center mb-3">
-                            <span><span class="badge bg-dark me-1">Paso 2</span> Fechas de la Falta Masiva (Máx 6)</span>
-                            <button type="button" id="btnAgregarParoTxtCol" class="btn btn-sm btn-outline-danger fw-bold"><i class="bi bi-plus-lg me-1"></i>Añadir Día</button>
+                            <span><span class="badge bg-dark me-1" th:text="#{txtcol.paso2}"></span> <span th:text="#{txtcol.paso2.desc}"></span></span>
+                            <button type="button" id="btnAgregarParoTxtCol" class="btn btn-sm btn-outline-danger fw-bold"><i class="bi bi-plus-lg me-1"></i><span th:text="#{txtcol.btn.add}"></span></button>
                         </label>
                         <div class="table-responsive bg-light rounded-3 shadow-sm border">
                             <table class="table table-bordered align-middle mb-0" id="tablaParosTXTCol">
                                 <thead class="table-light">
                                 <tr class="small text-muted text-uppercase fw-bold">
-                                    <th>Fecha del Paro</th>
-                                    <th style="width: 60px;" class="text-center">Quitar</th>
+                                    <th th:text="#{txtcol.tabla.paro}"></th>
+                                    <th style="width: 60px;" class="text-center" th:text="#{txtcol.tabla.quitar}"></th>
                                 </tr>
                                 </thead>
                                 <tbody id="tbodyParosTXTCol">
@@ -331,19 +394,19 @@
 
                     <div class="col-md-6">
                         <label class="form-label fw-bold text-dark small d-flex justify-content-between align-items-center mb-3">
-                            <span><span class="badge bg-dark me-1">Paso 3</span> Fechas de Reposición (Pago)</span>
-                            <button type="button" id="btnAgregarPagoTxtCol" class="btn btn-sm btn-outline-success fw-bold"><i class="bi bi-plus-lg me-1"></i>Añadir Día</button>
+                            <span><span class="badge bg-dark me-1" th:text="#{txtcol.paso3}"></span> <span th:text="#{txtcol.paso3.desc}"></span></span>
+                            <button type="button" id="btnAgregarPagoTxtCol" class="btn btn-sm btn-outline-success fw-bold"><i class="bi bi-plus-lg me-1"></i><span th:text="#{txtcol.btn.add}"></span></button>
                         </label>
                         <div class="alert bg-warning bg-opacity-10 text-dark small py-2 border-0 shadow-sm rounded-3">
-                            <i class="bi bi-info-circle-fill text-warning me-1"></i> El límite de pagos permitidos se calcula automáticamente (2 pagos máximos por cada día de paro).
+                            <i class="bi bi-info-circle-fill text-warning me-1"></i> <span th:text="#{txtcol.paso3.alerta}"></span>
                         </div>
                         <div class="table-responsive bg-white rounded-3 shadow-sm border">
                             <table class="table table-bordered align-middle mb-0" id="tablaPagosTXTCol">
                                 <thead class="table-light">
                                 <tr class="small text-muted text-uppercase fw-bold">
-                                    <th>Fecha de Reposición</th>
-                                    <th style="width: 150px;">Horas a Pagar</th>
-                                    <th style="width: 60px;" class="text-center">Quitar</th>
+                                    <th th:text="#{txtcol.tabla.reposicion}"></th>
+                                    <th style="width: 150px;" th:text="#{txtcol.tabla.horas}"></th>
+                                    <th style="width: 60px;" class="text-center" th:text="#{txtcol.tabla.quitar}"></th>
                                 </tr>
                                 </thead>
                                 <tbody id="tbodyTXTCol">
@@ -357,11 +420,11 @@
                     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
                         <div class="d-flex align-items-center gap-2">
                             <span class="badge bg-warning text-dark fs-6" id="badgeSeleccionadosTxtCol">0</span>
-                            <small class="fw-medium text-white-50"><span class="badge bg-light text-dark me-1">Paso 4</span> Operadores cargados. <br>Asigna el turno que le corresponde a cada quien:</small>
+                            <small class="fw-medium text-white-50"><span class="badge bg-light text-dark me-1" th:text="#{txtcol.paso4}"></span> <br><span th:text="#{txtcol.paso4.desc}"></span></small>
                         </div>
                         <div class="d-flex gap-2">
                             <select class="form-select form-select-sm bg-white text-dark fw-bold" id="selectorTurnoMasivoTxt" style="width: 180px;">
-                                <option value="">-- Asignar Turno --</option>
+                                <option value="" th:text="#{txtcol.sel.turno}"></option>
                                 <option th:each="turno : ${listaTurnosMaster}"
                                         th:if="${turno.activo}"
                                         th:value="${turno.nombreTurno}"
@@ -369,7 +432,7 @@
                                 </option>
                             </select>
                             <button type="button" class="btn btn-warning btn-sm fw-bold px-3 rounded-2 text-dark" onclick="aplicarTurnoMasivoTxt()">
-                                <i class="bi bi-lightning-fill"></i> Aplicar a Todos
+                                <i class="bi bi-lightning-fill"></i> <span th:text="#{txtcol.btn.aplicar}"></span>
                             </button>
                         </div>
                     </div>
@@ -385,7 +448,7 @@
                             <th class="py-2">Nómina</th>
                             <th>Colaborador</th>
                             <th>Línea</th>
-                            <th style="width: 250px;" class="bg-warning bg-opacity-10 text-dark border-start border-warning"><i class="bi bi-clock-history me-1"></i> Selecciona el Turno</th>
+                            <th style="width: 250px;" class="bg-warning bg-opacity-10 text-dark border-start border-warning"><i class="bi bi-clock-history me-1"></i> <span th:text="#{txtcol.tabla.selturno}"></span></th>
                         </tr>
                         </thead>
                         <tbody id="bodyTxtColInyeccion" style="font-size: 0.88rem;">
@@ -395,53 +458,53 @@
 
                 <div class="mb-4 text-end">
                     <button type="button" class="btn btn-dark btn-lg px-5 py-3 fw-bold shadow-sm d-none fs-5 w-100" id="btnSubmitTxtCol" onclick="prepararResumenTxtCol()">
-                        <i class="bi bi-send-fill me-2"></i> Procesar Lote TXT Masivo
+                        <i class="bi bi-send-fill me-2"></i> <span th:text="#{txtcol.btn.procesar}"></span>
                     </button>
                 </div>
 
-                <div class="card p-4 border-0 shadow-sm mt-5 bg-white" style="border-radius: 1rem;">
-                    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center border-bottom pb-3 mb-4 gap-3">
-                        <div>
-                            <h5 class="fw-bold text-dark mb-1"><i class="bi bi-journal-text text-success me-2"></i>Bitácora de TXT Colectivo</h5>
-                            <p class="text-muted small mb-0">Historial completo de inyecciones masivas aplicadas directamente a tus líneas operativas.</p>
-                        </div>
-                        <a th:href="@{/jefe/permisos/exportar-txt-colectivo(nomina=${jefe.nomina})}" class="btn btn-success fw-bold shadow-sm btn-sm d-flex align-items-center gap-1 rounded-pill px-4 py-2">
-                            <i class="bi bi-file-earmark-excel-fill"></i> Exportar Bitácora a Excel
-                        </a>
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center border-bottom pb-3 mb-4 gap-3">
+                    <div>
+                        <h5 class="fw-bold text-dark mb-1"><i class="bi bi-journal-text text-success me-2"></i><span th:text="#{txtcol.bitacora.titulo}"></span></h5>
+                        <p class="text-muted small mb-0" th:text="#{txtcol.bitacora.desc}"></p>
                     </div>
+                    <a th:href="@{/jefe/permisos/exportar-txt-colectivo(nomina=${jefe.nomina})}" class="btn btn-success fw-bold shadow-sm btn-sm d-flex align-items-center gap-1 rounded-pill px-4 py-2">
+                        <i class="bi bi-file-earmark-excel-fill"></i> <span th:text="#{txtcol.bitacora.exportar}"></span>
+                    </a>
+                </div>
 
-                    <div class="table-responsive">
-                        <table class="table table-sm align-middle table-hover border mb-0 text-start" style="font-size: 0.85rem;">
-                            <thead class="table-light text-secondary">
-                            <tr>
-                                <th class="py-2 px-3">Colaborador</th>
-                                <th>Línea</th>
-                                <th>Fecha Paro</th>
-                                <th>Plan de Reposición (Fechas de Pago)</th>
-                                <th>Justificación de Planta</th>
-                                <th>Fecha Aplicación</th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            <tr th:each="hist : ${historialTxtColectivo}">
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle table-hover border mb-0 text-start" style="font-size: 0.85rem;">
+                        <thead class="table-light text-secondary">
+                        <tr>
+                            <th class="py-2 px-3" th:text="#{tabla.colaborador}"></th>
+                            <th>Línea / Turno</th>
+                            <th th:text="#{txtcol.tabla.paro}"></th>
+                            <th th:text="#{txtcol.bitacora.tabla.plan}"></th>
+                            <th th:text="#{txtcol.bitacora.tabla.just}"></th>
+                            <th th:text="#{txtcol.bitacora.tabla.aplica}"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="hist : ${historialTxtColectivo}">
                                 <td class="py-2.5 px-3">
                                     <span class="fw-bold text-dark d-block" th:text="${hist.empleado.nombreCompleto}">Nombre</span>
                                     <small class="text-muted font-monospace">#<span th:text="${hist.empleado.nomina}"></span></small>
                                 </td>
                                 <td>
-                                    <span class="badge bg-light text-dark border fw-bold" th:text="'WC ' + ${hist.empleado.workCenter?.id ?: 'N/A'}">WC</span>
+                                    <span class="badge bg-light text-dark border fw-bold mb-1" th:text="'WC ' + ${hist.empleado.workCenter?.id ?: 'N/A'}">WC</span>
+                                    <span class="badge bg-info bg-opacity-10 text-info border border-info d-block fw-bold" th:text="${hist.turno != null ? hist.turno.nombreTurno : 'N/A'}" style="font-size: 0.7rem;">Turno</span>
                                 </td>
                                 <td>
                                     <span class="badge bg-danger bg-opacity-10 text-danger border border-danger font-monospace px-2 py-1 fw-bold th-fecha-paro" th:text="${hist.fechaIncidencia}">Fecha Paro</span>
                                 </td>
                                 <td>
                                     <div class="d-flex flex-column gap-1">
-                                            <span th:each="pago : ${hist.desglosesPago}" class="text-dark fw-medium" style="font-size:0.8rem;">
-                                                <i class="bi bi-calendar-check text-success me-1"></i>
-                                                <span th:text="${pago.fechaPago}"></span>
-                                                <span class="badge bg-secondary rounded-pill ms-1" th:text="${pago.horasPago} + ' hrs'"></span>
-                                            </span>
-                                        <span th:if="${hist.desglosesPago == null or hist.desglosesPago.isEmpty()}" class="text-muted italic">Sin desglose</span>
+                                        <span th:each="pago : ${hist.desglosesPago}" class="text-dark fw-medium" style="font-size:0.8rem;">
+                                            <i class="bi bi-calendar-check text-success me-1"></i>
+                                            <span th:text="${pago.fechaPago}"></span>
+                                            <span class="badge bg-secondary rounded-pill ms-1" th:text="${pago.horasPago} + ' hrs'"></span>
+                                        </span>
+                                        <span th:if="${hist.desglosesPago == null or hist.desglosesPago.isEmpty()}" class="text-muted italic" th:text="#{txtcol.bitacora.sin.desglose}"></span>
                                     </div>
                                 </td>
                                 <td>
@@ -451,33 +514,69 @@
                                     01/01/2026
                                 </td>
                             </tr>
-                            <tr th:if="${historialTxtColectivo == null or historialTxtColectivo.isEmpty()}">
-                                <td colspan="6" class="text-center py-5 text-muted italic">
-                                    <i class="bi bi-folder-x display-5 d-block mb-2 text-muted opacity-50"></i>
-                                    No se han detectado inyecciones contables de TXT colectivo aplicadas para tus áreas.
-                                </td>
-                            </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                        <tr th:if="${historialTxtColectivo == null or historialTxtColectivo.isEmpty()}">
+                            <td colspan="6" class="text-center py-5 text-muted italic">
+                                <i class="bi bi-folder-x display-5 d-block mb-2 text-muted opacity-50"></i>
+                                No se han detectado inyecciones contables de TXT colectivo aplicadas para tus áreas.
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
                 </div>
-
             </div>
-        </div>
+
+        </div> <!-- Fin de pills-txt-col -->
 
         <div class="tab-pane fade" id="pills-calendario" role="tabpanel" aria-labelledby="pills-calendario-tab">
-            <div class="card p-4 bg-white shadow-sm rounded-4 border-0">
-                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
-                    <div>
-                        <h4 class="fw-bold text-dark mb-1"><i class="bi bi-calendar3 me-2"></i>Calendario de Mapeo Operativo</h4>
-                        <p class="text-muted small mb-0">Mapeo unificado de incidencias y ausencias de personal.</p>
-                    </div>
+        <div class="card p-4 bg-white shadow-sm rounded-4 border-0">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+                <div>
+                    <h4 class="fw-bold text-dark mb-1"><i class="bi bi-calendar3 me-2"></i><span th:text="#{calendario.mapeo.titulo}"></span></h4>
+                    <p class="text-muted small mb-0" th:text="#{calendario.mapeo.desc}"></p>
                 </div>
-                <div id="calendarViewJefe" class="p-1"></div>
+            </div>
+            <div id="calendarViewJefe" class="p-1"></div>
+        </div>
+    </div>
+
+    <div class="tab-pane fade" id="pills-visor" role="tabpanel">
+        <div class="card p-4 border-0 shadow-sm" style="border-radius: 1rem;">
+            <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
+                <div>
+                    <h5 class="fw-bold text-dark mb-1"><i class="bi bi-person-vcard text-corporativo me-2"></i><span th:text="#{visor.titulo}">Expediente y Dashboard del Operador</span></h5>
+                    <p class="text-muted small mb-0" th:text="#{visor.desc}">Visualiza la pantalla exacta, saldos y boletos VIP que tu colaborador ve en su portal.</p>
+                </div>
+            </div>
+
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <input class="form-control form-control-lg bg-light fw-bold text-dark border-0 shadow-sm"
+                           id="inputBuscadorVisor"
+                           list="listaNombresVisor"
+                           th:placeholder="#{visor.buscar}"
+                           onchange="cargarDashboardClon()">
+                    <datalist id="listaNombresVisor">
+                        <option th:each="miembro : ${plantilla}" th:value="${miembro.nomina} + ' - ' + ${miembro.nombreCompleto}"></option>
+                    </datalist>
+                </div>
+                <div class="col-md-6 d-flex align-items-center">
+                    <button class="btn btn-outline-dark fw-bold shadow-sm d-none" id="btnRefrescarVisor" onclick="cargarDashboardClon()">
+                        <i class="bi bi-arrow-clockwise me-1"></i> <span th:text="#{visor.btn.refrescar}">Refrescar Datos</span>
+                    </button>
+                </div>
+            </div>
+
+            <div id="loaderDashboardClon" class="d-none text-center py-5">
+                <div class="spinner-border text-corporativo" role="status" style="width: 3rem; height: 3rem;"></div>
+                <p class="text-muted fw-bold mt-3" th:text="#{visor.sincronizando}">Sincronizando portal...</p>
+            </div>
+
+            <div id="contenedorDashboardClon" class="d-none bg-light border rounded-4 shadow-sm overflow-hidden" style="height: 850px;">
+                <iframe id="iframeDashboardClon" src="" width="100%" height="100%" frameborder="0" style="background: transparent;"></iframe>
             </div>
         </div>
-
     </div>
+
 </main>
 
 <div id="barraAccionesMasivasSolicitudes" class="d-none fixed-bottom bg-dark text-white p-3 shadow-lg border-top border-warning border-3" style="z-index: 1030;">
@@ -658,14 +757,59 @@
                         <label class="form-label text-dark fw-bold small mb-1">Tipo de Incidencia a Justificar</label>
                         <div class="input-group shadow-sm rounded-3 overflow-hidden">
                             <span class="input-group-text bg-white text-muted border-end-0"><i class="bi bi-bookmark-star-fill text-primary"></i></span>
-                            <select class="form-select bg-white border-start-0 text-dark fw-bold" name="tipoIncidencia" id="recupTipoIncidencia" required>
-                                <option value="" disabled selected>-- Selecciona Tipo de Permiso --</option>
-                                <option value="TXT">Tiempo por Tiempo (TXT)</option>
-                                <option value="HO">Home Office (HO)</option>
-                                <option value="C">Visita Cliente (Salida de Planta)</option>
-                                <option value="P">Visita Proveedor</option>
-                                <option value="TET">Visita Planta Hermana Tetla (TET)</option>
+                            <select class="form-select bg-white border-start-0 text-dark fw-bold" name="tipoIncidencia" id="recupTipoIncidencia" required onchange="toggleTxtRecuperacion()">
+                                <option value="" disabled selected>-- Cargando permisos... --</option>
                             </select>
+                        </div>
+                    </div>
+
+                    <!-- ✨ NUEVO: Contenedor Dinámico para los Pagos TXT -->
+                    <div id="seccionPagosTxtRecup" class="d-none mb-3 p-3 bg-light rounded-3 border shadow-sm">
+                        <label class="form-label text-dark fw-bold small d-flex justify-content-between align-items-center mb-2">
+                            <span>Fechas de Reposición (Pago TXT)</span>
+                            <button type="button" class="btn btn-sm btn-outline-success fw-bold" onclick="crearFilaPagoRecup()"><i class="bi bi-plus-lg me-1"></i>Añadir Día</button>
+                        </label>
+                        <table class="table table-bordered table-sm align-middle mb-0 bg-white" id="tablaPagosRecup">
+                            <thead class="table-light">
+                            <tr class="small text-muted text-uppercase fw-bold">
+                                <th>Fecha a Pagar</th>
+                                <th style="width: 100px;">Horas</th>
+                                <th style="width: 50px;" class="text-center">Quitar</th>
+                            </tr>
+                            </thead>
+                            <tbody id="tbodyPagosRecup">
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- ✨ MODIFICADO: Modalidad y Turno ahora se ocultan por defecto si no es TXT -->
+                    <div class="row mb-3 d-none" id="seccionModalidadTurnoRecup">
+                        <div class="col-md-6 mb-3 mb-md-0">
+                            <label for="recupModalidad" class="form-label text-dark fw-bold small mb-1">Modalidad</label>
+                            <select class="form-select bg-white shadow-sm fw-bold text-dark border-secondary border-opacity-25" name="modalidad" id="recupModalidad" onchange="toggleModalidadRecup()">
+                                <option value="COMPLETO" selected>Día Completo</option>
+                                <option value="PARCIAL">Por Horas (Parcial)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="recupTurno" class="form-label text-dark fw-bold small mb-1">Turno de la Falta</label>
+                            <!-- Se quitó el "required" fijo, lo controlaremos desde JavaScript -->
+                            <select class="form-select bg-white shadow-sm fw-bold text-dark border-secondary border-opacity-25" name="turno" id="recupTurno">
+                                <option value="" disabled selected>-- Selecciona --</option>
+                                <option th:each="turno : ${listaTurnosMaster}"
+                                        th:if="${turno.activo}"
+                                        th:value="${turno.nombreTurno}"
+                                        th:text="${turno.nombreTurno} + ' (' + ${turno.horasJornada} + ' hrs)'">
+                                </option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3 d-none" id="divRecupHoras">
+                        <label class="form-label text-dark fw-bold small mb-1">Horas a Justificar</label>
+                        <div class="input-group shadow-sm rounded-3 overflow-hidden">
+                            <span class="input-group-text bg-white text-muted border-end-0"><i class="bi bi-clock-history text-info"></i></span>
+                            <input type="number" class="form-control bg-white border-start-0 text-dark fw-bold" name="horasFalta" id="recupHorasFalta" step="0.5" min="0.5" max="24" placeholder="Ej: 4.0">
                         </div>
                     </div>
 
@@ -675,7 +819,7 @@
                             <span class="input-group-text bg-white text-muted border-end-0"><i class="bi bi-calendar-x text-danger"></i></span>
                             <input type="date" class="form-control bg-white border-start-0 text-dark fw-medium" name="fechaFalta" id="recupFechaFalta" required />
                         </div>
-                        <small class="text-danger d-block mt-1 style-mini fw-medium"><i class="bi bi-clock-history"></i> Candado Activo: Fechas restringidas estrictamente a periodos nominales cerrados.</small>
+                        <small class="text-secondary d-block mt-1 style-mini fw-medium"><i class="bi bi-info-circle text-primary"></i> Límite de retroactividad: Hasta 1 mes hacia atrás.</small>
                     </div>
 
                     <div class="mb-0">
@@ -744,6 +888,42 @@
                 </div>
                 <h5 class="mt-3 fw-bold text-white text-shadow">Procesando Lote TXT...</h5>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- ✨ MODAL REVOCACIÓN DE PERMISOS -->
+<div class="modal fade" id="modalOverridePermiso" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <form th:action="@{/jefe/permisos/override}" method="post">
+                <div class="modal-header bg-gradient text-dark border-0 py-3 text-white" style="background: linear-gradient(135deg, #ffc107, #e0a800);">
+                    <h5 class="modal-title fw-bold d-flex align-items-center gap-2 text-dark"><i class="bi bi-shield-fill-exclamation"></i> Panel de Revocación (Permisos)</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4 bg-light bg-opacity-50">
+                    <input type="hidden" name="idSolicitud" id="overridePermisoId" />
+                    <div class="mb-3">
+                        <label class="form-label text-secondary fw-bold small mb-1">Colaborador Afectado</label>
+                        <input type="text" class="form-control bg-white fw-bold text-dark shadow-sm border" id="overridePermisoNombre" readonly style="cursor: not-allowed;">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-secondary fw-bold small mb-1">Nueva Resolución Contable</label>
+                        <select class="form-select fw-bold shadow-sm border" name="nuevoEstatus" id="overridePermisoEstatus">
+                            <option value="APROBADO">Forzar ALTA (Aprobado)</option>
+                            <option value="RECHAZADO">Forzar BAJA (Rechazado)</option>
+                        </select>
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label text-secondary fw-bold small mb-1">Justificación Obligatoria</label>
+                        <textarea class="form-control bg-white shadow-sm border" name="comentario" rows="3" required placeholder="Motivo de la revocación..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 bg-light py-3">
+                    <button type="button" class="btn btn-light border fw-bold px-3 rounded-3" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-warning fw-bold text-dark px-4 rounded-3 shadow-sm">Aplicar Cambio</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -971,36 +1151,140 @@
         new bootstrap.Modal(document.getElementById('modalRechazo')).show();
     }
 
-    function abrirModalRecuperacion(nomina, nombreCompleto) {
+    // Variable global para saber a quién le estamos cobrando
+    let tipoEmpleadoModalActivo = 'SINDICALIZADO';
+
+    function abrirModalRecuperacion(nomina, nombreCompleto, tipoEmpleado) {
+        // Guardamos el tipo de empleado para la guillotina
+        tipoEmpleadoModalActivo = tipoEmpleado || 'SINDICALIZADO';
+
         document.getElementById('recupNominaEmpleado').value = nomina;
         document.getElementById('recupNombreEmpleado').value = "#" + nomina + " - " + nombreCompleto;
 
-        document.getElementById('recupTipoIncidencia').value = "";
-        const fechaInput = document.getElementById('recupFechaFalta');
-        fechaInput.value = "";
+        const selectTipo = document.getElementById('recupTipoIncidencia');
+        selectTipo.innerHTML = '<option value="" disabled selected>-- Cargando permisos... --</option>';
+
+        fetch(`/api/permisos/tipos-disponibles?nomina=${nomina}`)
+            .then(res => res.json())
+            .then(data => {
+                selectTipo.innerHTML = '<option value="" disabled selected>-- Selecciona Tipo de Permiso --</option>';
+                data.forEach(p => {
+                    // ✨ NUEVO: Filtramos visualmente para que NO aparezca "Vacaciones" (V)
+                    // pero mantenemos la lógica inteligente de BCI, WC, SIND del backend
+                    if (p.codigo.toUpperCase() !== 'V' && !p.codigo.toUpperCase().includes('VACACION')) {
+                        selectTipo.innerHTML += `<option value="${p.codigo}">${p.descripcion} (${p.codigo})</option>`;
+                    }
+                });
+            }).catch(err => { selectTipo.innerHTML = '<option value="" disabled selected>-- Error al cargar --</option>'; });
+
+        // Resetear Modalidad
+        document.getElementById('recupModalidad').value = "COMPLETO";
+        toggleModalidadRecup();
+
+        toggleTxtRecuperacion();
+        document.getElementById('tbodyPagosRecup').innerHTML = '';
         document.getElementById('recupJustificacion').value = "";
 
+        const fechaInput = document.getElementById('recupFechaFalta');
         const ahora = new Date();
-        const diaSemana = ahora.getDay();
-        const horaActual = ahora.getHours();
-        let diasResta = 7;
+        const unMesAtras = new Date(ahora);
+        unMesAtras.setMonth(ahora.getMonth() - 1);
 
-        if (diaSemana === 0) {
-            diasResta = 7;
-        } else if (diaSemana === 1) {
-            diasResta = 8;
-        } else if (diaSemana === 2) {
-            diasResta = (horaActual < 16) ? 9 : 2;
-        } else if (diaSemana > 2) {
-            diasResta = diaSemana;
-        }
-
-        const closedSunday = new Date(ahora);
-        closedSunday.setDate(ahora.getDate() - diasResta);
-
-        fechaInput.max = closedSunday.toISOString().split('T')[0];
+        fechaInput.min = unMesAtras.toISOString().split('T')[0];
+        fechaInput.max = ahora.toISOString().split('T')[0];
+        fechaInput.value = "";
 
         new bootstrap.Modal(document.getElementById('modalRecuperacion')).show();
+    }
+
+    // ✨ RESTAURADAS: Las funciones que controlan que se muestren/oculten los campos
+    function toggleModalidadRecup() {
+        const mod = document.getElementById('recupModalidad').value;
+        const divHoras = document.getElementById('divRecupHoras');
+        const inputHoras = document.getElementById('recupHorasFalta');
+
+        if (mod === "PARCIAL") {
+            divHoras.classList.remove('d-none');
+            inputHoras.setAttribute("required", "required");
+        } else {
+            divHoras.classList.add('d-none');
+            inputHoras.removeAttribute("required");
+            inputHoras.value = "";
+        }
+    }
+
+    function toggleTxtRecuperacion() {
+        const tipo = document.getElementById('recupTipoIncidencia').value;
+        const seccionPagos = document.getElementById('seccionPagosTxtRecup');
+        const seccionTurnoMod = document.getElementById('seccionModalidadTurnoRecup');
+        const inputTurno = document.getElementById('recupTurno');
+
+        if (tipo === 'TXT') {
+            // Si es TXT, mostramos los pagos y las opciones de modalidad/turno
+            seccionPagos.classList.remove('d-none');
+            seccionTurnoMod.classList.remove('d-none');
+            inputTurno.setAttribute("required", "required"); // Forzamos a que elijan turno
+
+            if (document.getElementById('tbodyPagosRecup').children.length === 0) crearFilaPagoRecup();
+        } else {
+            // Si es HO, PT, etc., escondemos todo ese ruido visual
+            seccionPagos.classList.add('d-none');
+            seccionTurnoMod.classList.add('d-none');
+            inputTurno.removeAttribute("required");
+
+            // Restablecemos a "Día Completo" por debajo del agua para asegurar
+            // que no se quede bloqueado pidiendo "Horas" ocultas
+            document.getElementById('recupModalidad').value = "COMPLETO";
+            toggleModalidadRecup();
+        }
+    }
+
+    // ✨ GUILLOTINA SINCRONIZADA CON TORRE DE CONTROL
+    function obtenerLimiteNominaJs() {
+        const cfgCorte = {
+            SIND: { dia: /*[[${corteSindDia}]]*/ 2, hora: /*[[${corteSindHora}]]*/ '16:00' },
+            ADMIN: { dia: /*[[${corteAdminDia}]]*/ 3, hora: /*[[${corteAdminHora}]]*/ '14:00' }
+        };
+
+        const strTipo = tipoEmpleadoModalActivo.toUpperCase();
+        const esAdmin = strTipo.includes('ADMIN') || strTipo.includes('WC') || strTipo.includes('BCI');
+        const cfg = esAdmin ? cfgCorte.ADMIN : cfgCorte.SIND;
+
+        const ahora = new Date();
+        let diaSemanaActual = ahora.getDay();
+        if (diaSemanaActual === 0) diaSemanaActual = 7;
+
+        const horaActual = String(ahora.getHours()).padStart(2, '0') + ':' + String(ahora.getMinutes()).padStart(2, '0');
+
+        let cortePasado = false;
+        if (diaSemanaActual > cfg.dia) {
+            cortePasado = true;
+        } else if (diaSemanaActual === cfg.dia && horaActual >= cfg.hora) {
+            cortePasado = true;
+        }
+
+        const lunesSemanaActual = new Date(ahora);
+        lunesSemanaActual.setDate(ahora.getDate() - (diaSemanaActual - 1));
+
+        const limite = new Date(lunesSemanaActual);
+        if (!cortePasado) {
+            limite.setDate(limite.getDate() - 7);
+        }
+
+        return limite.toISOString().split('T')[0];
+    }
+
+    function crearFilaPagoRecup() {
+        const tbody = document.getElementById('tbodyPagosRecup');
+        const limitePago = obtenerLimiteNominaJs();
+
+        let tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td><input type="date" name="fechasPago[]" min="${limitePago}" class="form-control form-control-sm border-secondary border-opacity-25 fw-bold" required></td>
+            <td><input type="number" name="horasPago[]" class="form-control form-control-sm border-secondary border-opacity-25 text-center fw-bold" step="0.1" min="0.5" max="24" placeholder="Ej: 8.0" required></td>
+            <td class="text-center"><button type="button" class="btn btn-sm btn-link text-danger" onclick="this.closest('tr').remove()"><i class="bi bi-trash3-fill"></i></button></td>
+        `;
+        tbody.appendChild(tr);
     }
 </script>
 
@@ -1410,6 +1694,42 @@
             loader.hide();
             mostrarNotificacionPremium("Error de Red", "Fallo de comunicación con el servidor central: " + err, "danger");
         });
+    }
+
+    function cargarDashboardClon() {
+        const inputVal = document.getElementById('inputBuscadorVisor').value;
+        if(!inputVal) return;
+
+        // Extraemos quirúrgicamente la nómina antes del guion
+        const nomina = inputVal.split('-')[0].trim();
+        if(!nomina || isNaN(nomina)) return;
+
+        document.getElementById('loaderDashboardClon').classList.remove('d-none');
+        document.getElementById('contenedorDashboardClon').classList.add('d-none');
+        document.getElementById('btnRefrescarVisor').classList.add('d-none');
+
+        const iframe = document.getElementById('iframeDashboardClon');
+
+        // ✨ FIX VISOR: URL dinámica a prueba de Context Paths y herencia de idioma
+        const baseUrl = /*[[@{/pantallas/dashboard}]]*/ '/pantallas/dashboard';
+        const lang = /*[[${#locale.language}]]*/ 'es';
+
+        iframe.src = `${baseUrl}?nominaConsulta=${nomina}&modoVisor=true&lang=${lang}`;
+
+        iframe.onload = function() {
+            document.getElementById('loaderDashboardClon').classList.add('d-none');
+            document.getElementById('contenedorDashboardClon').classList.remove('d-none');
+            document.getElementById('btnRefrescarVisor').classList.remove('d-none');
+        };
+    }
+
+    // ✨ ACTIVA EL MODAL DE REVOCACIÓN
+    function abrirModalOverridePermiso(idSolicitud, nombreEmpleado, estatusActual) {
+        document.getElementById('overridePermisoId').value = idSolicitud;
+        document.getElementById('overridePermisoNombre').value = nombreEmpleado;
+        const selectEstatus = document.getElementById('overridePermisoEstatus');
+        selectEstatus.value = (estatusActual === 'APROBADO') ? 'RECHAZADO' : 'APROBADO';
+        new bootstrap.Modal(document.getElementById('modalOverridePermiso')).show();
     }
 </script>
 

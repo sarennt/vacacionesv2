@@ -318,31 +318,39 @@ public class Empleado {
 
 
     public int calcularDiasDerecho(int año) {
-        int diasLey;
-        if (año == 1) diasLey = 12;
-        else if (año == 2) diasLey = 14;
-        else if (año == 3) diasLey = 16;
-        else if (año == 4) diasLey = 18;
-        else if (año == 5) diasLey = 20;
-        else if (año <= 10) diasLey = 22;
-        else if (año <= 15) diasLey = 24;
-        else if (año <= 20) diasLey = 26;
-        else diasLey = 28;
+        // ✨ Vamos al caché en memoria para no estresar la Base de Datos
+        int diasLey = com.hrms.vacaciones.service.TabuladorCache.getDiasLey(año);
 
-        if ("EXTRANJERO".equalsIgnoreCase(this.tipoEmpleado)) {
+        // ✨ Obtenemos el bono dinámico en tiempo real
+        int bonoAdminDinamico = com.hrms.vacaciones.service.TabuladorCache.getBonoAdministrativo();
+
+        // 1. Juntamos toda la información del empleado en un solo texto (en mayúsculas) para el radar
+        String infoLaboral = (
+                (this.tipoEmpleado != null ? this.tipoEmpleado : "") + " " +
+                        (this.contrato != null ? this.contrato : "") + " " +
+                        (this.puesto != null ? this.puesto : "")
+        ).toUpperCase();
+
+        // 2. EXTRANJEROS (Mundo WC)
+        if (infoLaboral.contains("EXTRANJERO")) {
+            // Si la ficha dice "Saldo Congelado", se respeta el acuerdo manual intocable
             if (Boolean.TRUE.equals(this.esSaldoCongelado)) {
                 return (this.diasBaseManual != null) ? this.diasBaseManual : 18;
             }
-            if (this.diasBaseManual != null) {
-                int bonoFijo = this.diasBaseManual - 12;
-                return diasLey + bonoFijo;
-            }
-            return diasLey;
+            // Si no están congelados, nacen con la regla Administrativa (Ley + Bono) MÁS cualquier bono extra pactado
+            int bonoFijoManual = (this.diasBaseManual != null) ? (this.diasBaseManual - 12) : 0;
+            return diasLey + bonoAdminDinamico + bonoFijoManual;
         }
 
-        if ("ADMINISTRATIVO".equalsIgnoreCase(this.tipoEmpleado)) {
-            return diasLey + 2;
+        // 3. 🛡️ EL NUEVO SÚPER RADAR (+ Bono Administrativo Dinámico)
+        if (infoLaboral.contains("ADMIN") ||
+                infoLaboral.contains("CONFIANZA") ||
+                infoLaboral.contains("WC") ||
+                infoLaboral.contains("BCI")) {
+            return diasLey + bonoAdminDinamico;
         }
+
+        // 4. SINDICALIZADOS / BCD (Días de Ley puros)
         return diasLey;
     }
 

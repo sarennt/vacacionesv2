@@ -1,6 +1,7 @@
 package com.hrms.vacaciones.repository;
 
 import com.hrms.vacaciones.model.SolicitudPermiso;
+import org.springframework.data.jpa.repository.EntityGraph; // ✨ IMPORT VITAL PARA EL ROBOT
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -11,6 +12,10 @@ import java.util.List;
 
 @Repository
 public interface SolicitudPermisoRepository extends JpaRepository<SolicitudPermiso, Integer> {
+
+    // ✨ NUEVO: El método optimizado para la Barredora (Evita LazyInitializationException e Infartos de RAM)
+    @EntityGraph(attributePaths = {"empleado"})
+    List<SolicitudPermiso> findByEstatus(String estatus);
 
     // 1. Para la Guillotina automática: Busca los pendientes que ya se los comió el corte de nómina
     List<SolicitudPermiso> findByEstatusAndFechaIncidenciaLessThanEqual(String estatus, LocalDate fechaCorte);

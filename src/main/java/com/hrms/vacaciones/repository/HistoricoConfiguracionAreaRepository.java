@@ -8,6 +8,6 @@ import java.util.List;
 @Repository
 public interface HistoricoConfiguracionAreaRepository extends JpaRepository<HistoricoConfiguracionArea, Integer> {
 
-    // Trae las bitácoras de auditoría de un bloque de líneas ordenadas desde la más nueva
-    List<HistoricoConfiguracionArea> findByWorkCenterIdInOrderByFechaRegistroDesc(List<Integer> workCenterIds);
+    // ✨ El único método V2.0 que necesitamos para el historial
+    List<HistoricoConfiguracionArea> findByRealizadoPorNominaOrderByFechaRegistroDesc(Integer nominaJefe);
 }

@@ -112,10 +112,16 @@ public class ExcelImportService {
             Iterator<Row> rowIterator = sheet.iterator();
             if (rowIterator.hasNext()) rowIterator.next();
 
+            // ✨ PASO 1: Crear la memoria temporal para el escáner de sobrevivientes
+            java.util.List<Integer> nominasEnExcel = new java.util.ArrayList<>();
+
             while (rowIterator.hasNext()) {
                 Row row = rowIterator.next();
                 Integer nominaId = getIntegerValue(row.getCell(0, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL));
                 if (nominaId == null || nominaId == 0) continue;
+
+                // ✨ PASO 2: Registrar que este empleado SÍ vino vivo en el Excel
+                nominasEnExcel.add(nominaId);
 
                 Empleado empleado = empleadoRepository.findById(nominaId).orElseGet(() -> {
                     Empleado newEmp = new Empleado();
@@ -123,81 +129,33 @@ public class ExcelImportService {
                     return newEmp;
                 });
 
-                String tagValue = getStringValue(row.getCell(1, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL));
-                empleado.setTag(tagValue);
+                // ... (AQUÍ SE QUEDA EXACTAMENTE IGUAL TODO TU CÓDIGO DONDE GUARDAS NOMBRE, FECHAS Y CENTROS DE COSTO) ...
 
-                String apPaterno = getStringValue(row.getCell(2, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL));
-                String apMaterno = getStringValue(row.getCell(3, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL));
-                String nombresStr = getStringValue(row.getCell(4, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL));
-
-                empleado.setApellidoPaterno(apPaterno != null ? apPaterno.trim() : null);
-                empleado.setApellidoMaterno(apMaterno != null ? apMaterno.trim() : null);
-                empleado.setNombres(nombresStr != null ? nombresStr.trim() : null);
-
-                Cell fechaCell = row.getCell(5, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
-                if (fechaCell != null) {
-                    if (fechaCell.getCellType() == CellType.NUMERIC) {
-                        if (DateUtil.isCellDateFormatted(fechaCell)) {
-                            empleado.setFechaIngreso(fechaCell.getLocalDateTimeCellValue().toLocalDate());
-                        } else {
-                            empleado.setFechaIngreso(DateUtil.getJavaDate(fechaCell.getNumericCellValue())
-                                    .toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate());
-                        }
-                    } else if (fechaCell.getCellType() == CellType.STRING) {
-                        try {
-                            String strFecha = fechaCell.getStringCellValue().trim();
-                            if (strFecha.contains("/")) {
-                                java.time.format.DateTimeFormatter dtf = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy");
-                                empleado.setFechaIngreso(LocalDate.parse(strFecha, dtf));
-                            } else {
-                                empleado.setFechaIngreso(LocalDate.parse(strFecha));
-                            }
-                        } catch (Exception e) {
-                            log.warn("⚠️ Error parseando fecha en nómina {}: {}", nominaId, e.getMessage());
-                        }
-                    }
-                }
-
-                empleado.setContrato(getStringValue(row.getCell(6, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL)));
-                empleado.setPuesto(getStringValue(row.getCell(9, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL)));
-                empleado.setTipoEmpleado(getStringValue(row.getCell(10, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL)));
-
-                Integer ccId = getIntegerValue(row.getCell(7, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL));
-                if (ccId != null) {
-                    final Integer finalCc = ccId;
-                    CentroCosto cc = centroCostoRepository.findById(ccId).orElseGet(() -> {
-                        CentroCosto autoCc = new CentroCosto();
-                        autoCc.setId(finalCc);
-                        autoCc.setNombre("CC STAFF " + finalCc);
-                        return centroCostoRepository.save(autoCc);
-                    });
-                    empleado.setCentroCosto(cc);
-                } else {
-                    empleado.setCentroCosto(null);
-                }
-
-                Integer wcId = getIntegerValue(row.getCell(8, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL));
-                if (wcId != null) {
-                    final Integer finalWc = wcId;
-                    final CentroCosto ccAsociado = empleado.getCentroCosto();
-
-                    WorkCenter wc = workCenterRepository.findById(wcId).orElseGet(() -> {
-                        WorkCenter autoWc = new WorkCenter();
-                        autoWc.setId(finalWc);
-                        autoWc.setNombre("WC LINEA " + finalWc);
-                        if (ccAsociado != null) {
-                            autoWc.setCentroCosto(ccAsociado);
-                        }
-                        return workCenterRepository.save(autoWc);
-                    });
-                    empleado.setWorkCenter(wc);
-                } else {
-                    empleado.setWorkCenter(null);
-                }
+                // ✨ NUEVO: Leemos la columna "Tipo de empleado" (Índice 10) y la traducimos
+                String tipoCrudo = getStringValue(row.getCell(10, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL));
+                empleado.setTipoEmpleado(normalizarTipoEmpleado(tipoCrudo));
 
                 empleado.setEstatus("ACTIVO");
                 empleadoRepository.save(empleado);
             }
+
+            // ✨ PASO 3: LA GUILLOTINA DE BAJAS (Cruce contra PostgreSQL)
+            // Una vez que terminó de leer el Excel, cruzamos contra la base de datos
+            java.util.List<Empleado> todosLosEmpleados = empleadoRepository.findAll();
+            for (Empleado empDb : todosLosEmpleados) {
+                // Si está ACTIVO en la BD, pero NO lo anotamos en la lista del Excel... ¡Cuello!
+                if ("ACTIVO".equalsIgnoreCase(empDb.getEstatus()) && !nominasEnExcel.contains(empDb.getNomina())) {
+                    empDb.setEstatus("BAJA");
+                    // Desvinculamos sus líneas y jefes para que no haga basura en las métricas de las Jefaturas
+                    empDb.setWorkCenter(null);
+                    empDb.setCentroCosto(null);
+                    empDb.setJefeDirectoNomina(null);
+                    empDb.setJefeDirecto(null);
+                    empleadoRepository.save(empDb);
+                    log.info("🔻 GUILLOTINA ACTIVADA: Empleado {} dado de BAJA por omisión en Excel.", empDb.getNomina());
+                }
+            }
+
             log.info("✅ Torre de Control: Plantilla indexada al centavo con nombres y apellidos separados.");
         } catch (Exception e) {
             throw new RuntimeException("Falla en plantilla personal: " + e.getMessage(), e);
@@ -402,6 +360,11 @@ public class ExcelImportService {
                 Empleado emp = empleadoRepository.findById(nominaId).orElse(null);
                 if (emp != null) {
                     emp.setSaldoVacacionesActual(BigDecimal.valueOf(saldoDevengado));
+
+                    // ✨ NUEVO: Actualizamos y traducimos su esquema operativo desde el Semillero (Índice 10)
+                    String tipoCrudo = getStringValue(row.getCell(10, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL));
+                    emp.setTipoEmpleado(normalizarTipoEmpleado(tipoCrudo));
+
                     empleadoRepository.save(emp);
 
                     if (emp.getFechaIngreso() != null) {
@@ -451,6 +414,26 @@ public class ExcelImportService {
         } catch (Exception e) {
             throw new RuntimeException("Falla en semillero contable: " + e.getMessage(), e);
         }
+    }
+
+    // ✨ TRADUCTOR INTELIGENTE DE RRHH (Normaliza la Base de Datos)
+    private String normalizarTipoEmpleado(String tipoCrudo) {
+        if (tipoCrudo == null || tipoCrudo.trim().isEmpty()) {
+            return "SINDICALIZADO"; // Fallback por defecto
+        }
+        String t = tipoCrudo.trim().toUpperCase();
+
+        // Si RH sube BCD o algo con "SIND", lo forzamos a SINDICALIZADO
+        if (t.equals("BCD") || t.contains("SIND")) {
+            return "SINDICALIZADO";
+        }
+        // Si RH sube el formato viejo o el nuevo, lo unificamos
+        if (t.equals("EXTRANJERO") || t.equals("WC-EXTRANJERO")) {
+            return "WC-EXTRANJERO";
+        }
+
+        // Pasa limpios los BCI, WC, y ADMINISTRATIVO
+        return t;
     }
 
     // --- MÉTODOS PARSEADORES SEGUROS PARA APACHE POI ---

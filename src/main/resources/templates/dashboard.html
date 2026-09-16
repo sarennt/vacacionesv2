@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Dashboard del Colaborador - Sistema de Vacaciones</title>
+    <title th:text="#{dash.colab.titulo}">Dashboard del Colaborador - Sistema de Vacaciones</title>
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -12,9 +12,11 @@
     <link rel="stylesheet" th:href="@{/css/estilos-grammer.css}">
 </head>
 <body class="bg-light pb-5">
-<div th:replace="~{fragments/navbar :: menuPlanta}"></div>
-
-<div style="height: 30px;"></div>
+<!-- ✨ Apagar menú superior en el Iframe -->
+<div th:if="${modoVisor == null or !modoVisor}">
+    <div th:replace="~{fragments/navbar :: menuPlanta}"></div>
+    <div style="height: 30px;"></div>
+</div>
 
 <main class="container mx-auto px-3">
     <div class="row g-4">
@@ -30,36 +32,36 @@
                     <h3 class="h4 fw-bold mb-1 text-dark mt-2" th:text="${empleado.nombreCompleto}">Nombre del Empleado</h3>
 
                     <div class="d-flex flex-wrap gap-2 justify-content-center mb-3 align-items-center">
-                        <span class="badge bg-light text-secondary border px-3 py-2 rounded-pill fw-medium">Nómina: <span class="fw-bold text-dark" th:text="${empleado.nomina}">00000</span></span>
+                        <span class="badge bg-light text-secondary border px-3 py-2 rounded-pill fw-medium"><span th:text="#{dash.colab.nomina}">Nómina:</span> <span class="fw-bold text-dark" th:text="${empleado.nomina}">00000</span></span>
                         <span class="badge border px-3 py-2 rounded-pill text-white bg-primary" th:text="${empleado.tipoEmpleado}">ADMINISTRATIVO</span>
-                        <span th:if="${empleado.estatus == 'ACTIVO' or empleado.estatus == null}" class="badge bg-success px-3 py-2 rounded-pill text-white fw-bold">ACTIVO</span>
-                        <span th:if="${empleado.estatus == 'BAJA'}" class="badge bg-danger px-3 py-2 rounded-pill text-white fw-bold">BAJA</span>
+                        <span th:if="${empleado.estatus == 'ACTIVO' or empleado.estatus == null}" class="badge bg-success px-3 py-2 rounded-pill text-white fw-bold" th:text="#{dash.colab.estatus.activo}">ACTIVO</span>
+                        <span th:if="${empleado.estatus == 'BAJA'}" class="badge bg-danger px-3 py-2 rounded-pill text-white fw-bold" th:text="#{dash.colab.estatus.baja}">BAJA</span>
                     </div>
 
                     <div class="text-start bg-light p-3 rounded-3 border mb-3" style="font-size: 0.85rem;">
-                        <div class="mb-2 text-muted"><i class="bi bi-briefcase-fill me-2 text-secondary"></i><strong>Puesto:</strong> <span class="text-dark fw-medium" th:text="${empleado.puesto ?: 'N/A'}">Puesto Oficial</span></div>
-                        <div class="mb-2 text-muted"><i class="bi bi-calendar-check-fill me-2 text-secondary"></i><strong>Fecha Ingreso:</strong> <span class="font-monospace fw-bold text-dark" th:text="${empleado.fechaIngreso != null ? #temporals.format(empleado.fechaIngreso, 'dd/MM/yyyy') : 'N/A'}">01/01/2020</span></div>
-                        <div th:if="${empleado.workCenter != null}" class="text-muted"><i class="bi bi-gear-wide-connected me-2 text-secondary"></i><strong>Línea / WC:</strong> <span class="badge bg-dark bg-opacity-10 text-dark font-monospace" th:text="'[' + ${empleado.workCenter.id} + '] ' + ${empleado.workCenter.nombre}">WC 1</span></div>
+                        <div class="mb-2 text-muted"><i class="bi bi-briefcase-fill me-2 text-secondary"></i><strong th:text="#{dash.colab.puesto}">Puesto:</strong> <span class="text-dark fw-medium" th:text="${empleado.puesto ?: 'N/A'}">Puesto Oficial</span></div>
+                        <div class="mb-2 text-muted"><i class="bi bi-calendar-check-fill me-2 text-secondary"></i><strong th:text="#{dash.colab.ingreso}">Fecha Ingreso:</strong> <span class="font-monospace fw-bold text-dark" th:text="${empleado.fechaIngreso != null ? #temporals.format(empleado.fechaIngreso, 'dd/MM/yyyy') : 'N/A'}">01/01/2020</span></div>
+                        <div th:if="${empleado.workCenter != null}" class="text-muted"><i class="bi bi-gear-wide-connected me-2 text-secondary"></i><strong th:text="#{dash.colab.linea}">Línea / WC:</strong> <span class="badge bg-dark bg-opacity-10 text-dark font-monospace" th:text="'[' + ${empleado.workCenter.id} + '] ' + ${empleado.workCenter.nombre}">WC 1</span></div>
                     </div>
 
                     <div class="balance-box bg-light p-4 rounded-3 border overflow-hidden text-center shadow-sm">
-                        <p class="text-secondary text-uppercase tracking-wider fw-bold mb-1" style="font-size: 0.75rem;">Saldo Acumulado General</p>
+                        <p class="text-secondary text-uppercase tracking-wider fw-bold mb-1" style="font-size: 0.75rem;" th:text="#{dash.colab.saldo.etiqueta}"></p>
                         <div class="d-flex justify-content-center align-items-baseline gap-1">
                             <span class="fs-1 th-balance fw-bold" th:classappend="${saldo < 0} ? 'text-danger' : 'text-success'" th:text="${saldo}">0.0</span>
-                            <span class="text-muted fw-bold small">días</span>
+                            <span class="text-muted fw-bold small" th:text="#{dash.colab.saldo.dias}"></span>
                         </div>
                         <div class="text-muted border-top pt-2 mt-2" style="font-size: 0.78rem;">
-                            <span>Proporcional del ciclo actual: <strong class="text-info" th:text="${empleado.saldoProporcional != null ? empleado.saldoProporcional : '0.00'}">0.00</strong> días</span>
+                            <span th:text="#{dash.colab.proporcional}">Proporcional del ciclo actual:</span> <strong class="text-info" th:text="${empleado.saldoProporcional != null ? empleado.saldoProporcional : '0.00'}">0.00</strong> <span th:text="#{dash.colab.saldo.dias}">días</span>
                         </div>
                     </div>
 
                     <div th:if="${empleado.getSaldoCiclosAnteriores() != null and empleado.getSaldoCiclosAnteriores().doubleValue() > 0}" class="mt-3 p-3 bg-white border text-start rounded-3 shadow-sm" style="border-left: 5px solid #ffc107 !important;">
-                        <p class="text-dark fw-bold mb-2 small"><i class="bi bi-clock-history text-warning me-1"></i> Saldo Pendiente (Atrasado)</p>
+                        <p class="text-dark fw-bold mb-2 small"><i class="bi bi-clock-history text-warning me-1"></i> <span th:text="#{dash.colab.ciclos.anteriores}">Saldo Pendiente (Atrasado)</span></p>
                         <div class="table-responsive mb-2">
                             <table class="table table-sm table-bordered align-middle text-center mb-0" style="font-size: 0.8rem; min-width: 100%;">
                                 <thead class="table-light text-muted small text-uppercase">
                                 <tr>
-                                    <th class="py-1.5 fw-bold" style="font-size: 0.68rem;">Días de Ciclos Anteriores</th>
+                                    <th class="py-1.5 fw-bold" style="font-size: 0.68rem;" th:text="#{dash.colab.ciclos.titulo}">Días de Ciclos Anteriores</th>
                                 </tr>
                                 </thead>
                                 <tbody>
@@ -78,22 +80,22 @@
                             <i class="bi" th:classappend="${empleado.getFechaLimiteExpiracion() != null and T(java.time.LocalDate).now().isAfter(empleado.getFechaLimiteExpiracion())} ? 'bi-exclamation-octagon-fill text-danger' : 'bi-clock-fill text-warning'"></i>
                             <div class="fw-medium">
                                 <span th:if="${empleado.getFechaLimiteExpiracion() != null and !T(java.time.LocalDate).now().isAfter(empleado.getFechaLimiteExpiracion())}">
-                                    Tienes hasta el <strong class="text-dark" th:text="${#temporals.format(empleado.getFechaLimiteExpiracion(), 'dd/MM/yyyy')}">01/01/2026</strong> para tomar tus días atrasados o Dirección de RH los podrá depurar.
+                                    <span th:text="#{dash.colab.alerta.vigente.1}">Tienes hasta el</span> <strong class="text-dark" th:text="${#temporals.format(empleado.getFechaLimiteExpiracion(), 'dd/MM/yyyy')}">01/01/2026</strong> <span th:text="#{dash.colab.alerta.vigente.2}">para tomar tus días atrasados.</span>
                                 </span>
                                 <span th:if="${empleado.getFechaLimiteExpiracion() != null and T(java.time.LocalDate).now().isAfter(empleado.getFechaLimiteExpiracion())}">
-                                    ¡Plazo Expirado! Tu fecha límite fue el <strong th:text="${#temporals.format(empleado.getFechaLimiteExpiracion(), 'dd/MM/yyyy')}">01/01/2026</strong>. Tu saldo atrasado se encuentra sujeto a remoción contable de RH.
+                                    <span th:text="#{dash.colab.alerta.expirado.1}">¡Plazo Expirado! Tu fecha límite fue el</span> <strong th:text="${#temporals.format(empleado.getFechaLimiteExpiracion(), 'dd/MM/yyyy')}">01/01/2026</strong><span th:text="#{dash.colab.alerta.expirado.2}">. Tu saldo atrasado se encuentra sujeto a remoción contable de RH.</span>
                                 </span>
                             </div>
                         </div>
                     </div>
 
                     <div class="mt-3 p-3 bg-white border text-start rounded-3 shadow-sm" style="border-left: 5px solid #198754 !important;">
-                        <p class="text-dark fw-bold mb-2 small"><i class="bi bi-calendar2-check-fill text-success me-1"></i> Saldo Periodo Actual</p>
+                        <p class="text-dark fw-bold mb-2 small"><i class="bi bi-calendar2-check-fill text-success me-1"></i> <span th:text="#{dash.colab.periodo.actual}">Saldo Periodo Actual</span></p>
                         <div class="table-responsive">
                             <table class="table table-sm table-bordered align-middle text-center mb-0" style="font-size: 0.8rem; min-width: 100%;">
                                 <thead class="table-light text-muted small text-uppercase">
                                 <tr>
-                                    <th class="py-1.5 fw-bold" style="font-size: 0.68rem;">Año Corriente (Días Base + Beneficios)</th>
+                                    <th class="py-1.5 fw-bold" style="font-size: 0.68rem;" th:text="#{dash.colab.periodo.anio}">Año Corriente</th>
                                 </tr>
                                 </thead>
                                 <tbody>
@@ -109,17 +111,18 @@
 
                     <div th:if="${esSindicalizado}" class="mb-4 p-3 rounded-3 border bg-white shadow-sm text-start" style="border-left: 5px solid #004b93 !important;">
                         <div class="d-flex justify-content-between align-items-center">
-                            <span class="text-secondary small fw-bold"><i class="bi bi-trophy-fill text-warning me-1"></i> Fila Virtual VIP:</span>
-                            <span class="badge bg-primary px-3 py-1.5 rounded-pill font-monospace fw-bold fs-6" style="background-color: #002f6c !important;" th:text="'Lugar #' + ${posicionRanking}">Lugar #1</span>
+                            <span class="text-secondary small fw-bold"><i class="bi bi-ticket-perforated-fill text-warning me-1"></i> <span th:text="#{dash.colab.vip.asignado}">Boleto VIP Asignado:</span></span>
+                            <span class="badge bg-primary px-3 py-1.5 rounded-pill font-monospace fw-bold fs-6" style="background-color: #002f6c !important;" th:text="${diaVIPAsignado}">LUNES</span>
                         </div>
-                        <div class="mt-2 text-muted" style="font-size: 0.76rem; line-height: 1.3;">
-                            Medido contra la plantilla de tu Supervisor de área. Cupo VIP actual configurado: <strong class="text-dark" th:text="'Top ' + ${topLimite}">Top 10</strong>.
+                        <div class="mt-2 text-muted" style="font-size: 0.76rem; line-height: 1.3;" th:text="#{dash.colab.vip.desc}">
+                            Calculado en base a tu saldo y antigüedad. Este es tu día exclusivo de registro antes de la apertura general (Sábado).
                         </div>
                     </div>
 
-                    <div class="d-grid mt-4">
+                    <!-- ✨ Ocultar botón de crear solicitud si es el jefe observando -->
+                    <div th:if="${modoVisor == null or !modoVisor}" class="d-grid mt-4">
                         <a href="/pantallas/solicitar-vacaciones" class="btn btn-lg text-white btn-solicitar-premium bg-corporativo d-flex align-items-center justify-content-center gap-2 fw-bold shadow-sm">
-                            <i class="bi bi-calendar-plus-fill fs-5"></i> NUEVA SOLICITUD DE AUSENCIA
+                            <i class="bi bi-calendar-plus-fill fs-5"></i> <span th:text="#{dash.colab.btn.nueva.solicitud}">NUEVA SOLICITUD DE AUSENCIA</span>
                         </a>
                     </div>
                 </div>
@@ -134,8 +137,8 @@
                         <i class="bi bi-clock-history text-dark fs-5"></i>
                     </div>
                     <div>
-                        <h4 class="h6 fw-bold mb-0 text-dark">Consulta de Historial e Incidencias</h4>
-                        <small class="text-muted font-monospace d-none d-sm-inline" style="font-size: 0.72rem;">Control de movimientos contables y pre-nómina</small>
+                        <h4 class="h6 fw-bold mb-0 text-dark" th:text="#{dash.colab.historial.titulo}">Consulta de Historial e Incidencias</h4>
+                        <small class="text-muted font-monospace d-none d-sm-inline" style="font-size: 0.72rem;" th:text="#{dash.colab.historial.sub}">Control de movimientos contables y pre-nómina</small>
                     </div>
                 </div>
                 <button class="btn btn-sm fw-bold rounded-pill px-3 shadow-sm transition-all"
@@ -146,7 +149,7 @@
                         th:aria-expanded="${(fechaInicioFilter != null and !fechaInicioFilter.trim().isEmpty()) or (fechaFinFilter != null and !fechaFinFilter.trim().isEmpty())} ? 'true' : 'false'"
                         aria-controls="collapseHistorialMaster"
                         id="btnToggleHistorial">
-                    <span th:text="${(fechaInicioFilter != null and !fechaInicioFilter.trim().isEmpty()) or (fechaFinFilter != null and !fechaFinFilter.trim().isEmpty())} ? 'Ocultar Historial' : 'Mostrar Historial'">Mostrar Historial</span>
+                    <span th:text="${(fechaInicioFilter != null and !fechaInicioFilter.trim().isEmpty()) or (fechaFinFilter != null and !fechaFinFilter.trim().isEmpty())} ? #{dash.colab.btn.ocultar} : #{dash.colab.btn.mostrar}">Mostrar Historial</span>
                     <i class="bi ms-1" th:classappend="${(fechaInicioFilter != null and !fechaInicioFilter.trim().isEmpty()) or (fechaFinFilter != null and !fechaFinFilter.trim().isEmpty())} ? 'bi-chevron-up' : 'bi-chevron-down'" id="iconoHistorial"></i>
                 </button>
             </div>
@@ -157,12 +160,17 @@
                 <ul class="nav nav-pills bg-white shadow-sm rounded-3 p-1 mb-3 border pills-compact-wrapper" id="pills-dashboard-tab" role="tablist">
                     <li class="nav-item flex-grow-1" role="presentation">
                         <button class="nav-link active rounded-2 fw-bold py-2 w-100" id="pills-vacaciones-tab" data-bs-toggle="pill" data-bs-target="#pills-vacaciones" type="button" role="tab" aria-selected="true">
-                            <i class="bi bi-airplane-engines-fill me-1 text-success"></i> Historial de Vacaciones
+                            <i class="bi bi-airplane-engines-fill me-1 text-success"></i> <span th:text="#{dash.colab.tab.vacaciones}">Historial de Vacaciones</span>
                         </button>
                     </li>
                     <li class="nav-item flex-grow-1" role="presentation">
                         <button class="nav-link rounded-2 fw-bold py-2 w-100" id="pills-permisos-tab" data-bs-toggle="pill" data-bs-target="#pills-permisos" type="button" role="tab" aria-selected="false">
-                            <i class="bi bi-clipboard-x-fill me-1 text-warning"></i> Historial Incidencias
+                            <i class="bi bi-clipboard-x-fill me-1 text-warning"></i> <span th:text="#{dash.colab.tab.permisos}">Historial Incidencias</span>
+                        </button>
+                    </li>
+                    <li class="nav-item flex-grow-1" role="presentation">
+                        <button class="nav-link rounded-2 fw-bold py-2 w-100" id="pills-canceladas-tab" data-bs-toggle="pill" data-bs-target="#pills-canceladas" type="button" role="tab" aria-selected="false">
+                            <i class="bi bi-x-circle-fill me-1 text-danger"></i> <span th:text="#{dash.colab.tab.canceladas}">Canceladas</span>
                         </button>
                     </li>
                 </ul>
@@ -170,16 +178,16 @@
                 <section class="custom-card p-2.5 mb-3 bg-white shadow-sm border filters-compact-wrapper rounded-3">
                     <form action="/pantallas/dashboard" method="GET" class="row g-2 align-items-center">
                         <div class="col-sm-5 d-flex align-items-center gap-2">
-                            <label for="fechaInicio" class="text-nowrap text-secondary font-monospace small mb-0 fw-bold">Desde:</label>
+                            <label for="fechaInicio" class="text-nowrap text-secondary font-monospace small mb-0 fw-bold" th:text="#{dash.colab.filtro.desde}">Desde:</label>
                             <input type="date" class="form-control form-control-sm bg-light border" id="fechaInicio" name="fechaInicio" th:value="${fechaInicioFilter}">
                         </div>
                         <div class="col-sm-5 d-flex align-items-center gap-2">
-                            <label for="fechaFin" class="text-nowrap text-secondary font-monospace small mb-0 fw-bold">Hasta:</label>
+                            <label for="fechaFin" class="text-nowrap text-secondary font-monospace small mb-0 fw-bold" th:text="#{dash.colab.filtro.hasta}">Hasta:</label>
                             <input type="date" class="form-control form-control-sm bg-light border" id="fechaFin" name="fechaFin" th:value="${fechaFinFilter}">
                         </div>
                         <div class="col-sm-2">
                             <button type="submit" class="btn btn-sm btn-dark w-100 fw-bold shadow-sm d-flex align-items-center justify-content-center gap-1" style="height: 31px; border-radius: 6px;">
-                                <i class="bi bi-funnel-fill"></i> Filtrar
+                                <i class="bi bi-funnel-fill"></i> <span th:text="#{dash.colab.filtro.btn}">Filtrar</span>
                             </button>
                         </div>
                     </form>
@@ -189,29 +197,44 @@
 
                     <div class="tab-pane fade show active" id="pills-vacaciones" role="tabpanel" aria-labelledby="pills-vacaciones-tab">
                         <div class="custom-card p-3 bg-white shadow-sm border rounded-3">
-                            <h4 class="h6 fw-bold text-dark border-bottom pb-2 mb-3"><i class="bi bi-clock-history me-2 text-success"></i> Solicitudes de Vacaciones y Cierres Colectivos</h4>
+                            <h4 class="h6 fw-bold text-dark border-bottom pb-2 mb-3"><i class="bi bi-clock-history me-2 text-warning"></i> <span th:text="#{dash.colab.permisos.titulo}">Bitácora de Justificaciones e Incidencias Operativas</span></h4>
 
-                            <div class="text-center py-5 text-muted" th:if="${historialVacaciones == null or historialVacaciones.isEmpty()}">
+                            <div class="text-center py-5 text-muted" th:if="${historialPermisos == null or historialPermisos.isEmpty()}">
                                 <i class="bi bi-folder-x fs-1 opacity-50"></i>
-                                <p class="mb-0 fw-medium mt-1">No se detectaron movimientos contables de vacaciones en este rango.</p>
+                                <p class="mb-0 fw-medium mt-1" th:text="#{dash.colab.permisos.vacio}">No se detectaron permisos ni incidencias operativas en este rango.</p>
                             </div>
 
                             <div th:if="${historialVacaciones != null and !historialVacaciones.isEmpty()}" class="d-flex flex-column gap-3">
-                                <div th:each="sol : ${historialVacaciones}" class="card border p-3 rounded-3 shadow-sm position-relative"
+                                <div th:each="sol : ${historialVacaciones}" th:if="${!#strings.equalsIgnoreCase(sol.estatus, 'CANCELADO')}" class="card border p-3 rounded-3 shadow-sm position-relative"
                                      th:style="${#strings.equalsIgnoreCase(sol.tipoSolicitud, 'Depuración Vacaciones Vencidas')} ? 'border-left: 5px solid #dc3545 !important;' : 'border-left: 5px solid #198754 !important;'">
 
                                     <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
                                         <div>
                                             <span th:if="${#strings.equalsIgnoreCase(sol.tipoSolicitud, 'Depuración Vacaciones Vencidas')}" class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 px-2.5 py-1.5 rounded text-uppercase fw-bold" style="font-size: 0.72rem;"><i class="bi bi-shield-slash-fill me-1"></i> Depuración de Remanente</span>
                                             <span th:if="${#strings.equalsIgnoreCase(sol.tipoSolicitud, 'Vacaciones Colectivas')}" class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 px-2.5 py-1.5 rounded text-uppercase fw-bold" style="font-size: 0.72rem;"><i class="bi bi-people-fill me-1"></i> Paro / Colectivo Masivo</span>
-                                            <span th:if="${!#strings.equalsIgnoreCase(sol.tipoSolicitud, 'Depuración Vacaciones Vencidas') and !#strings.equalsIgnoreCase(sol.tipoSolicitud, 'Vacaciones Colectivas')}" class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-2.5 py-1.5 rounded text-uppercase fw-bold" style="font-size: 0.72rem;"><i class="bi bi-calendar-check me-1"></i> Vacación Ordinaria</span>
+
+                                            <!-- ✨ NUEVA ETIQUETA PARA FALTAS PAGADAS CON SALDO -->
+                                            <span th:if="${#strings.containsIgnoreCase(sol.tipoSolicitud, 'Falta')}" class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-2.5 py-1.5 rounded text-uppercase fw-bold" style="font-size: 0.72rem;"><i class="bi bi-calendar-check me-1"></i> Recuperación a Cuenta de Vacaciones</span>
+
+                                            <span th:if="${!#strings.equalsIgnoreCase(sol.tipoSolicitud, 'Depuración Vacaciones Vencidas') and !#strings.equalsIgnoreCase(sol.tipoSolicitud, 'Vacaciones Colectivas') and !#strings.containsIgnoreCase(sol.tipoSolicitud, 'Falta')}" class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 px-2.5 py-1.5 rounded text-uppercase fw-bold" style="font-size: 0.72rem;"><i class="bi bi-calendar-check me-1"></i> Vacación Ordinaria</span>
 
                                             <h5 class="h6 fw-bold text-dark mt-2 mb-0" th:text="'Folio #' + ${sol.id} + ' | Del ' + ${#strings.substring(sol.fechaInicio,0,10)} + ' al ' + ${#strings.substring(sol.fechaFin,0,10)}">Folio #000</h5>
                                         </div>
 
-                                        <span class="badge rounded-pill px-3 py-1.5 fw-bold"
-                                              th:classappend="${#strings.equalsIgnoreCase(sol.estatus, 'Aprobado')} ? 'bg-success text-white' : (${#strings.equalsIgnoreCase(sol.estatus, 'Rechazado')} ? 'bg-danger text-white' : 'bg-warning text-dark')"
-                                              th:text="${sol.estatus}">Aprobado</span>
+                                        <!-- ✨ CONTENEDOR DERECHO CORREGIDO: Estatus + Botón de Cancelar (VACACIONES) -->
+                                        <div class="text-end">
+                                            <span class="badge rounded-pill px-3 py-1.5 fw-bold d-block mb-2 shadow-sm"
+                                                  th:classappend="${#strings.equalsIgnoreCase(sol.estatus, 'Aprobado')} ? 'bg-success text-white' : (${#strings.equalsIgnoreCase(sol.estatus, 'Rechazado')} ? 'bg-danger text-white' : 'bg-warning text-dark')">
+                                                <span th:if="${#strings.equalsIgnoreCase(sol.estatus, 'Rechazado')}">👨‍💼 Rechazada</span>
+                                                <span th:unless="${#strings.equalsIgnoreCase(sol.estatus, 'Rechazado')}" th:text="${sol.estatus}">Aprobado</span>
+                                            </span>
+
+                                            <div th:if="${#strings.containsIgnoreCase(sol.estatus, 'Pendiente')}" class="d-flex gap-2 justify-content-end">
+                                                <button type="button" class="btn btn-sm btn-outline-danger px-2 py-1 shadow-sm bg-white" style="font-size: 0.7rem; border-radius: 6px;" th:onclick="'abrirModalCancelar(\'VACACION\', ' + ${sol.id} + ')'">
+                                                    <i class="bi bi-trash3-fill"></i> Cancelar
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
 
                                     <div class="row g-2 text-secondary font-monospace mb-2" style="font-size: 0.8rem;">
@@ -220,7 +243,7 @@
                                     </div>
 
                                     <div class="bg-light p-2 rounded border" style="font-size: 0.82rem; line-height: 1.4;">
-                                        <div class="text-dark fw-medium" style="font-size: 0.78rem;"><i class="bi bi-chat-left-quote-fill text-primary me-1"></i><strong>Comentario de Autorización:</strong></div>
+                                        <div class="text-dark fw-medium" style="font-size: 0.78rem;"><i class="bi bi-chat-left-quote-fill text-primary me-1"></i><strong>Comentario:</strong></div>
                                         <span class="text-muted fst-italic" th:text="${sol.comentarioJefe ?: 'Sin observaciones adicionales.'}">Detalle</span>
 
                                         <div th:if="${#strings.equalsIgnoreCase(sol.estatus, 'Rechazado') and sol.comentarioSupervisor != null and !sol.comentarioSupervisor.trim().isEmpty()}" class="mt-2 pt-2 border-top text-danger fw-bold" style="font-size: 0.78rem;">
@@ -238,37 +261,67 @@
 
                     <div class="tab-pane fade" id="pills-permisos" role="tabpanel" aria-labelledby="pills-permisos-tab">
                         <div class="custom-card p-3 bg-white shadow-sm border rounded-3">
-                            <h4 class="h6 fw-bold text-dark border-bottom pb-2 mb-3"><i class="bi bi-clock-history me-2 text-warning"></i> Bitácora de Justificaciones e Incidencias Operativas</h4>
+                            <h4 class="h6 fw-bold text-dark border-bottom pb-2 mb-3"><i class="bi bi-clock-history me-2 text-warning"></i> <span th:text="#{dash.colab.permisos.titulo}">Bitácora de Justificaciones e Incidencias Operativas</span></h4>
 
                             <div class="text-center py-5 text-muted" th:if="${historialPermisos == null or historialPermisos.isEmpty()}">
                                 <i class="bi bi-folder-x fs-1 opacity-50"></i>
-                                <p class="mb-0 fw-medium mt-1">No se detectaron permisos ni incidencias operativas en este rango.</p>
+                                <p class="mb-0 fw-medium mt-1" th:text="#{dash.colab.permisos.vacio}">No se detectaron permisos ni incidencias operativas en este rango.</p>
                             </div>
 
                             <div th:if="${historialPermisos != null and !historialPermisos.isEmpty()}" class="d-flex flex-column gap-3">
-                                <div th:each="perm : ${historialPermisos}" class="card border p-3 rounded-3 shadow-sm position-relative" style="border-left: 5px solid #ffc107 !important;">
+                                <div th:each="perm : ${historialPermisos}" th:if="${!#strings.equalsIgnoreCase(perm.estatus, 'CANCELADO')}" class="card border p-3 rounded-3 shadow-sm position-relative" style="border-left: 5px solid #ffc107 !important;">
 
                                     <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
-                                        <div>
-                                            <span th:if="${#strings.contains(perm.tipoSolicitud, 'TXT')}" class="badge bg-warning bg-opacity-15 text-warning-dark border border-warning border-opacity-25 px-2.5 py-1.5 rounded text-uppercase fw-bold" style="font-size: 0.72rem; color: #856404;"><i class="bi bi-stopwatch-fill me-1"></i> Tiempo por Tiempo (TXT)</span>
-                                            <span th:if="${#strings.contains(perm.tipoSolicitud, 'HO')}" class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 px-2.5 py-1.5 rounded text-uppercase fw-bold" style="font-size: 0.72rem;"><i class="bi bi-house-door-fill me-1"></i> Home Office (HO)</span>
-                                            <span th:if="${#strings.contains(perm.tipoSolicitud, 'PT')}" class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 px-2.5 py-1.5 rounded text-uppercase fw-bold" style="font-size: 0.72rem;"><i class="bi bi-exclamation-triangle-fill me-1"></i> Paro Técnico (PT)</span>
-                                            <span th:if="${#strings.contains(perm.tipoSolicitud, 'C')}" class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 px-2.5 py-1.5 rounded text-uppercase fw-bold" style="font-size: 0.72rem;"><i class="bi bi-building-fill me-1"></i> Comisión Visita Cliente</span>
-                                            <span th:if="${#strings.contains(perm.tipoSolicitud, 'P')}" class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 px-2.5 py-1.5 rounded text-uppercase fw-bold" style="font-size: 0.72rem;"><i class="bi bi-truck me-1"></i> Comisión Visita Proveedor</span>
-                                            <span th:if="${#strings.contains(perm.tipoSolicitud, 'TET')}" class="badge bg-dark text-white px-2.5 py-1.5 rounded text-uppercase fw-bold" style="font-size: 0.72rem;"><i class="bi bi-geo-alt-fill me-1"></i> Estancia Planta Tetla</span>
-                                            <span th:if="${#strings.equalsIgnoreCase(perm.tipoSolicitud, 'Recuperación de Falta')}" class="badge bg-dark bg-opacity-10 text-dark border border-dark border-opacity-25 px-2.5 py-1.5 rounded text-uppercase fw-bold" style="font-size: 0.72rem;"><i class="bi bi-exclamation-diamond-fill me-1"></i> Falta Justificada / Supervisor</span>
+                                        <div th:with="textoCheck=${(perm.tipoSolicitud ?: '') + ' ' + (perm.comentarioJefe ?: '')}">
+                                            <span th:if="${#strings.containsIgnoreCase(textoCheck, 'TXT')}" class="badge bg-warning bg-opacity-15 text-warning-dark border border-warning border-opacity-25 px-2.5 py-1.5 rounded text-uppercase fw-bold" style="font-size: 0.72rem; color: #856404;"><i class="bi bi-stopwatch-fill me-1"></i> Tiempo por Tiempo (TXT)</span>
+                                            <span th:if="${#strings.containsIgnoreCase(textoCheck, 'HO')}" class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 px-2.5 py-1.5 rounded text-uppercase fw-bold" style="font-size: 0.72rem;"><i class="bi bi-house-door-fill me-1"></i> Home Office (HO)</span>
+                                            <span th:if="${#strings.containsIgnoreCase(textoCheck, 'PT')}" class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 px-2.5 py-1.5 rounded text-uppercase fw-bold" style="font-size: 0.72rem;"><i class="bi bi-exclamation-triangle-fill me-1"></i> Paro Técnico (PT)</span>
+                                            <span th:if="${#strings.containsIgnoreCase(textoCheck, '[C]') or #strings.equalsIgnoreCase(perm.tipoSolicitud, 'C')}" class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 px-2.5 py-1.5 rounded text-uppercase fw-bold" style="font-size: 0.72rem;"><i class="bi bi-building-fill me-1"></i> Comisión Visita Cliente</span>
+                                            <span th:if="${#strings.containsIgnoreCase(textoCheck, '[P]') or #strings.equalsIgnoreCase(perm.tipoSolicitud, 'P')}" class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 px-2.5 py-1.5 rounded text-uppercase fw-bold" style="font-size: 0.72rem;"><i class="bi bi-truck me-1"></i> Comisión Visita Proveedor</span>
+                                            <span th:if="${#strings.containsIgnoreCase(textoCheck, 'TET')}" class="badge bg-dark text-white px-2.5 py-1.5 rounded text-uppercase fw-bold" style="font-size: 0.72rem;"><i class="bi bi-geo-alt-fill me-1"></i> Estancia Planta Tetla</span>
+
+                                            <!-- Etiqueta por defecto solo si no hay etiquetas especiales -->
+                                            <span th:if="${#strings.equalsIgnoreCase(perm.tipoSolicitud, 'Recuperación de Falta') and !#strings.containsIgnoreCase(textoCheck, 'TXT') and !#strings.containsIgnoreCase(textoCheck, 'HO') and !#strings.containsIgnoreCase(textoCheck, 'PT') and !#strings.containsIgnoreCase(textoCheck, '[C]') and !#strings.containsIgnoreCase(textoCheck, '[P]') and !#strings.containsIgnoreCase(textoCheck, 'TET')}" class="badge bg-dark bg-opacity-10 text-dark border border-dark border-opacity-25 px-2.5 py-1.5 rounded text-uppercase fw-bold" style="font-size: 0.72rem;"><i class="bi bi-exclamation-diamond-fill me-1"></i> Falta Justificada / Supervisor</span>
 
                                             <h5 class="h6 fw-bold text-dark mt-2 mb-0" th:text="'Folio #' + ${perm.id} + ' | Fecha Incidencia: ' + ${#strings.substring(perm.fechaInicio,0,10)}">Folio #000</h5>
                                         </div>
 
-                                        <span class="badge rounded-pill px-3 py-1.5 fw-bold"
-                                              th:classappend="${#strings.equalsIgnoreCase(perm.estatus, 'Aprobado') or #strings.equalsIgnoreCase(perm.estatus, 'APROBADO')} ? 'bg-success text-white' : (${#strings.equalsIgnoreCase(perm.estatus, 'Rechazado') or #strings.equalsIgnoreCase(perm.estatus, 'RECHAZADO')} ? 'bg-danger text-white' : 'bg-warning text-dark')"
-                                              th:text="${perm.estatus}">Pendiente</span>
+                                        <!-- ✨ CONTENEDOR DERECHO CORREGIDO: Estatus + Botones (PERMISOS) -->
+                                        <div class="text-end">
+                                            <span class="badge rounded-pill px-3 py-1.5 fw-bold d-block mb-2 shadow-sm"
+                                                  th:classappend="${#strings.equalsIgnoreCase(perm.estatus, 'Aprobado') or #strings.equalsIgnoreCase(perm.estatus, 'APROBADO')} ? 'bg-success text-white' : (${#strings.equalsIgnoreCase(perm.estatus, 'Rechazado') or #strings.equalsIgnoreCase(perm.estatus, 'RECHAZADO')} ? 'bg-danger text-white' : 'bg-warning text-dark')">
+                                                <span th:if="${#strings.equalsIgnoreCase(perm.estatus, 'Rechazado') or #strings.equalsIgnoreCase(perm.estatus, 'RECHAZADO')}">👨‍💼 Rechazada</span>
+                                                <span th:unless="${#strings.equalsIgnoreCase(perm.estatus, 'Rechazado') or #strings.equalsIgnoreCase(perm.estatus, 'RECHAZADO')}" th:text="${perm.estatus}">Pendiente</span>
+                                            </span>
+
+                                            <div th:if="${#strings.containsIgnoreCase(perm.estatus, 'Pendiente')}" class="d-flex gap-2 justify-content-end">
+                                                <button type="button" class="btn btn-sm btn-outline-primary px-2 py-1 shadow-sm bg-white" style="font-size: 0.7rem; border-radius: 6px;" th:onclick="'abrirModalEditarPermiso(' + ${perm.id} + ')'">
+                                                    <i class="bi bi-pencil-square"></i> Editar
+                                                </button>
+                                                <button type="button" class="btn btn-sm btn-outline-danger px-2 py-1 shadow-sm bg-white" style="font-size: 0.7rem; border-radius: 6px;" th:onclick="'abrirModalCancelar(\'PERMISO\', ' + ${perm.id} + ')'">
+                                                    <i class="bi bi-trash3-fill"></i> Cancelar
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
 
                                     <div class="row g-2 text-secondary font-monospace mb-2" style="font-size: 0.8rem;">
-                                        <div class="col-sm-6"><i class="bi bi-hash me-1"></i><strong>Días Cobertura:</strong> <span class="fw-bold text-dark" th:text="${perm.diasTotalesCalculados} + ' día(s)'">1 día</span></div>
-                                        <div class="col-sm-6"><i class="bi bi-clock me-1"></i><strong>Cargada el:</strong> <span th:text="${#temporals.format(perm.fechaCreacion, 'dd/MM/yyyy HH:mm')}">N/A</span></div>
+                                        <div class="col-sm-4"><i class="bi bi-hash me-1"></i><strong>Cobertura:</strong> <span class="fw-bold text-dark" th:text="${perm.diasTotalesCalculados} + ' día(s)'">1 día</span></div>
+                                        <div class="col-sm-4"><i class="bi bi-clock-history me-1 text-info"></i><strong>Turno:</strong> <span class="fw-bold text-dark" th:text="${perm.turno}">N/A</span></div>
+                                        <div class="col-sm-4"><i class="bi bi-calendar-plus me-1"></i><strong>Cargada:</strong> <span th:text="${#temporals.format(perm.fechaCreacion, 'dd/MM/yyyy HH:mm')}">N/A</span></div>
+                                    </div>
+
+                                    <!-- ✨ INYECCIÓN DEL RECIBO TXT EN LA TARJETA -->
+                                    <div th:if="${#strings.containsIgnoreCase(perm.tipoSolicitud, 'TXT') and perm.detallePagos != null and !perm.detallePagos.isEmpty()}" class="bg-warning bg-opacity-10 border border-warning border-opacity-25 rounded p-2 mb-2">
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <span class="text-dark fw-bold" style="font-size: 0.75rem;"><i class="bi bi-wallet2 text-warning me-1"></i>Plan de Reposición (Fechas a Pagar)</span>
+                                            <span class="badge bg-secondary rounded-pill shadow-sm" style="font-size: 0.65rem;" th:text="${perm.esPorHoras != null and perm.esPorHoras} ? 'Parcial (' + ${perm.horasPermiso} + ' hrs)' : 'Día Completo'"></span>
+                                        </div>
+                                        <div class="d-flex flex-column gap-1 mt-1">
+                                            <span th:each="pago : ${perm.detallePagos}" class="text-dark fw-medium" style="font-size: 0.75rem;">
+                                                <i class="bi bi-check2-circle text-success me-1"></i><span th:text="${pago}"></span>
+                                            </span>
+                                        </div>
                                     </div>
 
                                     <div class="bg-light p-2 rounded border" style="font-size: 0.82rem; line-height: 1.4;">
@@ -284,6 +337,72 @@
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ✨ NUEVO PANEL DE CANCELADAS -->
+                    <div class="tab-pane fade" id="pills-canceladas" role="tabpanel" aria-labelledby="pills-canceladas-tab">
+                        <div class="custom-card p-3 bg-white shadow-sm border rounded-3">
+                            <h4 class="h6 fw-bold text-dark border-bottom pb-2 mb-3"><i class="bi bi-journal-x me-2 text-danger"></i> <span th:text="#{dash.colab.canceladas.titulo}">Registro de Cancelaciones</span></h4>
+
+                            <div class="text-center py-5 text-muted" th:if="${historialCanceladas == null or historialCanceladas.isEmpty()}">
+                                <i class="bi bi-folder-x fs-1 opacity-50"></i>
+                                <p class="mb-0 fw-medium mt-1" th:text="#{dash.colab.canceladas.vacio}">No tienes solicitudes canceladas registradas.</p>
+                            </div>
+
+                            <div class="table-responsive" th:if="${historialCanceladas != null and !historialCanceladas.isEmpty()}">
+                                <table class="table table-sm table-hover align-middle border" style="font-size: 0.8rem;">
+                                    <thead class="table-light text-muted">
+                                    <tr>
+                                        <th th:text="#{dash.colab.tabla.tipo}">Tipo de Solicitud</th>
+                                        <th th:text="#{dash.colab.tabla.fechas}">Fechas que se solicitaron</th>
+                                        <th><i class="bi bi-clock-history text-primary"></i> <span th:text="#{dash.colab.tabla.solicitada}">Solicitada el</span></th>
+                                        <th th:text="#{dash.colab.tabla.estatus}">Estatus</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr th:each="canc : ${historialCanceladas}">
+                                        <td class="fw-bold text-secondary">
+                                            <span th:if="${#strings.equalsIgnoreCase(canc.tipoSolicitud, 'V') or #strings.containsIgnoreCase(canc.tipoSolicitud, 'VACACION')}"><i class="bi bi-airplane-engines-fill text-success me-1"></i> Vacación</span>
+                                            <span th:if="${!#strings.equalsIgnoreCase(canc.tipoSolicitud, 'V') and !#strings.containsIgnoreCase(canc.tipoSolicitud, 'VACACION')}"><i class="bi bi-stopwatch-fill text-warning me-1"></i> Incidencia</span>
+                                        </td>
+
+                                        <!-- CIRUGÍA 1: Tratamos las fechas de inicio/fin como Texto Seguro -->
+                                        <td class="font-monospace">
+                                            <span th:text="${canc.fechaInicio != null ? #strings.substring(canc.fechaInicio,0,10) : 'N/A'}"></span>
+                                            <span th:if="${canc.fechaFin != null and canc.fechaFin != canc.fechaInicio}" th:text="' al ' + ${#strings.substring(canc.fechaFin,0,10)}"></span>
+                                        </td>
+
+                                        <!-- La fecha de creación SÍ es LocalDateTime en el DTO, así que #temporals sí funciona aquí -->
+                                        <td th:text="${canc.fechaCreacion != null ? #temporals.format(canc.fechaCreacion, 'dd/MM/yyyy HH:mm') : 'N/A'}"></td>
+
+                                        <!-- CIRUGÍA 2: Blindaje de texto leyendo solo variables seguras -->
+                                        <td th:with="textoAuditoria=${(canc.comentarioSupervisor ?: '') + ' ' + (canc.comentarioJefe ?: '')}">
+
+                                            <!-- 👤 Caso 1: Cancelada por el propio colaborador -->
+                                            <span th:if="${#strings.containsIgnoreCase(textoAuditoria, 'propio colaborador')}" class="badge bg-secondary text-white shadow-sm px-2 py-1">
+                                                👤 Cancelada por ti
+                                            </span>
+
+                                            <!-- 🪓 Caso 2: Guillotina Automática -->
+                                            <span th:if="${#strings.containsIgnoreCase(textoAuditoria, 'GUILLOTINA')}" class="badge text-white shadow-sm px-2 py-1" style="background-color: #8b0000;">
+                                                🪓 Por Sistema (Fuera de Tiempo)
+                                            </span>
+
+                                            <!-- 👨‍💼 Caso 3: Rechazo unificado a cancelado -->
+                                            <span th:if="${#strings.containsIgnoreCase(textoAuditoria, 'RECHAZADO')}" class="badge bg-danger text-white shadow-sm px-2 py-1">
+                                                👨‍💼 Rechazada
+                                            </span>
+
+                                            <!-- Fallback de seguridad -->
+                                            <span th:if="${!#strings.containsIgnoreCase(textoAuditoria, 'propio colaborador') and !#strings.containsIgnoreCase(textoAuditoria, 'GUILLOTINA') and !#strings.containsIgnoreCase(textoAuditoria, 'RECHAZADO')}" class="badge bg-danger shadow-sm px-2 py-1">
+                                                CANCELADA
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
@@ -355,28 +474,54 @@
                 </div>
                 <div>
                     <h5 class="modal-title fw-bold mb-0">¡Fase VIP Activada!</h5>
-                    <small class="text-white-50 small">Acceso exclusivo por días rezagados</small>
+                    <small class="text-white-50 small">Acceso exclusivo de Apertura</small>
                 </div>
             </div>
             <div class="modal-body p-4 bg-white text-center">
                 <p class="text-secondary mb-3" style="font-size: 0.92rem;">
-                    ¡Atención, operario! Debido a tu volumen de días acumulados de años anteriores, has ganado un lugar privilegiado en la fila operativa:
+                    ¡Atención, operario! Ha comenzado la Semana VIP de registro. Se te ha asignado un día específico para solicitar basado en tu saldo vacacional:
                 </p>
                 <div class="bg-light p-3 rounded-3 border mb-3 text-center shadow-sm">
-                    <span class="text-secondary small d-block mb-1 fw-bold font-monospace">TU LUGAR ACTUAL</span>
-                    <span class="fs-2 fw-bold text-success font-monospace" th:text="'#' + ${posicionRanking}">#1</span>
+                    <span class="text-secondary small d-block mb-1 fw-bold font-monospace">TU DÍA DE ACCESO VIP</span>
+                    <span class="fs-2 fw-bold text-success font-monospace text-uppercase" th:text="${diaVIPAsignado}">LUNES</span>
                 </div>
                 <div class="text-start p-3 bg-light rounded-3 border" style="font-size: 0.85rem;">
-                    <div class="mb-2 text-muted"><i class="bi bi-calendar-event-fill text-success me-2"></i><strong>Apertura de Registro VIP:</strong> <span class="text-dark fw-bold" th:text="${fechaAperturaRezago != null ? #temporals.format(fechaAperturaRezago, 'dd/MM/yyyy') : 'Activa'}">23/10/2026</span></div>
-                    <div class="text-muted"><i class="bi bi-unlock-fill text-primary me-2"></i><strong>Apertura General Planta:</strong> <span class="text-dark fw-bold" th:text="${fechaAperturaGeneral != null ? #temporals.format(fechaAperturaGeneral, 'dd/MM/yyyy') : '01/11/2026'}">01/11/2026</span></div>
+                    <div class="mb-2 text-muted"><i class="bi bi-calendar-event-fill text-success me-2"></i><strong>Semana de Apertura VIP:</strong> <span class="text-dark fw-bold" th:text="${fechaAperturaRezago != null ? #temporals.format(fechaAperturaRezago, 'dd/MM/yyyy') : 'Activa'}">23/10/2026</span></div>
+                    <div class="text-muted"><i class="bi bi-unlock-fill text-primary me-2"></i><strong>Apertura General (Repechaje):</strong> <span class="text-dark fw-bold" th:text="${fechaAperturaGeneral != null ? #temporals.format(fechaAperturaGeneral, 'dd/MM/yyyy') : '01/11/2026'}">01/11/2026</span></div>
                 </div>
                 <p class="mt-3 mb-0 text-muted small" style="line-height: 1.4;">
-                    Tu Supervisor del área configuró un cupo de <strong th:text="${topLimite}">10</strong> personas para esta ronda. Aprovecha esta ventana especial antes de que el candado expire y abra la barra libre de planta.
+                    Solo podrás ingresar solicitudes ordinarias durante tu día de acceso o a partir del Sábado de Repechaje.
                 </p>
             </div>
             <div class="modal-footer bg-light border-0 px-4 py-2.5">
-                <a href="/pantallas/solicitar-vacaciones" class="btn btn-sm btn-success rounded-3 fw-bold px-4 shadow-sm">Registrar Vacaciones</a>
+                <a href="/pantallas/solicitar-vacaciones" class="btn btn-sm btn-success rounded-3 fw-bold px-4 shadow-sm">Entrar al Calendario</a>
                 <button type="button" class="btn btn-sm btn-outline-secondary rounded-3 fw-bold px-3 border-0" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ✨ MODAL CANCELAR SOLICITUD TUNEADO PARA AJAX -->
+<div class="modal fade" id="modalCancelarSolicitud" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 400px;">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <div class="modal-header border-0 bg-danger text-white py-3">
+                <h5 class="modal-title fw-bold fs-6"><i class="bi bi-exclamation-triangle-fill me-2 text-warning"></i> Confirmar Cancelación</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4 bg-white text-center">
+                <p class="text-secondary fw-medium mb-1" style="font-size: 0.9rem;">
+                    ¿Estás seguro de cancelar esta solicitud?
+                </p>
+                <p class="text-muted small mb-4">
+                    Al confirmar, perderás este lugar en la fila. Deberás ingresar de nuevo una solicitud y consultar la disponibilidad de espacios en el calendario.
+                </p>
+
+                <input type="hidden" id="inputIdSolicitudCancelar">
+                <div class="d-grid gap-2">
+                    <button type="button" id="btnConfirmarCancelacion" onclick="procesarCancelacion()" class="btn btn-danger fw-bold shadow-sm">Sí, cancelar definitivamente</button>
+                    <button type="button" class="btn btn-light fw-bold text-secondary border" data-bs-dismiss="modal">Conservar mi solicitud</button>
+                </div>
             </div>
         </div>
     </div>
@@ -503,6 +648,166 @@
             }
         });
     }, 200); // 200ms para asegurar que el navegador asiente el DOM primero
+
+    // ==========================================
+    // 1. LÓGICA DE CANCELACIÓN (AHORA CON AJAX)
+    // ==========================================
+    let urlCancelacion = '';
+
+    function abrirModalCancelar(tipo, id) {
+        if (tipo === 'VACACION') {
+            urlCancelacion = '/pantallas/solicitudes/cancelar-vacacion-api';
+        } else {
+            urlCancelacion = '/pantallas/solicitudes/cancelar-permiso-api';
+        }
+        document.getElementById('inputIdSolicitudCancelar').value = id;
+        var myModal = new bootstrap.Modal(document.getElementById('modalCancelarSolicitud'));
+        myModal.show();
+    }
+
+    function procesarCancelacion() {
+        const id = document.getElementById('inputIdSolicitudCancelar').value;
+        const btn = document.getElementById('btnConfirmarCancelacion');
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span> Cancelando...`;
+        btn.disabled = true;
+
+        const formData = new URLSearchParams();
+        formData.append('idSolicitud', id);
+
+        fetch(urlCancelacion, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formData.toString()
+        })
+        .then(res => res.json().then(data => ({ status: res.status, body: data })))
+        .then(res => {
+            if(res.status !== 200) throw new Error(res.body.error || 'Error desconocido.');
+            location.reload();
+        })
+        .catch(error => {
+            alert("No se pudo cancelar: " + error.message);
+            btn.innerHTML = `Sí, cancelar definitivamente`;
+            btn.disabled = false;
+        });
+    }
+
+    // ==========================================
+    // 2. MAGIA DE EDICIÓN DE PERMISOS (AJAX)
+    // ==========================================
+    let filasTxtEdicion = [];
+
+    function abrirModalEditarPermiso(idPermiso) {
+        const modal = new bootstrap.Modal(document.getElementById('modalEditarPermiso'));
+        modal.show();
+
+        document.getElementById('loaderEdicion').classList.remove('d-none');
+        document.getElementById('formEdicionMaster').classList.add('d-none');
+        document.getElementById('alertaEdicionError').classList.add('d-none');
+
+        fetch(`/pantallas/solicitudes/api/permiso/${idPermiso}`)
+            .then(response => response.json())
+            .then(data => {
+                if(data.error) throw new Error(data.error);
+
+                document.getElementById('editPermisoId').value = data.id;
+                document.getElementById('editTipoConcepto').value = data.codigoPermiso;
+                document.getElementById('editFechaIncidencia').value = data.fechaIncidencia;
+                document.getElementById('editJustificacion').value = data.justificacion;
+
+                if(data.codigoPermiso === 'TXT') {
+                    document.getElementById('editTurnoTxt').value = data.turno;
+                    document.getElementById('editModalidadTxt').value = data.esPorHoras ? 'true' : 'false';
+                    document.getElementById('editHorasTxt').value = data.horasPermiso;
+                    document.getElementById('editHorasTxt').disabled = !data.esPorHoras;
+
+                    filasTxtEdicion = data.desglosesPago || [];
+                } else {
+                    filasTxtEdicion = [];
+                }
+
+                toggleEdicionTXT();
+                renderTablaEdicionTxt();
+
+                document.getElementById('loaderEdicion').classList.add('d-none');
+                document.getElementById('formEdicionMaster').classList.remove('d-none');
+            })
+            .catch(error => {
+                document.getElementById('loaderEdicion').classList.add('d-none');
+                document.getElementById('alertaEdicionError').classList.remove('d-none');
+                document.getElementById('alertaEdicionError').innerText = "Error al cargar: " + error.message;
+            });
+    }
+
+    function toggleEdicionTXT() {
+        const isTxt = document.getElementById('editTipoConcepto').value === 'TXT';
+        document.getElementById('boxEdicionTxtRows').classList.toggle('d-none', !isTxt);
+    }
+
+    function agregarFilaEdicionTxt() {
+        filasTxtEdicion.push({ fecha: '', horas: 0 });
+        renderTablaEdicionTxt();
+    }
+
+    function removerFilaEdicionTxt(index) {
+        filasTxtEdicion.splice(index, 1);
+        renderTablaEdicionTxt();
+    }
+
+    function renderTablaEdicionTxt() {
+        const tbody = document.getElementById('tbodyEdicionTxt');
+        tbody.innerHTML = '';
+        filasTxtEdicion.forEach((fila, index) => {
+            tbody.innerHTML += `
+                <tr>
+                    <td><input type="date" class="form-control form-control-sm" value="${fila.fecha}" onchange="filasTxtEdicion[${index}].fecha = this.value"></td>
+                    <td style="width: 100px;"><input type="number" class="form-control form-control-sm" value="${fila.horas}" step="0.5" onchange="filasTxtEdicion[${index}].horas = parseFloat(this.value) || 0"></td>
+                    <td style="width: 40px;" class="text-center"><button type="button" class="btn btn-sm btn-danger px-2" onclick="removerFilaEdicionTxt(${index})"><i class="bi bi-trash"></i></button></td>
+                </tr>
+            `;
+        });
+    }
+
+    function enviarEdicionPermiso() {
+        const id = document.getElementById('editPermisoId').value;
+        const btn = document.querySelector('#formEdicionMaster .btn-primary');
+        const alertBox = document.getElementById('alertaEdicionError');
+
+        btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span> Guardando...`;
+        btn.disabled = true;
+        alertBox.classList.add('d-none');
+
+        // ✨ EL ESCUDO CONTRA EL ERROR 400: Filtramos las fechas vacías y parseamos los números
+        const payload = {
+            idSolicitud: parseInt(id),
+            empleadoNomina: document.getElementById('nominaEmpleado') ? parseInt(document.getElementById('nominaEmpleado').value) : 10040,
+            codigoPermiso: document.getElementById('editTipoConcepto').value,
+            fechaIncidencia: document.getElementById('editFechaIncidencia').value,
+            justificacionSupervisor: document.getElementById('editJustificacion').value,
+            nombreTurno: document.getElementById('editTipoConcepto').value === 'TXT' ? document.getElementById('editTurnoTxt').value : null,
+            esPorHoras: document.getElementById('editModalidadTxt').value === 'true',
+            horasPermiso: parseFloat(document.getElementById('editHorasTxt').value) || 0.0,
+            desglosesPago: filasTxtEdicion
+                .filter(f => f.fecha && f.fecha.trim() !== '') // Matamos filas en blanco
+                .map(f => ({ fechaPago: f.fecha, horasPago: parseFloat(f.horas) || 0.0 }))
+        };
+
+        fetch(`/pantallas/solicitudes/editar-permiso-api/${id}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(res => res.json().then(data => ({ status: res.status, body: data })))
+        .then(res => {
+            if(res.status !== 200) throw new Error(res.body.error || 'Error desconocido en el servidor.');
+            location.reload();
+        })
+        .catch(error => {
+            alertBox.classList.remove('d-none');
+            alertBox.innerText = error.message;
+            btn.innerHTML = `<i class="bi bi-cloud-upload me-1"></i> Guardar Cambios Definitivos`;
+            btn.disabled = false;
+        });
+    }
 </script>
 </body>
 </html>

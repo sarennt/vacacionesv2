@@ -41,6 +41,9 @@ public class VacacionesService {
     private final AduanaService aduanaService;
     private final CalendarioService calendarioService;
     private final GrupoProcesoRepository grupoProcesoRepository;
+    private final CentroCostoRepository centroCostoRepository;
+    private final PeriodoInhabilRepository periodoInhabilRepository;
+    private final BoletoVipRepository boletoVipRepository;
 
     @Autowired
     public VacacionesService(
@@ -58,7 +61,10 @@ public class VacacionesService {
             DiasFestivosRepository diasFestivosRepository,
             AduanaService aduanaService,
             CalendarioService calendarioService,
-            GrupoProcesoRepository grupoProcesoRepository) { // <-- Aquí sí va el paréntesis de cierre
+            CentroCostoRepository centroCostoRepository,
+            PeriodoInhabilRepository periodoInhabilRepository,
+            GrupoProcesoRepository grupoProcesoRepository,
+            BoletoVipRepository boletoVipRepository) {
 
         this.empleadoRepository = empleadoRepository;
         this.solicitudVacacionesRepository = solicitudVacacionesRepository;
@@ -75,6 +81,9 @@ public class VacacionesService {
         this.aduanaService = aduanaService;
         this.calendarioService = calendarioService;
         this.grupoProcesoRepository = grupoProcesoRepository;
+        this.centroCostoRepository = centroCostoRepository;
+        this.periodoInhabilRepository = periodoInhabilRepository;
+        this.boletoVipRepository = boletoVipRepository;
     }
 
     private String obtenerDiaSemanaEspNormalizado(LocalDate fecha) {
@@ -170,6 +179,7 @@ public class VacacionesService {
                 boolean yaTieneRegistro = solicitudVacacionesRepository.findAll().stream()
                         .anyMatch(s -> s.getEmpleado().getNomina().equals(nominaEmpleadoAfectado)
                                 && !"Rechazado".equalsIgnoreCase(s.getEstatus())
+                                && !"CANCELADO".equalsIgnoreCase(s.getEstatus()) // ✨ Ignoramos las canceladas
                                 && !fechaEspecifica.isBefore(s.getFechaInicio())
                                 && !fechaEspecifica.isAfter(s.getFechaFin()));
 
@@ -229,6 +239,7 @@ public class VacacionesService {
         boolean yaTieneRegistro = solicitudVacacionesRepository.findAll().stream()
                 .anyMatch(s -> s.getEmpleado().getNomina().equals(nominaEmpleado)
                         && !"Rechazado".equalsIgnoreCase(s.getEstatus())
+                        && !"CANCELADO".equalsIgnoreCase(s.getEstatus()) // ✨ Ignoramos las canceladas
                         && !fechaFalta.isBefore(s.getFechaInicio())
                         && !fechaFalta.isAfter(s.getFechaFin()));
 
@@ -278,10 +289,12 @@ public class VacacionesService {
     }
 
     public List<SolicitudVacaciones> obtenerPendientesDeNomina() {
+        // ✨ RESTAURADO: Solo pendientes reales, nada de históricos
         return solicitudVacacionesRepository.findByEstatusIn(List.of("Pendiente_Nomina"));
     }
 
     public List<SolicitudVacaciones> obtenerHistorialRecuperacionesGlobal() {
+        // ✨ RESTAURADO: Vuelve a jalar Aprobado y Rechazado
         return solicitudVacacionesRepository.findAll().stream()
                 .filter(s -> "Recuperación de Falta".equalsIgnoreCase(s.getTipoSolicitud()))
                 .filter(s -> List.of("Aprobado", "Rechazado").contains(s.getEstatus()))
@@ -381,6 +394,17 @@ public class VacacionesService {
             int anioSol = request.fechaInicio().getYear();
             Integer supervisorNomina = empleado.getWorkCenter().getSupervisorNomina();
 
+            // ✨ NUEVO ESCUDO: BLACKOUT DATES (Periodos Inhábiles)
+            List<PeriodoInhabil> bloqueos = periodoInhabilRepository.findBySupervisorNominaOrderByFechaInicioDesc(supervisorNomina);
+            for (PeriodoInhabil bloqueo : bloqueos) {
+                // Lógica de intersección de fechas:
+                // (InicioSolicitud <= FinBloqueo) Y (FinSolicitud >= InicioBloqueo)
+                if (!request.fechaInicio().isAfter(bloqueo.getFechaFin()) && !request.fechaFin().isBefore(bloqueo.getFechaInicio())) {
+                    throw new RuntimeException("🛑 ¡Fechas Bloqueadas! No puedes pedir vacaciones en estos días porque tu área completa estará en: '"
+                            + bloqueo.getMotivo() + "' (Del " + bloqueo.getFechaInicio() + " al " + bloqueo.getFechaFin() + ").");
+                }
+            }
+
             // ✨ 1. CERO MOCKS - LECTURA DIRECTA DE LA BOLSA GLOBAL DEL SUPERVISOR
             CapacidadVacacionesMes configLinea = capacidadRepo
                     .findBySupervisorNominaAndMesAndAnioAndTurno_Id(supervisorNomina, mesSol, anioSol, turnoAsignado.getId())
@@ -389,14 +413,22 @@ public class VacacionesService {
             LocalDate hoy = LocalDate.now();
             boolean esSemanaVip = calendarioService.esSemanaAperturaVip(hoy);
 
-            // 1. Obtenemos el saldo y el ranking en vivo
+            // 1. Obtenemos el saldo en vivo
             BigDecimal saldoDevengadoReal = empleado.getSaldoVacacionesActual() != null ? empleado.getSaldoVacacionesActual() : BigDecimal.ZERO;
-            int posicionRanking = empleadoRepository.obtenerPosicionRankingSupervisorVivo(supervisorNomina, saldoDevengadoReal, empleado.getNomina());
 
-            // 2. Matemáticas de Quintil: Agrupamos a la gente según su ranking para repartirlos en los 5 días (1-10=Lunes, 11-20=Martes, etc.)
-            // El offset máximo es 4 (Viernes)
-            int offsetDia = Math.min(((posicionRanking - 1) / 10), 4);
-            java.time.DayOfWeek diaQuintil = java.time.DayOfWeek.MONDAY.plus(offsetDia);
+            // 2. Leemos el Boleto VIP congelado de la base de datos
+            java.util.Optional<BoletoVip> miBoleto = boletoVipRepository.findByNominaEmpleadoAndMesAndAnio(empleado.getNomina(), mesSol, anioSol);
+            java.time.DayOfWeek diaQuintil = null;
+
+            if (miBoleto.isPresent()) {
+                switch(miBoleto.get().getDiaAsignado()) {
+                    case "LUNES": diaQuintil = java.time.DayOfWeek.MONDAY; break;
+                    case "MARTES": diaQuintil = java.time.DayOfWeek.TUESDAY; break;
+                    case "MIÉRCOLES": diaQuintil = java.time.DayOfWeek.WEDNESDAY; break;
+                    case "JUEVES": diaQuintil = java.time.DayOfWeek.THURSDAY; break;
+                    case "VIERNES": diaQuintil = java.time.DayOfWeek.FRIDAY; break;
+                }
+            }
 
             // 3. La Aduana dicta sentencia final
             boolean accesoPermitido = aduanaService.puedeSolicitarVacaciones(
@@ -427,50 +459,82 @@ public class VacacionesService {
             List<Integer> wcsDelArea = lineasArea.stream().map(WorkCenter::getId).collect(Collectors.toList());
             if (wcsDelArea.isEmpty()) wcsDelArea.add(empleado.getWorkCenter().getId());
 
-            // --- INICIO DE LA NUEVA ADUANA: DOBLE CANDADO SIMPLIFICADO ---
+            // ✨ BUSCAMOS LA BOLSA HÍBRIDA DEL OPERADOR ANTES DE EVALUAR (OPTIMIZACIÓN DE MEMORIA)
+            GrupoProceso grupoAfectado = null;
+            List<GrupoProceso> gruposDelJefe = obtenerGruposProcesoPorJefe(supervisorNomina);
+
+            for (GrupoProceso g : gruposDelJefe) {
+                if ("CC".equalsIgnoreCase(g.getTipoAgrupacion()) && empleado.getCentroCosto() != null) {
+                    if (g.getCentrosCosto().stream().anyMatch(cc -> cc.getId().equals(empleado.getCentroCosto().getId()))) {
+                        grupoAfectado = g; break;
+                    }
+                } else if ("WC".equalsIgnoreCase(g.getTipoAgrupacion()) && empleado.getWorkCenter() != null) {
+                    if (g.getWorkCenters().stream().anyMatch(wc -> wc.getId().equals(empleado.getWorkCenter().getId()))) {
+                        grupoAfectado = g; break;
+                    }
+                }
+            }
+
+            // --- INICIO DE LA NUEVA ADUANA HÍBRIDA ---
             LocalDate diaCursor = request.fechaInicio();
             while (!diaCursor.isAfter(request.fechaFin())) {
+                final LocalDate fechaEvaluada = diaCursor;
 
-                // 🔒 CANDADO 1: La Regla de Oro (No empalmar el mismo WC y Turno)
-                // CERO MOCKS: Vamos a la base de datos a contar cuántos hay exactos en ese WC, turno y día.
-                long ocupadosMismoWcTurno = solicitudVacacionesRepository.contarOcupadosPorLineaYTurno(
-                        empleado.getWorkCenter().getId(), turnoAsignado.getId(), diaCursor
-                );
+                if (grupoAfectado != null && "WC".equalsIgnoreCase(grupoAfectado.getTipoAgrupacion())) {
+                    // 🛡️ MODO WC: EL GRUPO MACRO DICTA LAS REGLAS DE TURNO Y DÍA PARA ESTAS LÍNEAS
+                    List<Integer> wcIdsDelGrupo = grupoAfectado.getWorkCenters().stream().map(WorkCenter::getId).collect(Collectors.toList());
 
-                if (ocupadosMismoWcTurno >= 1) {
-                    throw new RuntimeException("🚨 Choque de Turno: Ya hay una persona autorizada de tu misma línea (WC "
-                            + empleado.getWorkCenter().getId() + ") en el turno '"
-                            + turnoAsignado.getNombreTurno() + "' para el día " + diaCursor
-                            + ". El sistema solo permite 1 operador por turno.");
-                }
+                    // Filtramos en caliente las vacaciones vivas de este bloque
+                    List<SolicitudVacaciones> vivasDelGrupo = solicitudVacacionesRepository.findAll().stream()
+                            .filter(s -> !List.of("RECHAZADO", "CANCELADO").contains(s.getEstatus().toUpperCase()))
+                            .filter(s -> s.getTipoSolicitud() != null && (s.getTipoSolicitud().toUpperCase().contains("VACACION") || s.getTipoSolicitud().trim().equalsIgnoreCase("V")))
+                            .filter(s -> s.getEmpleado().getWorkCenter() != null && wcIdsDelGrupo.contains(s.getEmpleado().getWorkCenter().getId()))
+                            .filter(s -> !fechaEvaluada.isBefore(s.getFechaInicio()) && !fechaEvaluada.isAfter(s.getFechaFin()))
+                            .collect(Collectors.toList());
 
-                // 🔒 CANDADO 2: La Bolsa del Jefe (Cupo del Grupo de Procesos)
-                // Si pasó la regla del turno, verificamos que su grupo tenga lugares libres en la bolsa.
-                if (empleado.getCentroCosto() != null) {
-                    // 💡 Variable efectivamente final para el Lambda
-                    final LocalDate fechaEvaluada = diaCursor;
+                    long ocupadosEnElDia = vivasDelGrupo.size();
+                    if (ocupadosEnElDia >= grupoAfectado.getCupoMaximo()) {
+                        throw new RuntimeException("🛑 Bolsa Agotada: El límite máximo de " + grupoAfectado.getCupoMaximo()
+                                + " lugares para tu grupo ('" + grupoAfectado.getNombre() + "') ha sido alcanzado para el día " + fechaEvaluada + ".");
+                    }
 
-                    grupoProcesoRepository.findByCentrosCosto_Id(empleado.getCentroCosto().getId())
-                            .ifPresent(grupo -> {
-                                // Extraemos todos los IDs de los Centros de Costo de esta bolsa
-                                List<Integer> ccIdsDelGrupo = grupo.getCentrosCosto().stream()
-                                        .map(CentroCosto::getId)
-                                        .collect(Collectors.toList());
+                    long ocupadosEnElTurno = vivasDelGrupo.stream()
+                            .filter(s -> s.getTurno() != null && s.getTurno().getId().equals(turnoAsignado.getId()))
+                            .count();
 
-                                // Contamos cuántos se van de vacaciones de todo este bloque
-                                long ocupadosEnElMacroGrupo = solicitudVacacionesRepository.countVacacionesPorGrupoYFecha(ccIdsDelGrupo, fechaEvaluada);
+                    if (ocupadosEnElTurno >= grupoAfectado.getCupoMaximoTurno()) {
+                        throw new RuntimeException("🚨 Capacidad de Turno Agotada: Ya se alcanzó el máximo de " + grupoAfectado.getCupoMaximoTurno()
+                                + " persona(s) por turno en el grupo '" + grupoAfectado.getNombre() + "' para el día " + fechaEvaluada + ".");
+                    }
 
-                                if (ocupadosEnElMacroGrupo >= grupo.getCupoMaximo()) {
-                                    throw new RuntimeException("🛑 Bolsa Agotada: El límite máximo de " + grupo.getCupoMaximo()
-                                            + " lugares para tu grupo ('" + grupo.getNombre()
-                                            + "') ha sido alcanzado para el día " + fechaEvaluada + ". Intenta con otra fecha.");
-                                }
-                            });
+                } else {
+                    // 🛡️ MODO CC (O SIN GRUPO): REGLA INDIVIDUAL DE LÍNEA + BOLSA CC
+                    long ocupadosMismoWcTurno = solicitudVacacionesRepository.contarOcupadosPorLineaYTurno(
+                            empleado.getWorkCenter().getId(), turnoAsignado.getId(), diaCursor
+                    );
+                    int cupoMaximoWc = (empleado.getWorkCenter().getCupoConcurrenteTurno() != null && empleado.getWorkCenter().getCupoConcurrenteTurno() > 0)
+                            ? empleado.getWorkCenter().getCupoConcurrenteTurno() : 1;
+
+                    if (ocupadosMismoWcTurno >= cupoMaximoWc) {
+                        throw new RuntimeException("🚨 Capacidad de Línea Agotada: Ya se alcanzó el cupo máximo de " + cupoMaximoWc
+                                + " persona(s) autorizada(s) para tu línea (WC " + empleado.getWorkCenter().getId() + ") en el turno '"
+                                + turnoAsignado.getNombreTurno() + "' para el día " + diaCursor + ".");
+                    }
+
+                    if (grupoAfectado != null && "CC".equalsIgnoreCase(grupoAfectado.getTipoAgrupacion())) {
+                        List<Integer> ccIdsDelGrupo = grupoAfectado.getCentrosCosto().stream().map(CentroCosto::getId).collect(Collectors.toList());
+                        long ocupadosEnElMacroGrupo = solicitudVacacionesRepository.countVacacionesPorGrupoYFecha(ccIdsDelGrupo, fechaEvaluada);
+
+                        if (ocupadosEnElMacroGrupo >= grupoAfectado.getCupoMaximo()) {
+                            throw new RuntimeException("🛑 Bolsa Agotada: El límite máximo de " + grupoAfectado.getCupoMaximo()
+                                    + " lugares para tu grupo ('" + grupoAfectado.getNombre() + "') ha sido alcanzado para el día " + fechaEvaluada + ".");
+                        }
+                    }
                 }
 
                 diaCursor = diaCursor.plusDays(1);
             }
-            // --- FIN DE LA NUEVA ADUANA ---
+            // --- FIN DE LA NUEVA ADUANA HÍBRIDA ---
         }
 
         boolean esExtemporanea = determinarSiEsExtemporanea(empleado, request.fechaInicio());
@@ -602,7 +666,11 @@ public class VacacionesService {
                             s.getTipoSolicitud(),
                             s.getComentarioSupervisor(),
                             s.getComentarioExcepcion(),
-                            s.getGrupoFolio()
+                            s.getGrupoFolio(),
+                            s.getTurno() != null ? s.getTurno().getNombreTurno() : "N/A",
+                            false,
+                            java.math.BigDecimal.ZERO,
+                            new java.util.ArrayList<String>()
                     );
                 })
                 .toList();
@@ -1066,9 +1134,7 @@ public class VacacionesService {
     }
 
     @Transactional
-    public void guardarConfiguracionArea(Integer nominaJefe, List<Integer> workCenterIds, Integer mes, Integer anio,
-                                         Integer maxPersonalGlobal, String fechaLimiteStr,
-                                         Integer diasMinimosRezago, List<Integer> turnoIds, List<Integer> cuposPorTurno) {
+    public void guardarConfiguracionArea(Integer nominaJefe, Integer mes, Integer anio, String fechaLimiteStr) {
 
         LocalDate hoy = LocalDate.now();
         LocalDate inicioMesConfig = LocalDate.of(anio, mes, 1);
@@ -1078,71 +1144,98 @@ public class VacacionesService {
             throw new IllegalArgumentException("El periodo seleccionado corresponde a un mes ya cerrado en el sistema contable.");
         }
 
-        if (turnoIds == null || cuposPorTurno == null || turnoIds.size() != cuposPorTurno.size()) {
-            throw new IllegalArgumentException("Error en la matriz de turnos: Los datos de distribución llegaron corruptos.");
-        }
-
         LocalDate fechaLimiteRegistro = LocalDate.parse(fechaLimiteStr);
-        LocalDate fechaAperturaRezago = inicioMesConfig.minusMonths(1).withDayOfMonth(23);
-        LocalDate fechaAperturaGeneral = inicioMesConfig;
 
-        // 🌟 Iteramos por Turno para grabar la Bitácora LIMPIA y la Bolsa Global
-        for (int i = 0; i < turnoIds.size(); i++) {
-            Integer turnoId = turnoIds.get(i);
-            Integer cupoEspecificoTurno = cuposPorTurno.get(i);
-            Turno turno = turnoRepository.findById(turnoId)
-                    .orElseThrow(() -> new IllegalArgumentException("El turno especificado no existe."));
+        // ✨ AQUÍ CONECTAMOS LA MÁQUINA MATEMÁTICA PARA FECHAS VIP
+        java.util.Map<String, LocalDate> semanaVip = calcularSemanaVIP(mes, anio);
+        LocalDate fechaAperturaRezago = semanaVip.get("inicio"); // Empieza el Lunes de la semana VIP
+        LocalDate fechaAperturaGeneral = semanaVip.get("fin").plusDays(1); // El repechaje general abre en Sábado
 
-            // ✨ 1. EL ANCLA GLOBAL: Creamos 1 SOLO registro por Turno para representar la "Bolsa del Supervisor"
+        // ✨ 1. ANCLA GLOBAL: Traemos todos los turnos activos para inyectarles las fechas
+        List<Turno> todosLosTurnos = turnoRepository.findByActivoTrue();
+
+        for (Turno turno : todosLosTurnos) {
             CapacidadVacacionesMes config = capacidadRepo
-                    .findBySupervisorNominaAndMesAndAnioAndTurno_Id(nominaJefe, mes, anio, turnoId)
+                    .findBySupervisorNominaAndMesAndAnioAndTurno_Id(nominaJefe, mes, anio, turno.getId())
                     .orElse(new CapacidadVacacionesMes());
 
             config.setSupervisorNomina(nominaJefe);
             config.setTurno(turno);
             config.setMes(mes);
             config.setAnio(anio);
-            config.setMaxEmpleadosPorDia(cupoEspecificoTurno);
+            // El cupo aquí ya no importa, la aduana la hace el Grupo de Proceso. Le ponemos 999.
+            config.setMaxEmpleadosPorDia(999);
             config.setFechaLimiteRegistro(fechaLimiteRegistro);
             config.setFechaAperturaRezago(fechaAperturaRezago);
             config.setFechaAperturaGeneral(fechaAperturaGeneral);
-            config.setDiasMinimosRezago(diasMinimosRezago);
+            config.setDiasMinimosRezago(10); // Valor legacy por seguridad
             config.setUltimaModificacionPor(nominaJefe);
             config.setFechaUltimaModificacion(LocalDateTime.now());
 
             capacidadRepo.save(config);
-
-            // 2. EL TRUCO PARA LA BITÁCORA: 1 Solo registro por Turno
-            String accionTurno = "CONF_" + turno.getNombreTurno().substring(0, Math.min(turno.getNombreTurno().length(), 10));
-            HistoricoConfiguracionArea log = HistoricoConfiguracionArea.builder()
-                    .workCenterId(0) // 0 significa "Aplica para toda mi área"
-                    .mes(mes)
-                    .anio(anio)
-                    .maxEmpleadosPorDia(cupoEspecificoTurno)
-                    .fechaLimiteRegistro(fechaLimiteRegistro)
-                    .fechaAperturaRezago(fechaAperturaRezago)
-                    .fechaAperturaGeneral(fechaAperturaGeneral)
-                    .diasMinimosRezago(diasMinimosRezago)
-                    .accion(accionTurno)
-                    .realizadoPorNomina(nominaJefe)
-                    .fechaRegistro(LocalDateTime.now())
-                    .build();
-
-            historicoRepo.save(log);
         }
+
+        // ✨ 2. TOMAMOS LA "FOTO" DE LOS GRUPOS ACTUALES
+        List<GrupoProceso> gruposActivos = obtenerGruposProcesoPorJefe(nominaJefe);
+        String resumenGrupos = gruposActivos.isEmpty() ? "Sin grupos configurados" :
+                gruposActivos.stream()
+                        .map(g -> g.getNombre() + " (Cupo: " + g.getCupoMaximo() + ")")
+                        .collect(Collectors.joining(" | "));
+
+        // ✨ 3. TOMAMOS LA "FOTO" DE LOS BLOQUEOS QUE CAEN EN ESTE MES
+        List<PeriodoInhabil> bloqueos = periodoInhabilRepository.findBySupervisorNominaOrderByFechaInicioDesc(nominaJefe);
+        String resumenBloqueos = bloqueos.stream()
+                .filter(b -> b.getFechaInicio().getMonthValue() == mes || b.getFechaFin().getMonthValue() == mes)
+                .map(b -> b.getMotivo() + " (" + b.getFechaInicio().getDayOfMonth() + " al " + b.getFechaFin().getDayOfMonth() + ")")
+                .collect(Collectors.joining(" | "));
+
+        if (resumenBloqueos.isEmpty()) {
+            resumenBloqueos = "Sin bloqueos para este mes";
+        }
+
+        // ✨ VALIDACIÓN FORENSE: ¿Está sobreescribiendo en zona de riesgo (Sábado de congelamiento o después)?
+        LocalDate sabadoPrevio = fechaAperturaRezago.minusDays(2);
+        String etiquetaAccion = "APERTURA_PERIODO";
+        if (!hoy.isBefore(sabadoPrevio)) {
+            etiquetaAccion = "SOBREESCRITO_EN_SEMANA_VIP";
+            System.out.println("⚠️ ALERTA: Supervisor #" + nominaJefe + " forzó la sobreescritura del periodo " + mes + "/" + anio + " en zona de riesgo.");
+        }
+
+        // ✨ 4. GUARDAMOS LA BITÁCORA V2.0 (Snapshot Contable)
+        HistoricoConfiguracionArea log = HistoricoConfiguracionArea.builder()
+                .mes(mes)
+                .anio(anio)
+                .fechaLimiteRegistro(fechaLimiteRegistro)
+                .fechaAperturaRezago(fechaAperturaRezago)
+                .fechaAperturaGeneral(fechaAperturaGeneral)
+                .resumenGrupos(resumenGrupos)
+                .resumenBloqueos(resumenBloqueos)
+                .accion(etiquetaAccion)
+                .realizadoPorNomina(nominaJefe)
+                .fechaRegistro(LocalDateTime.now())
+                .build();
+
+        historicoRepo.save(log);
+
+        // ✨ CONGELAMOS LOS BOLETOS VIP EN ESTE EXACTO SEGUNDO
+        boletoVipRepository.deleteBySupervisorNominaAndMesAndAnio(nominaJefe, mes, anio);
+        java.util.Map<String, java.util.Map<String, List<Empleado>>> quintiles = obtenerDistribucionQuintiles(nominaJefe);
+        List<BoletoVip> nuevosBoletos = new ArrayList<>();
+
+        for (java.util.Map<String, List<Empleado>> diasMap : quintiles.values()) {
+            for (java.util.Map.Entry<String, List<Empleado>> entry : diasMap.entrySet()) {
+                String dia = entry.getKey();
+                for (Empleado emp : entry.getValue()) {
+                    nuevosBoletos.add(new BoletoVip(emp.getNomina(), nominaJefe, mes, anio, dia));
+                }
+            }
+        }
+        boletoVipRepository.saveAll(nuevosBoletos);
     }
 
-    public List<HistoricoConfiguracionArea> obtenerHistoricoConfiguracion(List<Integer> workCenterIds) {
-        // ✨ 1. Clonamos la lista de líneas del jefe para no alterar la original en memoria
-        List<Integer> idsABuscar = new java.util.ArrayList<>(workCenterIds);
-
-        // ✨ 2. EL TRUCO: Le inyectamos el "0" para que también pesque la nueva Bolsa Global
-        if (!idsABuscar.contains(0)) {
-            idsABuscar.add(0);
-        }
-
-        // ✨ 3. Ejecutamos la búsqueda. ¡Ahora traerá lo viejo (por línea) y lo nuevo (global)!
-        return historicoRepo.findByWorkCenterIdInOrderByFechaRegistroDesc(idsABuscar);
+    public List<HistoricoConfiguracionArea> obtenerHistoricoConfiguracion(Integer nominaJefe) {
+        // ✨ Consulta directa V2 por supervisor
+        return historicoRepo.findByRealizadoPorNominaOrderByFechaRegistroDesc(nominaJefe);
     }
 
     public List<WorkCenter> obtenerWorkCentersPorJefe(Integer nominaJefe) {
@@ -1228,6 +1321,113 @@ public class VacacionesService {
         }
     }
 
+    @Scheduled(cron = "0 0 8,14,20 * * ?") // 🤖 Se ejecuta TODOS LOS DÍAS a las 8am, 2pm y 8pm
+    @Transactional
+    public void cronRenovacionAutomaticaReglas() {
+        LocalDate hoy = LocalDate.now();
+
+        // 1. Descubrimos el "Mes Objetivo". Sumar 15 días garantiza proyectar el mes correcto sin importar si es 28 o 31.
+        LocalDate mesObjetivoDate = hoy.plusDays(15);
+        int mesProx = mesObjetivoDate.getMonthValue();
+        int anioProx = mesObjetivoDate.getYear();
+
+        // 2. Calculamos cuándo es realmente la semana VIP de ese mes
+        java.util.Map<String, LocalDate> semanaVip = calcularSemanaVIP(mesProx, anioProx);
+        LocalDate fechaAperturaRezago = semanaVip.get("inicio");
+
+        // 3. ✨ EL DOBLE CHECK AUTOMÁTICO (Resiliencia contra apagones)
+        // La "Zona de Riesgo" empieza el sábado previo al lunes VIP.
+        LocalDate sabadoPrevio = fechaAperturaRezago.minusDays(2);
+
+        // Si aún no entramos en la zona de congelamiento, el robot se vuelve a dormir
+        if (hoy.isBefore(sabadoPrevio)) {
+            return;
+        }
+
+        // ---------------------------------------------------------
+        // 🚨 SI LLEGAMOS AQUÍ: ESTAMOS EN ZONA DE CONGELAMIENTO O VIP
+        // ---------------------------------------------------------
+
+        int mesActual = hoy.getMonthValue();
+        int anioActual = hoy.getYear();
+
+        // 4. Buscamos a los supervisores que tuvieron actividad en el mes actual (o el que está terminando)
+        List<Integer> supervisoresActivos = capacidadRepo.findAll().stream()
+                .filter(c -> c.getMes() == mesActual && c.getAnio() == anioActual)
+                .map(CapacidadVacacionesMes::getSupervisorNomina)
+                .distinct()
+                .collect(Collectors.toList());
+
+        LocalDate fechaAperturaGeneral = semanaVip.get("fin").plusDays(1);
+        LocalDate ultimoDiaProxMes = LocalDate.of(anioProx, mesProx, 1).with(java.time.temporal.TemporalAdjusters.lastDayOfMonth());
+
+        for (Integer nominaJefe : supervisoresActivos) {
+            // 5. Verificamos si este jefe ya configuró. Este es el seguro anti-duplicados para las corridas diarias.
+            boolean yaConfigurado = capacidadRepo.findAll().stream()
+                    .anyMatch(c -> c.getSupervisorNomina().equals(nominaJefe) && c.getMes() == mesProx && c.getAnio() == anioProx);
+
+            if (!yaConfigurado) {
+                // 6. El Jefe olvidó abrir el mes (o hubo un apagón el sábado). El sistema lo clona.
+                List<Turno> todosLosTurnos = turnoRepository.findByActivoTrue();
+
+                for (Turno turno : todosLosTurnos) {
+                    CapacidadVacacionesMes configAuto = new CapacidadVacacionesMes();
+                    configAuto.setSupervisorNomina(nominaJefe);
+                    configAuto.setTurno(turno);
+                    configAuto.setMes(mesProx);
+                    configAuto.setAnio(anioProx);
+                    configAuto.setMaxEmpleadosPorDia(999); // La aduana la hace el Grupo de Proceso
+                    configAuto.setFechaLimiteRegistro(ultimoDiaProxMes);
+                    configAuto.setFechaAperturaRezago(fechaAperturaRezago);
+                    configAuto.setFechaAperturaGeneral(fechaAperturaGeneral);
+                    configAuto.setDiasMinimosRezago(10);
+                    configAuto.setUltimaModificacionPor(1555); // 1555 = Firma de SISTEMA
+                    configAuto.setFechaUltimaModificacion(LocalDateTime.now());
+
+                    capacidadRepo.save(configAuto);
+                }
+
+                // 7. Tomamos la "Foto" de los grupos para la Auditoría
+                List<GrupoProceso> gruposActivos = obtenerGruposProcesoPorJefe(nominaJefe);
+                String resumenGrupos = gruposActivos.isEmpty() ? "Sin grupos configurados" :
+                        gruposActivos.stream()
+                                .map(g -> g.getNombre() + " (Cupo: " + g.getCupoMaximo() + ")")
+                                .collect(Collectors.joining(" | "));
+
+                HistoricoConfiguracionArea logAuto = HistoricoConfiguracionArea.builder()
+                        .mes(mesProx)
+                        .anio(anioProx)
+                        .fechaLimiteRegistro(ultimoDiaProxMes)
+                        .fechaAperturaRezago(fechaAperturaRezago)
+                        .fechaAperturaGeneral(fechaAperturaGeneral)
+                        .resumenGrupos(resumenGrupos)
+                        .resumenBloqueos("Ninguno (Apertura Automática del Sistema)")
+                        .accion("AUTOGENERADO_SISTEMA")
+                        .realizadoPorNomina(1555) // Firma del sistema
+                        .fechaRegistro(LocalDateTime.now())
+                        .build();
+
+                historicoRepo.save(logAuto);
+
+                // ✨ CONGELAMOS LOS BOLETOS VIP EN AUTOMÁTICO
+                boletoVipRepository.deleteBySupervisorNominaAndMesAndAnio(nominaJefe, mesProx, anioProx);
+                java.util.Map<String, java.util.Map<String, List<Empleado>>> quintiles = obtenerDistribucionQuintiles(nominaJefe);
+                List<BoletoVip> nuevosBoletos = new ArrayList<>();
+                for (java.util.Map<String, List<Empleado>> diasMap : quintiles.values()) {
+                    for (java.util.Map.Entry<String, List<Empleado>> entry : diasMap.entrySet()) {
+                        String dia = entry.getKey();
+                        for (Empleado emp : entry.getValue()) {
+                            nuevosBoletos.add(new BoletoVip(emp.getNomina(), nominaJefe, mesProx, anioProx, dia));
+                        }
+                    }
+                }
+                boletoVipRepository.saveAll(nuevosBoletos);
+
+                System.out.println("🤖 [AUTOPILOT RESILIENTE] Reglas renovadas y Calculos VIP listos para Supervisor #" + nominaJefe);
+            }
+        }
+    }
+
     @Transactional
     public void depurarSaldoVencidoManual(Integer nominaOperador, Integer nominaEmpleadoAfectado, String justificacion) {
         if (!esAdminORH(nominaOperador)) {
@@ -1303,7 +1503,9 @@ public class VacacionesService {
             if (emp != null && rol != null) {
                 final Integer finalNomina = emp.getNomina();
                 List<SolicitudVacaciones> solicitudesPrevias = todasLasSolicitudes.stream()
-                        .filter(s -> s.getEmpleado().getNomina().equals(finalNomina) && !"Rechazado".equalsIgnoreCase(s.getEstatus()))
+                        .filter(s -> s.getEmpleado().getNomina().equals(finalNomina)
+                                && !"Rechazado".equalsIgnoreCase(s.getEstatus())
+                                && !"CANCELADO".equalsIgnoreCase(s.getEstatus())) // ✨ Ignoramos las canceladas
                         .collect(Collectors.toList());
 
                 int diasPedidoOriginal = 0;
@@ -1493,66 +1695,122 @@ public class VacacionesService {
         Integer wcId = solicitudAprobada.getEmpleado().getWorkCenter().getId();
         LocalDate inicio = solicitudAprobada.getFechaInicio();
         LocalDate fin = solicitudAprobada.getFechaFin();
+        Integer supervisorNomina = solicitudAprobada.getEmpleado().getWorkCenter().getSupervisorNomina();
 
-        if (inicio == null || fin == null) return;
+        if (inicio == null || fin == null || supervisorNomina == null) return;
+
+        // ✨ BUSCAMOS LA BOLSA HÍBRIDA
+        GrupoProceso grupoAfectado = null;
+        List<GrupoProceso> gruposDelJefe = obtenerGruposProcesoPorJefe(supervisorNomina);
+
+        for (GrupoProceso g : gruposDelJefe) {
+            if ("CC".equalsIgnoreCase(g.getTipoAgrupacion()) && solicitudAprobada.getEmpleado().getCentroCosto() != null) {
+                if (g.getCentrosCosto().stream().anyMatch(cc -> cc.getId().equals(solicitudAprobada.getEmpleado().getCentroCosto().getId()))) {
+                    grupoAfectado = g; break;
+                }
+            } else if ("WC".equalsIgnoreCase(g.getTipoAgrupacion())) {
+                if (g.getWorkCenters().stream().anyMatch(wc -> wc.getId().equals(wcId))) {
+                    grupoAfectado = g; break;
+                }
+            }
+        }
 
         LocalDate diaCursor = inicio;
         while (!diaCursor.isAfter(fin)) {
             final LocalDate diaEvaluado = diaCursor;
 
-            // 🧹 BARRIDO 1: Choque de Turno y WC (Regla 1x1)
-            long ocupadosMismoWcTurno = solicitudVacacionesRepository.contarOcupadosPorLineaYTurno(wcId, turnoId, diaEvaluado);
+            if (grupoAfectado != null && "WC".equalsIgnoreCase(grupoAfectado.getTipoAgrupacion())) {
+                // MODO WC: BARRIDO POR GRUPO MACRO (Día y Turno)
+                List<Integer> wcIdsDelGrupo = grupoAfectado.getWorkCenters().stream().map(WorkCenter::getId).collect(Collectors.toList());
 
-            if (ocupadosMismoWcTurno >= 1) {
-                // Rechazamos a todos los que estaban formados esperando irse en ese mismo WC, Turno y Día
-                List<SolicitudVacaciones> pendientesWcTurno = solicitudVacacionesRepository.findAll().stream()
-                        .filter(s -> s.getEstatus() != null && s.getEstatus().toUpperCase().startsWith("PENDIENTE"))
-                        .filter(s -> s.getEmpleado() != null && s.getEmpleado().getWorkCenter() != null && s.getEmpleado().getWorkCenter().getId().equals(wcId))
-                        .filter(s -> s.getTurno() != null && s.getTurno().getId().equals(turnoId))
-                        .filter(s -> !s.getId().equals(solicitudAprobada.getId()))
+                List<SolicitudVacaciones> vivasDelGrupo = solicitudVacacionesRepository.findAll().stream()
+                        .filter(s -> !List.of("RECHAZADO", "CANCELADO").contains(s.getEstatus().toUpperCase()))
+                        .filter(s -> s.getTipoSolicitud() != null && (s.getTipoSolicitud().toUpperCase().contains("VACACION") || s.getTipoSolicitud().trim().equalsIgnoreCase("V")))
+                        .filter(s -> s.getEmpleado().getWorkCenter() != null && wcIdsDelGrupo.contains(s.getEmpleado().getWorkCenter().getId()))
                         .filter(s -> !diaEvaluado.isBefore(s.getFechaInicio()) && !diaEvaluado.isAfter(s.getFechaFin()))
                         .collect(Collectors.toList());
 
-                for (SolicitudVacaciones solRechazada : pendientesWcTurno) {
-                    String timestamp = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").format(LocalDateTime.now());
-                    solRechazada.setEstatus("Rechazado");
-                    solRechazada.setComentarioSupervisor("[SISTEMA]: Solicitud RECHAZADA AUTOMÁTICAMENTE. Razón: El lugar para tu turno en la línea (WC " + wcId + ") ya fue ocupado. Autorización previa asentada el " + timestamp + ".");
-                    solRechazada.setNotasSistema((solRechazada.getNotasSistema() != null ? solRechazada.getNotasSistema() + "\n" : "") + "[SISTEMA - EFECTO DOMINÓ] Choque de turno el " + diaEvaluado);
-                    solicitudVacacionesRepository.save(solRechazada);
+                // 1. Efecto Dominó por Saturación Total de la Bolsa
+                if (vivasDelGrupo.size() >= grupoAfectado.getCupoMaximo()) {
+                    rechazarPendientesCascada(
+                            solicitudVacacionesRepository.findAll().stream()
+                                    .filter(s -> s.getEstatus() != null && s.getEstatus().toUpperCase().startsWith("PENDIENTE"))
+                                    .filter(s -> s.getEmpleado() != null && s.getEmpleado().getWorkCenter() != null && wcIdsDelGrupo.contains(s.getEmpleado().getWorkCenter().getId()))
+                                    .filter(s -> !s.getId().equals(solicitudAprobada.getId()))
+                                    .filter(s -> !diaEvaluado.isBefore(s.getFechaInicio()) && !diaEvaluado.isAfter(s.getFechaFin()))
+                                    .collect(Collectors.toList()),
+                            "La capacidad máxima del grupo ('" + grupoAfectado.getNombre() + "') se ha agotado para este día.",
+                            diaEvaluado, "[SISTEMA - EFECTO DOMINÓ] Saturación de Grupo WC"
+                    );
                 }
-            }
 
-            // 🧹 BARRIDO 2: Saturación de la Bolsa (Grupo de Proceso)
-            if (solicitudAprobada.getEmpleado().getCentroCosto() != null) {
-                grupoProcesoRepository.findByCentrosCosto_Id(solicitudAprobada.getEmpleado().getCentroCosto().getId())
-                        .ifPresent(grupo -> {
-                            List<Integer> ccIdsDelGrupo = grupo.getCentrosCosto().stream()
-                                    .map(CentroCosto::getId)
-                                    .collect(Collectors.toList());
+                // 2. Efecto Dominó por Saturación de Turno en el Grupo
+                long ocupadosEnElTurno = vivasDelGrupo.stream().filter(s -> s.getTurno() != null && s.getTurno().getId().equals(turnoId)).count();
+                int limiteTurno = (grupoAfectado.getCupoMaximoTurno() != null) ? grupoAfectado.getCupoMaximoTurno() : 1;
 
-                            long ocupadosEnElMacroGrupo = solicitudVacacionesRepository.countVacacionesPorGrupoYFecha(ccIdsDelGrupo, diaEvaluado);
+                if (ocupadosEnElTurno >= limiteTurno) {
+                    rechazarPendientesCascada(
+                            solicitudVacacionesRepository.findAll().stream()
+                                    .filter(s -> s.getEstatus() != null && s.getEstatus().toUpperCase().startsWith("PENDIENTE"))
+                                    .filter(s -> s.getEmpleado() != null && s.getEmpleado().getWorkCenter() != null && wcIdsDelGrupo.contains(s.getEmpleado().getWorkCenter().getId()))
+                                    .filter(s -> s.getTurno() != null && s.getTurno().getId().equals(turnoId))
+                                    .filter(s -> !s.getId().equals(solicitudAprobada.getId()))
+                                    .filter(s -> !diaEvaluado.isBefore(s.getFechaInicio()) && !diaEvaluado.isAfter(s.getFechaFin()))
+                                    .collect(Collectors.toList()),
+                            "El cupo máximo para el turno '" + solicitudAprobada.getTurno().getNombreTurno() + "' en el grupo ('" + grupoAfectado.getNombre() + "') se ha completado.",
+                            diaEvaluado, "[SISTEMA - EFECTO DOMINÓ] Límite de Turno Grupo WC"
+                    );
+                }
 
-                            if (ocupadosEnElMacroGrupo >= grupo.getCupoMaximo()) {
-                                // Si se llenó la bolsa, rechazamos a todos los pendientes de CUALQUIER CC de este grupo para ese día
-                                List<SolicitudVacaciones> pendientesGrupo = solicitudVacacionesRepository.findAll().stream()
+            } else {
+                // MODO CC: BARRIDO CLÁSICO (WC Individual + Bolsa CC)
+                long ocupadosMismoWcTurno = solicitudVacacionesRepository.contarOcupadosPorLineaYTurno(wcId, turnoId, diaEvaluado);
+                int cupoPermitidoWc = (solicitudAprobada.getEmpleado().getWorkCenter().getCupoConcurrenteTurno() != null && solicitudAprobada.getEmpleado().getWorkCenter().getCupoConcurrenteTurno() > 0)
+                        ? solicitudAprobada.getEmpleado().getWorkCenter().getCupoConcurrenteTurno() : 1;
+
+                if (ocupadosMismoWcTurno >= cupoPermitidoWc) {
+                    rechazarPendientesCascada(
+                            solicitudVacacionesRepository.findAll().stream()
+                                    .filter(s -> s.getEstatus() != null && s.getEstatus().toUpperCase().startsWith("PENDIENTE"))
+                                    .filter(s -> s.getEmpleado() != null && s.getEmpleado().getWorkCenter() != null && s.getEmpleado().getWorkCenter().getId().equals(wcId))
+                                    .filter(s -> s.getTurno() != null && s.getTurno().getId().equals(turnoId))
+                                    .filter(s -> !s.getId().equals(solicitudAprobada.getId()))
+                                    .filter(s -> !diaEvaluado.isBefore(s.getFechaInicio()) && !diaEvaluado.isAfter(s.getFechaFin()))
+                                    .collect(Collectors.toList()),
+                            "El cupo máximo (" + cupoPermitidoWc + ") para tu turno en el WC " + wcId + " se ha completado.",
+                            diaEvaluado, "[SISTEMA - EFECTO DOMINÓ] Límite de WC alcanzado"
+                    );
+                }
+
+                if (grupoAfectado != null && "CC".equalsIgnoreCase(grupoAfectado.getTipoAgrupacion())) {
+                    List<Integer> ccIdsDelGrupo = grupoAfectado.getCentrosCosto().stream().map(CentroCosto::getId).collect(Collectors.toList());
+                    long ocupadosEnElMacroGrupo = solicitudVacacionesRepository.countVacacionesPorGrupoYFecha(ccIdsDelGrupo, diaEvaluado);
+
+                    if (ocupadosEnElMacroGrupo >= grupoAfectado.getCupoMaximo()) {
+                        rechazarPendientesCascada(
+                                solicitudVacacionesRepository.findAll().stream()
                                         .filter(s -> s.getEstatus() != null && s.getEstatus().toUpperCase().startsWith("PENDIENTE"))
                                         .filter(s -> s.getEmpleado() != null && s.getEmpleado().getCentroCosto() != null && ccIdsDelGrupo.contains(s.getEmpleado().getCentroCosto().getId()))
                                         .filter(s -> !s.getId().equals(solicitudAprobada.getId()))
                                         .filter(s -> !diaEvaluado.isBefore(s.getFechaInicio()) && !diaEvaluado.isAfter(s.getFechaFin()))
-                                        .collect(Collectors.toList());
-
-                                for (SolicitudVacaciones solRechazada : pendientesGrupo) {
-                                    String timestamp = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").format(LocalDateTime.now());
-                                    solRechazada.setEstatus("Rechazado");
-                                    solRechazada.setComentarioSupervisor("[SISTEMA]: Solicitud RECHAZADA AUTOMÁTICAMENTE. Razón: La capacidad máxima del grupo ('" + grupo.getNombre() + "') se ha agotado para este día. Autorización previa asentada el " + timestamp + ".");
-                                    solRechazada.setNotasSistema((solRechazada.getNotasSistema() != null ? solRechazada.getNotasSistema() + "\n" : "") + "[SISTEMA - EFECTO DOMINÓ] Saturación de Grupo el " + diaEvaluado);
-                                    solicitudVacacionesRepository.save(solRechazada);
-                                }
-                            }
-                        });
+                                        .collect(Collectors.toList()),
+                                "La capacidad máxima del grupo ('" + grupoAfectado.getNombre() + "') se ha agotado para este día.",
+                                diaEvaluado, "[SISTEMA - EFECTO DOMINÓ] Saturación de Grupo CC"
+                        );
+                    }
+                }
             }
-
             diaCursor = diaCursor.plusDays(1);
+        }
+    }
+
+    private void rechazarPendientesCascada(List<SolicitudVacaciones> pendientes, String razon, LocalDate dia, String tagSistema) {
+        String timestamp = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm").format(LocalDateTime.now());
+        for (SolicitudVacaciones solRechazada : pendientes) {
+            solRechazada.setEstatus("Rechazado");
+            solRechazada.setComentarioSupervisor("[SISTEMA]: Solicitud RECHAZADA AUTOMÁTICAMENTE. Razón: " + razon + " Autorización previa asentada el " + timestamp + ".");
+            solRechazada.setNotasSistema((solRechazada.getNotasSistema() != null ? solRechazada.getNotasSistema() + "\n" : "") + tagSistema + " el " + dia);
+            solicitudVacacionesRepository.save(solRechazada);
         }
     }
 
@@ -1698,12 +1956,19 @@ public class VacacionesService {
                     sTipoSol,
                     sComentarioSup,
                     sComentarioExc,
-                    s.getGrupoFolio()
+                    s.getGrupoFolio(),
+                    s.getTurno() != null ? s.getTurno().getNombreTurno() : "N/A",
+                    false,
+                    java.math.BigDecimal.ZERO,
+                    new java.util.ArrayList<String>()
             ));
         });
 
         List<com.hrms.vacaciones.model.SolicitudPermiso> solicitudesPerm = solicitudPermisoRepository.findAll().stream()
                 .filter(p -> p.getEmpleado() != null && p.getEmpleado().getNomina().equals(nomina))
+                // ✨ FILTRO ANTI-DUPLICADOS: Ocultamos la tarjeta gemela de piso (TXT).
+                // Así el trabajador solo verá el estatus real de RH dictado por la tarjeta de Recuperación.
+                .filter(p -> p.getJustificacionSupervisor() == null || !p.getJustificacionSupervisor().contains("[RECUPERACIÓN EXTRAORDINARIA]"))
                 .collect(Collectors.toList());
 
         solicitudesPerm.forEach(p -> {
@@ -1741,6 +2006,14 @@ public class VacacionesService {
             LocalDateTime pFechaSol = p.getFechaSolicitud();
             String pComentarioExc = null;
 
+            // ✨ EXTRACCIÓN DEL RECIBO TXT
+            List<String> pagosTxt = new ArrayList<>();
+            if (p.getDesglosesPago() != null && !p.getDesglosesPago().isEmpty()) {
+                for (com.hrms.vacaciones.model.SolicitudTxtPago pago : p.getDesglosesPago()) {
+                    pagosTxt.add(pago.getFechaPago().toString() + " (" + pago.getHorasPago() + " hrs)");
+                }
+            }
+
             todosDtos.add(new com.hrms.vacaciones.dto.SolicitudDTO(
                     pId,
                     pFecha,
@@ -1753,7 +2026,11 @@ public class VacacionesService {
                     codigoPermiso,
                     comentarioSupervisor,
                     pComentarioExc,
-                    null // ✨ CORRECCIÓN: Los permisos no se fraccionan, pasamos null
+                    (String) null,
+                    p.getTurno() != null ? p.getTurno().getNombreTurno() : "N/A",
+                    p.getEsPorHoras() != null ? p.getEsPorHoras() : false,
+                    p.getHorasPermiso() != null ? p.getHorasPermiso() : java.math.BigDecimal.ZERO,
+                    pagosTxt
             ));
         });
 
@@ -1775,13 +2052,33 @@ public class VacacionesService {
         }
 
         List<com.hrms.vacaciones.dto.SolicitudDTO> listaVacaciones = listaFiltrada.stream()
-                .filter(s -> s.tipoSolicitud() != null &&
-                        (s.tipoSolicitud().toUpperCase().contains("VACACION") || s.tipoSolicitud().trim().equalsIgnoreCase("V")))
+                .filter(s -> {
+                    if (s.tipoSolicitud() == null) return false;
+                    String tipo = s.tipoSolicitud().toUpperCase();
+                    if (tipo.contains("VACACION") || tipo.trim().equalsIgnoreCase("V")) return true;
+                    if (tipo.contains("FALTA")) {
+                        String comentario = s.comentarioJefe() != null ? s.comentarioJefe().toUpperCase() : "";
+                        return !(comentario.contains("[TXT]") || comentario.contains("[HO]") ||
+                                comentario.contains("[C]") || comentario.contains("[P]") ||
+                                comentario.contains("[TET]"));
+                    }
+                    return false;
+                })
                 .collect(Collectors.toList());
 
         List<com.hrms.vacaciones.dto.SolicitudDTO> listaPermisos = listaFiltrada.stream()
-                .filter(s -> s.tipoSolicitud() == null ||
-                        (!s.tipoSolicitud().toUpperCase().contains("VACACION") && !s.tipoSolicitud().trim().equalsIgnoreCase("V")))
+                .filter(s -> {
+                    if (s.tipoSolicitud() == null) return true;
+                    String tipo = s.tipoSolicitud().toUpperCase();
+                    if (tipo.contains("VACACION") || tipo.trim().equalsIgnoreCase("V")) return false;
+                    if (tipo.contains("FALTA")) {
+                        String comentario = s.comentarioJefe() != null ? s.comentarioJefe().toUpperCase() : "";
+                        return (comentario.contains("[TXT]") || comentario.contains("[HO]") ||
+                                comentario.contains("[C]") || comentario.contains("[P]") ||
+                                comentario.contains("[TET]"));
+                    }
+                    return true;
+                })
                 .collect(Collectors.toList());
 
         if (inicio == null || fin == null) {
@@ -1831,44 +2128,1040 @@ public class VacacionesService {
         int mesConfig = hoy.getMonthValue();
         int anioConfig = hoy.getYear();
 
-        if (hoy.getDayOfMonth() >= 23) {
+        // ✨ BISTURÍ DASHBOARD: Conectamos la misma lógica del Robot
+        java.util.Map<String, LocalDate> semanaVip = calcularSemanaVIP(mesConfig, anioConfig);
+        LocalDate fechaAperturaRezago = semanaVip.get("inicio");
+
+        // Si ya llegamos a la semana VIP de este mes (o la pasamos), proyectamos hacia el próximo mes
+        if (!hoy.isBefore(fechaAperturaRezago)) {
             LocalDate proximoMes = hoy.plusMonths(1);
             mesConfig = proximoMes.getMonthValue();
             anioConfig = proximoMes.getYear();
+
+            // Recalculamos la ventana VIP para el próximo mes (para el anuncio del modal)
+            semanaVip = calcularSemanaVIP(mesConfig, anioConfig);
         }
 
         Integer turnoId = empleado.getTurno() != null ? empleado.getTurno().getId() : 1;
 
-        // ✨ AHORA BUSCAMOS LA BOLSA GLOBAL DEL SUPERVISOR
         java.util.Optional<CapacidadVacacionesMes> configOpt = java.util.Optional.empty();
         if (supervisorNomina != null) {
             configOpt = capacidadRepo.findBySupervisorNominaAndMesAndAnioAndTurno_Id(
                     supervisorNomina, mesConfig, anioConfig, turnoId);
         }
 
+        // ✨ NUEVA LÓGICA VIP SMART V3: Boleto VIP Congelado
+        String diaVIPAsignado = "SÁBADO (Repechaje Libre)";
+        boolean perteneceAlTop = false;
+
+        if (supervisorNomina != null && saldoDevengadoReal.compareTo(BigDecimal.ZERO) > 0) {
+            java.util.Optional<BoletoVip> miBoleto = boletoVipRepository.findByNominaEmpleadoAndMesAndAnio(empleado.getNomina(), mesConfig, anioConfig);
+            if (miBoleto.isPresent()) {
+                diaVIPAsignado = miBoleto.get().getDiaAsignado();
+                perteneceAlTop = true;
+            } else {
+                diaVIPAsignado = "SÁBADO (Repechaje Libre)";
+            }
+        } else if (saldoDevengadoReal.compareTo(BigDecimal.ZERO) <= 0) {
+            diaVIPAsignado = "SIN ACCESO (Saldo Insuficiente)";
+            perteneceAlTop = false;
+        }
+
+        datos.put("diaVIPAsignado", diaVIPAsignado);
+        datos.put("perteneceAlTop", perteneceAlTop);
+
         if (configOpt.isPresent()) {
             CapacidadVacacionesMes config = configOpt.get();
-            int topLimite = config.getDiasMinimosRezago() != null ? config.getDiasMinimosRezago() : 10;
-            boolean perteneceAlTop = posicionRanking > 0 && posicionRanking <= topLimite;
             boolean enVentanaVIP = !hoy.isBefore(config.getFechaAperturaRezago()) && hoy.isBefore(config.getFechaAperturaGeneral());
 
-            datos.put("topLimite", topLimite);
-            datos.put("perteneceAlTop", perteneceAlTop);
             datos.put("fechaAperturaRezago", config.getFechaAperturaRezago());
             datos.put("fechaAperturaGeneral", config.getFechaAperturaGeneral());
             datos.put("mostrarModalVIPAnuncio", enVentanaVIP && perteneceAlTop);
         } else {
-            datos.put("topLimite", 10);
-            datos.put("perteneceAlTop", posicionRanking <= 10);
             datos.put("mostrarModalVIPAnuncio", false);
         }
 
         return datos;
     }
+
     // 💡 Método auxiliar para leer el Switch Maestro en DB
     public boolean isEscalamientoAutomaticoHabilitado() {
         return configuracionSistemaRepository.findById("ESCALAMIENTO_AUTOMATICO")
                 .map(c -> "TRUE".equalsIgnoreCase(c.getValor()) || "ENABLED".equalsIgnoreCase(c.getValor()) || "1".equals(c.getValor()))
                 .orElse(false);
+    }
+
+    // =========================================================================
+    // ⚙️ MÓDULO: GRUPOS DE PROCESO (EL CADENERO V2)
+    // =========================================================================
+
+    public List<CentroCosto> obtenerCentrosCostoPorJefe(Integer nominaJefe) {
+        Empleado jefe = empleadoRepository.findById(nominaJefe)
+                .orElseThrow(() -> new RuntimeException("Jefe no encontrado"));
+
+        java.util.Set<CentroCosto> misCentros = new java.util.HashSet<>();
+
+        // 1. Centros de Costo directos del Supervisor
+        if (jefe.getCentrosCostoACargo() != null) {
+            misCentros.addAll(jefe.getCentrosCostoACargo());
+        }
+
+        // 2. Centros de Costo heredados de sus Shift Leaders
+        List<Empleado> shiftLeaders = empleadoRepository.findByJefeDirectoNomina(nominaJefe);
+        for (Empleado sl : shiftLeaders) {
+            if (sl.getCentrosCostoACargo() != null) {
+                misCentros.addAll(sl.getCentrosCostoACargo());
+            }
+        }
+        return new java.util.ArrayList<>(misCentros);
+    }
+
+    public List<GrupoProceso> obtenerGruposProcesoPorJefe(Integer nominaJefe) {
+        Empleado empleado = empleadoRepository.findById(nominaJefe)
+                .orElseThrow(() -> new RuntimeException("Empleado no encontrado"));
+
+        String rol = empleado.getRolJerarquico() != null ? empleado.getRolJerarquico().trim().toUpperCase() : "";
+
+        if ("SUPERVISOR".equals(rol)) {
+            // ✨ CERO MOCKS: El Supervisor ve SOLO los grupos que él creó
+            return grupoProcesoRepository.findAll().stream()
+                    .filter(g -> g.getSupervisorNomina() != null && g.getSupervisorNomina().equals(nominaJefe))
+                    .collect(Collectors.toList());
+        }
+
+        // 🧠 ESTRATEGIA DEFINITIVA (BALA DE PLATA): Usar la columna numérica nativa
+        Integer nominaSupervisor = empleado.getJefeDirectoNomina();
+
+        // Respaldo de seguridad por si la ficha no tiene jefe directo configurado
+        if (nominaSupervisor == null && empleado.getWorkCentersACargo() != null) {
+            nominaSupervisor = empleado.getWorkCentersACargo().stream()
+                    .map(WorkCenter::getSupervisorNomina)
+                    .filter(java.util.Objects::nonNull)
+                    .findFirst()
+                    .orElse(null);
+        }
+
+        if (nominaSupervisor == null) {
+            return new ArrayList<>(); // Si de plano el operador es huérfano contable
+        }
+
+        // ✨ ALIMENTAMOS EL RADAR CON LA MATRIZ DEL SUPERVISOR
+        // Esto le da al Shift Leader opciones reales en su desplegable
+        Integer finalSupervisor = nominaSupervisor;
+        return grupoProcesoRepository.findAll().stream()
+                .filter(g -> g.getSupervisorNomina() != null && g.getSupervisorNomina().equals(finalSupervisor))
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void crearGrupoProceso(String nombre, Integer cupoMaximo, String tipoAgrupacion, Integer cupoMaximoTurno, List<Integer> centroCostoIds, List<Integer> workCenterIds, Integer nominaJefe) {
+        GrupoProceso nuevoGrupo = new GrupoProceso();
+        nuevoGrupo.setNombre(nombre.trim().toUpperCase());
+        nuevoGrupo.setCupoMaximo(cupoMaximo);
+        nuevoGrupo.setSupervisorNomina(nominaJefe);
+        nuevoGrupo.setTipoAgrupacion(tipoAgrupacion != null ? tipoAgrupacion : "CC");
+
+        if ("CC".equalsIgnoreCase(tipoAgrupacion)) {
+            if (centroCostoIds == null || centroCostoIds.isEmpty()) throw new IllegalArgumentException("Debes seleccionar al menos un Centro de Costo (CC).");
+            nuevoGrupo.setCentrosCosto(centroCostoRepository.findAllById(centroCostoIds));
+        } else if ("WC".equalsIgnoreCase(tipoAgrupacion)) {
+            if (workCenterIds == null || workCenterIds.isEmpty()) throw new IllegalArgumentException("Debes seleccionar al menos un Work Center (WC).");
+            if (cupoMaximoTurno == null || cupoMaximoTurno < 1) throw new IllegalArgumentException("Debes especificar un cupo máximo por turno para el grupo de WCs.");
+            nuevoGrupo.setCupoMaximoTurno(cupoMaximoTurno);
+            nuevoGrupo.setWorkCenters(workCenterRepository.findAllById(workCenterIds));
+        }
+
+        grupoProcesoRepository.save(nuevoGrupo);
+    }
+
+    @Transactional
+    public void eliminarGrupoProceso(Integer idGrupo) {
+        GrupoProceso grupo = grupoProcesoRepository.findById(idGrupo)
+                .orElseThrow(() -> new IllegalArgumentException("El grupo no existe."));
+
+        if (grupo.getCentrosCosto() != null) grupo.getCentrosCosto().clear();
+        if (grupo.getWorkCenters() != null) grupo.getWorkCenters().clear();
+
+        grupoProcesoRepository.save(grupo);
+        grupoProcesoRepository.delete(grupo);
+    }
+
+    // =========================================================================
+    // 📊 DISTRIBUCIÓN VIP SMART V3 CON CONSOLIDADOR DE REPECHAJE INTELIGENTE
+    // =========================================================================
+    public java.util.Map<String, java.util.Map<String, List<Empleado>>> obtenerDistribucionQuintiles(Integer nominaJefe) {
+
+        java.util.Map<String, java.util.Map<String, List<Empleado>>> distribucionPorGrupo = new java.util.LinkedHashMap<>();
+        List<GrupoProceso> misGrupos = obtenerGruposProcesoPorJefe(nominaJefe);
+        String[] diasApertura = {"LUNES", "MARTES", "MIÉRCOLES", "JUEVES", "VIERNES"};
+
+        for (GrupoProceso grupo : misGrupos) {
+            java.util.Map<String, List<Empleado>> distribucion = new java.util.LinkedHashMap<>();
+            for (String dia : diasApertura) {
+                distribucion.put(dia, new ArrayList<>());
+            }
+
+            List<Integer> idsCcGrupo = grupo.getCentrosCosto().stream()
+                    .map(CentroCosto::getId)
+                    .collect(Collectors.toList());
+
+            List<Empleado> plantillaGrupo = obtenerPlantillaDelJefe(nominaJefe).stream()
+                    .filter(e -> e.getEstatus() != null && "ACTIVO".equalsIgnoreCase(e.getEstatus()))
+                    .filter(e -> "SINDICALIZADO".equalsIgnoreCase(e.getTipoEmpleado()))
+                    .filter(e -> e.getCentroCosto() != null && idsCcGrupo.contains(e.getCentroCosto().getId()))
+                    .filter(e -> e.getSaldoVacacionesActual() != null && e.getSaldoVacacionesActual().compareTo(BigDecimal.ZERO) > 0)
+                    .sorted((a, b) -> {
+                        int cmp = b.getSaldoVacacionesActual().compareTo(a.getSaldoVacacionesActual());
+                        if (cmp == 0) {
+                            LocalDate fechaA = a.getFechaIngreso() != null ? a.getFechaIngreso() : LocalDate.MAX;
+                            LocalDate fechaB = b.getFechaIngreso() != null ? b.getFechaIngreso() : LocalDate.MAX;
+                            return fechaA.compareTo(fechaB);
+                        }
+                        return cmp;
+                    })
+                    .collect(Collectors.toList());
+
+            if (plantillaGrupo.isEmpty()) {
+                distribucionPorGrupo.put(grupo.getNombre(), distribucion);
+                continue;
+            }
+
+            // 🧠 ALGORITMO DINÁMICO Y REPECHAJE SMART V3
+            int totalEmpleados = plantillaGrupo.size();
+            double cuotaIdealOriginal = totalEmpleados / 5.0;
+            double cuotaDinamica = cuotaIdealOriginal;
+
+            int diaActualIndex = 0;
+            int asignadosEnElDia = 0;
+            BigDecimal saldoAnterior = null;
+
+            for (int i = 0; i < totalEmpleados; i++) {
+                Empleado emp = plantillaGrupo.get(i);
+                BigDecimal saldoActual = emp.getSaldoVacacionesActual();
+
+                // 🛡️ ESCUDO AGRUPADOR (Solo evaluamos avanzar si el saldo cambia)
+                if (saldoAnterior != null && saldoActual.compareTo(saldoAnterior) != 0) {
+
+                    // ¿Ya llenamos la cuota del día actual?
+                    if (asignadosEnElDia >= Math.ceil(cuotaDinamica) && diaActualIndex < 4) {
+                        int genteRestante = totalEmpleados - i;
+                        boolean forzarRepechaje = false;
+
+                        // 🔍 ANÁLISIS DE REPECHAJE
+                        if (diaActualIndex == 2) {
+                            // Si terminamos Miércoles, ¿lo que sobra cabe en UN solo día? (Permitimos 20% de tolerancia)
+                            // Ej: Si el ideal es 10, y sobran 11 o 12, los junta en Jueves. Si sobran 13, los parte Jueves y Viernes.
+                            if (genteRestante <= Math.ceil(cuotaIdealOriginal * 1.2)) {
+                                forzarRepechaje = true;
+                            }
+                        } else if (diaActualIndex == 3) {
+                            // Si terminamos Jueves, ¿quedan muy poquitos para el Viernes? (Menos del 30% o 3 personas)
+                            if (genteRestante <= Math.max(3, cuotaIdealOriginal * 0.3)) {
+                                forzarRepechaje = true;
+                            }
+                        }
+
+                        if (forzarRepechaje) {
+                            if (diaActualIndex == 2) {
+                                diaActualIndex = 3; // Brincamos a Jueves
+                                asignadosEnElDia = 0;
+                            }
+                            // Congelamos el avance: Jueves absorbe a todos (o Viernes se queda en 0)
+                            cuotaDinamica = Double.MAX_VALUE;
+                        } else {
+                            // Avance Normal Equitativo (Auto-Balanceo)
+                            diaActualIndex++;
+                            int diasRestantes = 5 - diaActualIndex;
+                            cuotaDinamica = genteRestante / (double) diasRestantes; // Recalcula la meta para los días que faltan
+                            asignadosEnElDia = 0;
+                        }
+                    }
+                }
+
+                distribucion.get(diasApertura[diaActualIndex]).add(emp);
+                asignadosEnElDia++;
+                saldoAnterior = saldoActual;
+            }
+
+            distribucionPorGrupo.put(grupo.getNombre(), distribucion);
+        }
+
+        return distribucionPorGrupo;
+    }
+
+    // =========================================================================
+    // 🧮 MÓDULO: DETERMINADOR AUTOMÁTICO DE LA SEMANA VIP
+    // =========================================================================
+    public java.util.Map<String, LocalDate> calcularSemanaVIP(Integer mesConfig, Integer anioConfig) {
+        // La semana VIP para disfrutar vacaciones en el mes "mesConfig" ocurre
+        // en la ÚLTIMA semana completa (Lunes a Viernes) del mes ANTERIOR.
+
+        LocalDate primeroMesConfig = LocalDate.of(anioConfig, mesConfig, 1);
+        LocalDate ultimoDiaMesAnterior = primeroMesConfig.minusDays(1);
+
+        // Retrocedemos hasta encontrar el último viernes del mes anterior
+        LocalDate viernesVIP = ultimoDiaMesAnterior;
+        while (viernesVIP.getDayOfWeek() != java.time.DayOfWeek.FRIDAY) {
+            viernesVIP = viernesVIP.minusDays(1);
+        }
+
+        // El lunes de esa misma semana
+        LocalDate lunesVIP = viernesVIP.minusDays(4);
+
+        java.util.Map<String, LocalDate> resultado = new java.util.HashMap<>();
+        resultado.put("inicio", lunesVIP);
+        resultado.put("fin", viernesVIP);
+
+        return resultado;
+    }
+
+    // =========================================================================
+    // 🍿 API CINÉPOLIS: ESCANER DE DÍAS BLOQUEADOS (Próximos 90 días)
+    // =========================================================================
+    public List<String> obtenerDiasBloqueadosCinepolis(Integer nominaEmpleado, Integer turnoId) {
+        List<String> diasBloqueados = new ArrayList<>();
+        Empleado empleado = empleadoRepository.findById(nominaEmpleado).orElse(null);
+
+        if (empleado == null || empleado.getWorkCenter() == null || empleado.getWorkCenter().getSupervisorNomina() == null) {
+            return diasBloqueados;
+        }
+
+        Integer supervisorNomina = empleado.getWorkCenter().getSupervisorNomina();
+        LocalDate hoy = LocalDate.now();
+        LocalDate limiteBusqueda = hoy.plusMonths(3); // Escaneamos 90 días al futuro
+
+        // 1. Blackout Dates (Periodos Inhábiles del Supervisor)
+        List<PeriodoInhabil> bloqueos = periodoInhabilRepository.findBySupervisorNominaOrderByFechaInicioDesc(supervisorNomina);
+        for (PeriodoInhabil bloqueo : bloqueos) {
+            LocalDate cursor = bloqueo.getFechaInicio();
+            while (!cursor.isAfter(bloqueo.getFechaFin())) {
+                diasBloqueados.add(cursor.toString());
+                cursor = cursor.plusDays(1);
+            }
+        }
+
+        // 2. Cupos de Grupo de Proceso y Choques de Turno Híbrido
+        GrupoProceso grupoAfectado = null;
+        List<GrupoProceso> gruposDelJefe = obtenerGruposProcesoPorJefe(supervisorNomina);
+
+        for (GrupoProceso g : gruposDelJefe) {
+            if ("CC".equalsIgnoreCase(g.getTipoAgrupacion()) && empleado.getCentroCosto() != null) {
+                if (g.getCentrosCosto().stream().anyMatch(cc -> cc.getId().equals(empleado.getCentroCosto().getId()))) {
+                    grupoAfectado = g; break;
+                }
+            } else if ("WC".equalsIgnoreCase(g.getTipoAgrupacion()) && empleado.getWorkCenter() != null) {
+                if (g.getWorkCenters().stream().anyMatch(wc -> wc.getId().equals(empleado.getWorkCenter().getId()))) {
+                    grupoAfectado = g; break;
+                }
+            }
+        }
+
+        int cupoMaximo = grupoAfectado != null ? grupoAfectado.getCupoMaximo() : 999;
+
+        // --- INICIO AJUSTE ESCÁNER RETROACTIVO ---
+        String tipoEmpleado = empleado.getTipoEmpleado() != null ? empleado.getTipoEmpleado() : "SINDICALIZADO";
+        ConfiguracionCorteNomina configCorte = configuracionCorteNominaRepository.findByTipoEmpleado(tipoEmpleado).orElse(null);
+
+        LocalDate fechaMinima = hoy.with(java.time.DayOfWeek.MONDAY);
+        if (configCorte != null) {
+            LocalDateTime ahora = LocalDateTime.now();
+            java.time.DayOfWeek diaCorte = java.time.DayOfWeek.of(configCorte.getDiaCorte() != null ? configCorte.getDiaCorte() : 2);
+            java.time.LocalTime horaCorte = configCorte.getHoraCorte() != null ? configCorte.getHoraCorte() : java.time.LocalTime.of(16, 0);
+
+            LocalDateTime limiteGuillotina = ahora.with(java.time.DayOfWeek.MONDAY)
+                    .plusDays(diaCorte.getValue() - 1)
+                    .toLocalDate()
+                    .atTime(horaCorte);
+
+            if (ahora.isBefore(limiteGuillotina)) {
+                fechaMinima = ahora.with(java.time.DayOfWeek.MONDAY).minusWeeks(1).toLocalDate();
+            }
+        }
+        LocalDate cursor = fechaMinima;
+        // --- FIN AJUSTE ---
+
+        // ✨ BISTURÍ 1: Calcular regla VIP para meses futuros
+        boolean esSemanaVip = calendarioService.esSemanaAperturaVip(hoy);
+        java.time.DayOfWeek diaQuintil = null;
+        if (esSemanaVip) {
+            int mesProx = hoy.plusMonths(1).getMonthValue();
+            int anioProx = hoy.plusMonths(1).getYear();
+            java.util.Optional<BoletoVip> miBoleto = boletoVipRepository.findByNominaEmpleadoAndMesAndAnio(nominaEmpleado, mesProx, anioProx);
+            if (miBoleto.isPresent()) {
+                switch(miBoleto.get().getDiaAsignado()) {
+                    case "LUNES": diaQuintil = java.time.DayOfWeek.MONDAY; break;
+                    case "MARTES": diaQuintil = java.time.DayOfWeek.TUESDAY; break;
+                    case "MIÉRCOLES": diaQuintil = java.time.DayOfWeek.WEDNESDAY; break;
+                    case "JUEVES": diaQuintil = java.time.DayOfWeek.THURSDAY; break;
+                    case "VIERNES": diaQuintil = java.time.DayOfWeek.FRIDAY; break;
+                }
+            }
+        }
+
+        while (!cursor.isAfter(limiteBusqueda)) {
+            final LocalDate diaEval = cursor;
+
+            // ✨ BISTURÍ 2: Bloquear solo si es mes futuro y no es su turno VIP
+            if (esSemanaVip && (diaEval.getMonthValue() != hoy.getMonthValue() || diaEval.getYear() != hoy.getYear())) {
+                if (hoy.getDayOfWeek() != diaQuintil && hoy.getDayOfWeek() != java.time.DayOfWeek.SATURDAY) {
+                    diasBloqueados.add(diaEval.toString());
+                    cursor = cursor.plusDays(1);
+                    continue;
+                }
+            }
+
+            if (!diasBloqueados.contains(diaEval.toString())) {
+                if (grupoAfectado != null) {
+                    if ("WC".equalsIgnoreCase(grupoAfectado.getTipoAgrupacion())) {
+                        List<Integer> wcIdsDelGrupo = grupoAfectado.getWorkCenters().stream().map(WorkCenter::getId).collect(Collectors.toList());
+
+                        List<SolicitudVacaciones> vivasDelGrupo = solicitudVacacionesRepository.findAll().stream()
+                                .filter(s -> !List.of("RECHAZADO", "CANCELADO").contains(s.getEstatus().toUpperCase()))
+                                .filter(s -> s.getTipoSolicitud() != null && (s.getTipoSolicitud().toUpperCase().contains("VACACION") || s.getTipoSolicitud().trim().equalsIgnoreCase("V")))
+                                .filter(s -> s.getEmpleado().getWorkCenter() != null && wcIdsDelGrupo.contains(s.getEmpleado().getWorkCenter().getId()))
+                                .filter(s -> !diaEval.isBefore(s.getFechaInicio()) && !diaEval.isAfter(s.getFechaFin()))
+                                .collect(Collectors.toList());
+
+                        long ocupadosGrupo = vivasDelGrupo.size();
+                        if (ocupadosGrupo >= cupoMaximo) {
+                            diasBloqueados.add(diaEval.toString());
+                            cursor = cursor.plusDays(1);
+                            continue;
+                        }
+
+                        long ocupadosTurno = vivasDelGrupo.stream().filter(s -> s.getTurno() != null && s.getTurno().getId().equals(turnoId)).count();
+                        int limiteTurno = (grupoAfectado.getCupoMaximoTurno() != null) ? grupoAfectado.getCupoMaximoTurno() : 1;
+                        if (ocupadosTurno >= limiteTurno) {
+                            diasBloqueados.add(diaEval.toString());
+                        }
+
+                    } else {
+                        List<Integer> ccIds = grupoAfectado.getCentrosCosto().stream().map(CentroCosto::getId).collect(Collectors.toList());
+                        long ocupadosGrupo = solicitudVacacionesRepository.countVacacionesPorGrupoYFecha(ccIds, diaEval);
+                        if (ocupadosGrupo >= cupoMaximo) {
+                            diasBloqueados.add(diaEval.toString());
+                            cursor = cursor.plusDays(1);
+                            continue;
+                        }
+
+                        int cupoWc = (empleado.getWorkCenter().getCupoConcurrenteTurno() != null && empleado.getWorkCenter().getCupoConcurrenteTurno() > 0)
+                                ? empleado.getWorkCenter().getCupoConcurrenteTurno() : 1;
+                        long ocupadosMismoWcTurno = solicitudVacacionesRepository.contarOcupadosPorLineaYTurno(empleado.getWorkCenter().getId(), turnoId, diaEval);
+                        if (ocupadosMismoWcTurno >= cupoWc) {
+                            diasBloqueados.add(diaEval.toString());
+                        }
+                    }
+                } else {
+                    int cupoWc = (empleado.getWorkCenter().getCupoConcurrenteTurno() != null && empleado.getWorkCenter().getCupoConcurrenteTurno() > 0)
+                            ? empleado.getWorkCenter().getCupoConcurrenteTurno() : 1;
+                    long ocupadosMismoWcTurno = solicitudVacacionesRepository.contarOcupadosPorLineaYTurno(empleado.getWorkCenter().getId(), turnoId, diaEval);
+                    if (ocupadosMismoWcTurno >= cupoWc) {
+                        diasBloqueados.add(diaEval.toString());
+                    }
+                }
+            }
+            cursor = cursor.plusDays(1);
+        }
+
+        return diasBloqueados.stream().distinct().collect(Collectors.toList());
+    }
+
+    // =========================================================================
+    // 🎟️ MOTOR DE LA CARTELERA: ANÁLISIS DE ASIENTOS POR DÍA
+    // =========================================================================
+    public Map<String, Object> obtenerCarteleraPorFecha(Integer nominaEmpleado, LocalDate fecha) {
+        Map<String, Object> respuesta = new HashMap<>();
+        Empleado empleado = empleadoRepository.findById(nominaEmpleado)
+                .orElseThrow(() -> new RuntimeException("Empleado no encontrado."));
+
+        if (empleado.getWorkCenter() == null || empleado.getWorkCenter().getSupervisorNomina() == null) {
+            respuesta.put("estatusGlobal", "ERROR");
+            respuesta.put("mensaje", "No cuenta con una línea de trabajo o supervisor asignado en su perfil.");
+            return respuesta;
+        }
+
+        Integer supervisorNomina = empleado.getWorkCenter().getSupervisorNomina();
+        LocalDate hoy = LocalDate.now();
+
+        // 1. REVISIÓN DE SEMANA VIP (Boleto Congelado)
+        if (calendarioService.esSemanaAperturaVip(hoy)) {
+            // ✨ BISTURÍ 3: El mes en curso es de libre tránsito. Solo blindamos meses futuros.
+            if (fecha.getMonthValue() != hoy.getMonthValue() || fecha.getYear() != hoy.getYear()) {
+                java.time.DayOfWeek diaQuintil = null;
+                java.util.Optional<BoletoVip> miBoleto = boletoVipRepository.findByNominaEmpleadoAndMesAndAnio(nominaEmpleado, fecha.getMonthValue(), fecha.getYear());
+
+                if (miBoleto.isPresent()) {
+                    switch(miBoleto.get().getDiaAsignado()) {
+                        case "LUNES": diaQuintil = java.time.DayOfWeek.MONDAY; break;
+                        case "MARTES": diaQuintil = java.time.DayOfWeek.TUESDAY; break;
+                        case "MIÉRCOLES": diaQuintil = java.time.DayOfWeek.WEDNESDAY; break;
+                        case "JUEVES": diaQuintil = java.time.DayOfWeek.THURSDAY; break;
+                        case "VIERNES": diaQuintil = java.time.DayOfWeek.FRIDAY; break;
+                    }
+                }
+
+                if (hoy.getDayOfWeek() != diaQuintil && hoy.getDayOfWeek() != java.time.DayOfWeek.SATURDAY) {
+                    respuesta.put("estatusGlobal", "BLOQUEADO_VIP");
+                    respuesta.put("mensaje", "Apertura VIP: Aún no es tu turno para apartar días del próximo mes. Regresa el día asignado en tu boleto.");
+                    return respuesta;
+                }
+            }
+        }
+
+        // 2. REVISIÓN DE PERIODOS INHÁBILES (BLACKOUT DATES)
+        List<PeriodoInhabil> bloqueos = periodoInhabilRepository.findBySupervisorNominaOrderByFechaInicioDesc(supervisorNomina);
+        boolean esInhabil = bloqueos.stream().anyMatch(b -> !fecha.isBefore(b.getFechaInicio()) && !fecha.isAfter(b.getFechaFin()));
+        if (esInhabil) {
+            respuesta.put("estatusGlobal", "INHABIL");
+            respuesta.put("mensaje", "La fecha seleccionada corresponde a un periodo inhábil o de inactividad programada para su área.");
+            return respuesta;
+        }
+
+        // ✨ NUEVO: REVISIÓN DE DÍAS FESTIVOS PARA LA CARTELERA
+        java.util.Optional<DiasFestivos> feriadoOpt = diasFestivosRepository.findByActivoTrue().stream()
+                .filter(f -> f.getFecha().equals(fecha))
+                .findFirst();
+        if (feriadoOpt.isPresent()) {
+            respuesta.put("estatusGlobal", "FERIADO");
+            respuesta.put("mensaje", "Día festivo oficial: " + feriadoOpt.get().getDescripcion() + " (No consume saldo de vacaciones).");
+            return respuesta;
+        }
+        // ✨ 3. REVISIÓN HÍBRIDA DE CAPACIDAD DEL GRUPO DE PROCESO
+        GrupoProceso grupoAfectado = null;
+        List<GrupoProceso> gruposDelJefe = obtenerGruposProcesoPorJefe(supervisorNomina);
+
+        for (GrupoProceso g : gruposDelJefe) {
+            if ("CC".equalsIgnoreCase(g.getTipoAgrupacion()) && empleado.getCentroCosto() != null) {
+                if (g.getCentrosCosto().stream().anyMatch(cc -> cc.getId().equals(empleado.getCentroCosto().getId()))) {
+                    grupoAfectado = g; break;
+                }
+            } else if ("WC".equalsIgnoreCase(g.getTipoAgrupacion()) && empleado.getWorkCenter() != null) {
+                if (g.getWorkCenters().stream().anyMatch(wc -> wc.getId().equals(empleado.getWorkCenter().getId()))) {
+                    grupoAfectado = g; break;
+                }
+            }
+        }
+
+        String nombreGrupo = grupoAfectado != null ? grupoAfectado.getNombre() : "Sin Grupo Asignado";
+        int cupoMaximo = grupoAfectado != null ? grupoAfectado.getCupoMaximo() : 999;
+        long ocupadosEnElDia = 0;
+
+        if (grupoAfectado != null) {
+            if ("WC".equalsIgnoreCase(grupoAfectado.getTipoAgrupacion())) {
+                List<Integer> wcIdsDelGrupo = grupoAfectado.getWorkCenters().stream().map(WorkCenter::getId).collect(Collectors.toList());
+                ocupadosEnElDia = solicitudVacacionesRepository.findAll().stream()
+                        .filter(s -> !List.of("RECHAZADO", "CANCELADO").contains(s.getEstatus().toUpperCase()))
+                        .filter(s -> s.getTipoSolicitud() != null && (s.getTipoSolicitud().toUpperCase().contains("VACACION") || s.getTipoSolicitud().trim().equalsIgnoreCase("V")))
+                        .filter(s -> s.getEmpleado().getWorkCenter() != null && wcIdsDelGrupo.contains(s.getEmpleado().getWorkCenter().getId()))
+                        .filter(s -> !fecha.isBefore(s.getFechaInicio()) && !fecha.isAfter(s.getFechaFin()))
+                        .count();
+            } else {
+                List<Integer> ccIdsDelGrupo = grupoAfectado.getCentrosCosto().stream().map(CentroCosto::getId).collect(Collectors.toList());
+                ocupadosEnElDia = solicitudVacacionesRepository.countVacacionesPorGrupoYFecha(ccIdsDelGrupo, fecha);
+            }
+        }
+
+        respuesta.put("grupoNombre", nombreGrupo);
+        respuesta.put("cupoMaximo", cupoMaximo);
+        respuesta.put("ocupadosGrupo", ocupadosEnElDia);
+
+        if (ocupadosEnElDia >= cupoMaximo) {
+            respuesta.put("estatusGlobal", "GRUPO_LLENO");
+            respuesta.put("mensaje", "La capacidad máxima de ausencias simultáneas para su bloque operativo ha sido alcanzada.");
+            return respuesta;
+        }
+
+        // ✨ 4. REVISIÓN DE CADA TURNO (LOS ASIENTOS HÍBRIDOS)
+        respuesta.put("estatusGlobal", "DISPONIBLE");
+        respuesta.put("mensaje", "Existe capacidad en su bloque. Revise la disponibilidad de su turno específico:");
+
+        List<Turno> turnosActivos = turnoRepository.findByActivoTrue();
+        List<Map<String, Object>> butacas = new ArrayList<>();
+
+        for (Turno t : turnosActivos) {
+            boolean ocupado;
+
+            if (grupoAfectado != null && "WC".equalsIgnoreCase(grupoAfectado.getTipoAgrupacion())) {
+                List<Integer> wcIdsDelGrupo = grupoAfectado.getWorkCenters().stream().map(WorkCenter::getId).collect(Collectors.toList());
+                long ocupadosEnElTurno = solicitudVacacionesRepository.findAll().stream()
+                        .filter(s -> !List.of("RECHAZADO", "CANCELADO").contains(s.getEstatus().toUpperCase()))
+                        .filter(s -> s.getTipoSolicitud() != null && (s.getTipoSolicitud().toUpperCase().contains("VACACION") || s.getTipoSolicitud().trim().equalsIgnoreCase("V")))
+                        .filter(s -> s.getEmpleado().getWorkCenter() != null && wcIdsDelGrupo.contains(s.getEmpleado().getWorkCenter().getId()))
+                        .filter(s -> s.getTurno() != null && s.getTurno().getId().equals(t.getId()))
+                        .filter(s -> !fecha.isBefore(s.getFechaInicio()) && !fecha.isAfter(s.getFechaFin()))
+                        .count();
+
+                int limiteTurno = (grupoAfectado.getCupoMaximoTurno() != null) ? grupoAfectado.getCupoMaximoTurno() : 1;
+                ocupado = ocupadosEnElTurno >= limiteTurno;
+            } else {
+                int cupoWc = (empleado.getWorkCenter().getCupoConcurrenteTurno() != null) ? empleado.getWorkCenter().getCupoConcurrenteTurno() : 1;
+                long ocupadosTurno = solicitudVacacionesRepository.contarOcupadosPorLineaYTurno(empleado.getWorkCenter().getId(), t.getId(), fecha);
+                ocupado = ocupadosTurno >= cupoWc;
+            }
+
+            Map<String, Object> butaca = new HashMap<>();
+            butaca.put("turnoId", t.getId());
+            butaca.put("turnoNombre", t.getNombreTurno());
+            butaca.put("ocupado", ocupado);
+            butacas.add(butaca);
+        }
+
+        respuesta.put("turnos", butacas);
+        return respuesta;
+    }
+
+    // =========================================================================
+    // 🎟️ MOTOR DE LA CARTELERA: ESCANEO POR RANGO Y TURNO ESPECÍFICO
+    // =========================================================================
+    public List<Map<String, Object>> obtenerCarteleraPorRango(Integer nominaEmpleado, LocalDate inicio, LocalDate fin, Integer turnoId) {
+        List<Map<String, Object>> listaReportes = new ArrayList<>();
+        LocalDate cursor = inicio;
+
+        while (!cursor.isAfter(fin)) {
+            Map<String, Object> reporteDia = obtenerCarteleraPorFecha(nominaEmpleado, cursor, turnoId); // Pasamos el turnoId
+            reporteDia.put("fechaAfectada", cursor.toString());
+            listaReportes.add(reporteDia);
+            cursor = cursor.plusDays(1);
+        }
+        return listaReportes;
+    }
+
+    public Map<String, Object> obtenerCarteleraPorFecha(Integer nominaEmpleado, LocalDate fecha, Integer turnoId) {
+        Map<String, Object> respuesta = new HashMap<>();
+        Empleado empleado = empleadoRepository.findById(nominaEmpleado)
+                .orElseThrow(() -> new RuntimeException("Empleado no encontrado."));
+
+        if (empleado.getWorkCenter() == null || empleado.getWorkCenter().getSupervisorNomina() == null) {
+            respuesta.put("estatusGlobal", "ERROR");
+            respuesta.put("mensaje", "No cuenta con una línea de trabajo o supervisor asignado en su perfil.");
+            return respuesta;
+        }
+
+        Integer supervisorNomina = empleado.getWorkCenter().getSupervisorNomina();
+        LocalDate hoy = LocalDate.now();
+
+        // 1. REVISIÓN DE SEMANA VIP
+        if (calendarioService.esSemanaAperturaVip(hoy)) {
+            // ✨ BISTURÍ 4: El mes en curso es de libre tránsito. Solo blindamos meses futuros.
+            if (fecha.getMonthValue() != hoy.getMonthValue() || fecha.getYear() != hoy.getYear()) {
+                BigDecimal saldo = empleado.getSaldoVacacionesActual() != null ? empleado.getSaldoVacacionesActual() : BigDecimal.ZERO;
+                int posicion = empleadoRepository.obtenerPosicionRankingSupervisorVivo(supervisorNomina, saldo, nominaEmpleado);
+                int offsetDia = Math.min(((posicion - 1) / 10), 4);
+                java.time.DayOfWeek diaQuintil = java.time.DayOfWeek.MONDAY.plus(offsetDia);
+
+                if (hoy.getDayOfWeek() != diaQuintil && hoy.getDayOfWeek() != java.time.DayOfWeek.SATURDAY) {
+                    respuesta.put("estatusGlobal", "BLOQUEADO_VIP");
+                    respuesta.put("mensaje", "Apertura VIP: Aún no es tu turno para apartar días del próximo mes. Regresa el día asignado en tu boleto.");
+                    return respuesta;
+                }
+            }
+        }
+
+        // 2. REVISIÓN DE PERIODOS INHÁBILES (BLACKOUT DATES)
+        List<PeriodoInhabil> bloqueos = periodoInhabilRepository.findBySupervisorNominaOrderByFechaInicioDesc(supervisorNomina);
+        boolean esInhabil = bloqueos.stream().anyMatch(b -> !fecha.isBefore(b.getFechaInicio()) && !fecha.isAfter(b.getFechaFin()));
+        if (esInhabil) {
+            respuesta.put("estatusGlobal", "INHABIL");
+            respuesta.put("mensaje", "La fecha seleccionada corresponde a un periodo inhábil o de inactividad programada para su área.");
+            return respuesta;
+        }
+
+        // ✨ NUEVO: REVISIÓN DE DÍAS FESTIVOS PARA LA CARTELERA
+        java.util.Optional<DiasFestivos> feriadoOpt = diasFestivosRepository.findByActivoTrue().stream()
+                .filter(f -> f.getFecha().equals(fecha))
+                .findFirst();
+        if (feriadoOpt.isPresent()) {
+            respuesta.put("estatusGlobal", "FERIADO");
+            respuesta.put("mensaje", "Día festivo oficial: " + feriadoOpt.get().getDescripcion() + " (No consume saldo de vacaciones).");
+            return respuesta;
+        }
+
+        // ✨ 3. REVISIÓN HÍBRIDA DE CAPACIDAD DEL GRUPO DE PROCESO
+        GrupoProceso grupoAfectado = null;
+        List<GrupoProceso> gruposDelJefe = obtenerGruposProcesoPorJefe(supervisorNomina);
+
+        for (GrupoProceso g : gruposDelJefe) {
+            if ("CC".equalsIgnoreCase(g.getTipoAgrupacion()) && empleado.getCentroCosto() != null) {
+                if (g.getCentrosCosto().stream().anyMatch(cc -> cc.getId().equals(empleado.getCentroCosto().getId()))) {
+                    grupoAfectado = g; break;
+                }
+            } else if ("WC".equalsIgnoreCase(g.getTipoAgrupacion()) && empleado.getWorkCenter() != null) {
+                if (g.getWorkCenters().stream().anyMatch(wc -> wc.getId().equals(empleado.getWorkCenter().getId()))) {
+                    grupoAfectado = g; break;
+                }
+            }
+        }
+
+        // ✨ BISTURÍ CARTELERA 1: ¿Yo ya aparté este día?
+        boolean yaTengoEsteDia = solicitudVacacionesRepository.findAll().stream()
+                .filter(s -> !List.of("RECHAZADO", "CANCELADO").contains(s.getEstatus().toUpperCase()))
+                .filter(s -> s.getTipoSolicitud() != null && (s.getTipoSolicitud().toUpperCase().contains("VACACION") || s.getTipoSolicitud().trim().equalsIgnoreCase("V")))
+                .filter(s -> s.getEmpleado().getNomina().equals(nominaEmpleado))
+                .anyMatch(s -> !fecha.isBefore(s.getFechaInicio()) && !fecha.isAfter(s.getFechaFin()));
+
+        if (yaTengoEsteDia) {
+            respuesta.put("estatusGlobal", "MI_VACACION");
+            respuesta.put("mensaje", "Ya tienes una solicitud de vacaciones (Aprobada o Pendiente) que cubre este día.");
+            return respuesta;
+        }
+
+        String nombreGrupo = grupoAfectado != null ? grupoAfectado.getNombre() : "Sin Grupo Asignado";
+        int cupoMaximo = grupoAfectado != null ? grupoAfectado.getCupoMaximo() : 999;
+        long ocupadosEnElDia = 0;
+
+        if (grupoAfectado != null) {
+            if ("WC".equalsIgnoreCase(grupoAfectado.getTipoAgrupacion())) {
+                List<Integer> wcIdsDelGrupo = grupoAfectado.getWorkCenters().stream().map(WorkCenter::getId).collect(Collectors.toList());
+                ocupadosEnElDia = solicitudVacacionesRepository.findAll().stream()
+                        .filter(s -> !List.of("RECHAZADO", "CANCELADO").contains(s.getEstatus().toUpperCase()))
+                        .filter(s -> s.getTipoSolicitud() != null && (s.getTipoSolicitud().toUpperCase().contains("VACACION") || s.getTipoSolicitud().trim().equalsIgnoreCase("V")))
+                        .filter(s -> s.getEmpleado().getWorkCenter() != null && wcIdsDelGrupo.contains(s.getEmpleado().getWorkCenter().getId()))
+                        .filter(s -> !fecha.isBefore(s.getFechaInicio()) && !fecha.isAfter(s.getFechaFin()))
+                        .count();
+            } else {
+                List<Integer> ccIdsDelGrupo = grupoAfectado.getCentrosCosto().stream().map(CentroCosto::getId).collect(Collectors.toList());
+                ocupadosEnElDia = solicitudVacacionesRepository.countVacacionesPorGrupoYFecha(ccIdsDelGrupo, fecha);
+            }
+        }
+
+        respuesta.put("grupoNombre", nombreGrupo);
+        respuesta.put("cupoMaximo", cupoMaximo);
+        respuesta.put("ocupadosGrupo", ocupadosEnElDia);
+
+        if (ocupadosEnElDia >= cupoMaximo) {
+            respuesta.put("estatusGlobal", "GRUPO_LLENO");
+            respuesta.put("mensaje", "La capacidad máxima de ausencias simultáneas para su bloque operativo ha sido alcanzada.");
+            return respuesta;
+        }
+
+        // ✨ 4. REVISIÓN ESTRICTA DEL TURNO SELECCIONADO (HÍBRIDO)
+        Turno turnoBuscado = turnoRepository.findById(turnoId).orElseThrow(() -> new RuntimeException("El turno seleccionado no es válido."));
+        boolean ocupado = false;
+
+        if (grupoAfectado != null && "WC".equalsIgnoreCase(grupoAfectado.getTipoAgrupacion())) {
+            List<Integer> wcIdsDelGrupo = grupoAfectado.getWorkCenters().stream().map(WorkCenter::getId).collect(Collectors.toList());
+            long ocupadosEnElTurno = solicitudVacacionesRepository.findAll().stream()
+                    .filter(s -> !List.of("RECHAZADO", "CANCELADO").contains(s.getEstatus().toUpperCase()))
+                    .filter(s -> s.getTipoSolicitud() != null && (s.getTipoSolicitud().toUpperCase().contains("VACACION") || s.getTipoSolicitud().trim().equalsIgnoreCase("V")))
+                    .filter(s -> s.getEmpleado().getWorkCenter() != null && wcIdsDelGrupo.contains(s.getEmpleado().getWorkCenter().getId()))
+                    .filter(s -> s.getTurno() != null && s.getTurno().getId().equals(turnoId))
+                    .filter(s -> !fecha.isBefore(s.getFechaInicio()) && !fecha.isAfter(s.getFechaFin()))
+                    .count();
+
+            int limiteTurno = (grupoAfectado.getCupoMaximoTurno() != null) ? grupoAfectado.getCupoMaximoTurno() : 1;
+            ocupado = ocupadosEnElTurno >= limiteTurno;
+        } else {
+            int cupoWc = (empleado.getWorkCenter().getCupoConcurrenteTurno() != null && empleado.getWorkCenter().getCupoConcurrenteTurno() > 0)
+                    ? empleado.getWorkCenter().getCupoConcurrenteTurno() : 1;
+            long ocupadosTurno = solicitudVacacionesRepository.contarOcupadosPorLineaYTurno(empleado.getWorkCenter().getId(), turnoId, fecha);
+            ocupado = ocupadosTurno >= cupoWc;
+        }
+
+        Map<String, Object> infoTurno = new HashMap<>();
+        infoTurno.put("turnoNombre", turnoBuscado.getNombreTurno());
+        infoTurno.put("ocupado", ocupado);
+        respuesta.put("turnoData", infoTurno);
+
+        if (ocupado) {
+            respuesta.put("estatusGlobal", "TURNO_LLENO");
+            respuesta.put("mensaje", "El cupo en su línea de trabajo o grupo para el turno solicitado ya ha sido cubierto.");
+            return respuesta;
+        }
+
+        respuesta.put("estatusGlobal", "DISPONIBLE");
+        respuesta.put("mensaje", "Cumple con las condiciones operativas y el lugar de su turno se encuentra libre.");
+        return respuesta;
+    }
+
+    @Transactional
+    public void cancelarSolicitudPorEmpleado(Integer idSolicitud, Integer nominaEmpleado) {
+        SolicitudVacaciones sol = solicitudVacacionesRepository.findById(idSolicitud)
+                .orElseThrow(() -> new RuntimeException("Solicitud no encontrada."));
+
+        if (!sol.getEmpleado().getNomina().equals(nominaEmpleado)) {
+            throw new SecurityException("Bloqueo de Seguridad: No tienes permiso para cancelar esta solicitud.");
+        }
+
+        if (!sol.getEstatus().toUpperCase().startsWith("PENDIENTE")) {
+            throw new RuntimeException("Solo puedes cancelar solicitudes que aún están en estatus pendiente.");
+        }
+
+        sol.setEstatus("CANCELADO");
+        sol.setNotasSistema((sol.getNotasSistema() != null ? sol.getNotasSistema() + "\n" : "") + "[SISTEMA] Cancelada por el propio colaborador.");
+        solicitudVacacionesRepository.save(sol);
+    }
+
+    public List<Map<String, Object>> escanearRadarPorGrupo(Integer grupoId, LocalDate inicio, LocalDate fin) {
+        GrupoProceso grupo = grupoProcesoRepository.findById(grupoId)
+                .orElseThrow(() -> new RuntimeException("Grupo de proceso no localizado."));
+
+        List<Integer> idsAgrupados = new ArrayList<>();
+        boolean esWC = "WC".equalsIgnoreCase(grupo.getTipoAgrupacion());
+
+        if (esWC) {
+            idsAgrupados = grupo.getWorkCenters().stream().map(WorkCenter::getId).collect(Collectors.toList());
+        } else {
+            idsAgrupados = grupo.getCentrosCosto().stream().map(CentroCosto::getId).collect(Collectors.toList());
+        }
+
+        int cupoMaximo = grupo.getCupoMaximo();
+        List<Map<String, Object>> radar = new ArrayList<>();
+        LocalDate cursor = inicio;
+
+        Integer supervisorNomina = grupo.getSupervisorNomina();
+        List<Turno> turnosActivos = turnoRepository.findByActivoTrue();
+        Map<String, Boolean> mesesAperturadosCache = new HashMap<>();
+        Map<LocalDate, String> feriadosActivos = diasFestivosRepository.findByActivoTrue().stream()
+                .collect(Collectors.toMap(DiasFestivos::getFecha, DiasFestivos::getDescripcion));
+
+        while (!cursor.isAfter(fin)) {
+            boolean esFeriado = feriadosActivos.containsKey(cursor);
+            String descFeriado = esFeriado ? feriadosActivos.get(cursor) : "";
+            int mesActual = cursor.getMonthValue();
+            int anioActual = cursor.getYear();
+            String keyCache = mesActual + "-" + anioActual;
+
+            boolean mesAperturado = mesesAperturadosCache.computeIfAbsent(keyCache, k -> {
+                if (supervisorNomina != null && !turnosActivos.isEmpty()) {
+                    return capacidadRepo.findBySupervisorNominaAndMesAndAnioAndTurno_Id(
+                            supervisorNomina, mesActual, anioActual, turnosActivos.get(0).getId()
+                    ).isPresent();
+                }
+                return false;
+            });
+
+            long ocupados = 0;
+            if (!esFeriado && mesAperturado && !idsAgrupados.isEmpty()) {
+                if (esWC) {
+                    final LocalDate diaRadar = cursor;
+                    List<Integer> finalIds = idsAgrupados;
+                    ocupados = solicitudVacacionesRepository.findAll().stream()
+                            .filter(s -> !List.of("RECHAZADO", "CANCELADO").contains(s.getEstatus().toUpperCase()))
+                            .filter(s -> s.getTipoSolicitud() != null && (s.getTipoSolicitud().toUpperCase().contains("VACACION") || s.getTipoSolicitud().trim().equalsIgnoreCase("V")))
+                            .filter(s -> s.getEmpleado().getWorkCenter() != null && finalIds.contains(s.getEmpleado().getWorkCenter().getId()))
+                            .filter(s -> !diaRadar.isBefore(s.getFechaInicio()) && !diaRadar.isAfter(s.getFechaFin()))
+                            .count();
+                } else {
+                    ocupados = solicitudVacacionesRepository.countVacacionesPorGrupoYFecha(idsAgrupados, cursor);
+                }
+            }
+
+            Map<String, Object> infoDia = new HashMap<>();
+            infoDia.put("fecha", cursor.toString());
+            infoDia.put("ocupados", ocupados);
+            infoDia.put("cupo", (!esFeriado && mesAperturado) ? cupoMaximo : 0);
+            infoDia.put("lleno", esFeriado || !mesAperturado || ocupados >= cupoMaximo);
+            infoDia.put("esFeriado", esFeriado);
+            infoDia.put("descFeriado", descFeriado);
+
+            radar.add(infoDia);
+            cursor = cursor.plusDays(1);
+        }
+
+        return radar;
+    }
+
+    public List<Map<String, Object>> obtenerDetalleRadarPorTurnos(Integer grupoId, LocalDate fecha) {
+        GrupoProceso grupo = grupoProcesoRepository.findById(grupoId)
+                .orElseThrow(() -> new RuntimeException("Grupo de proceso no localizado."));
+
+        List<Integer> idsAgrupados = new ArrayList<>();
+        boolean esWC = "WC".equalsIgnoreCase(grupo.getTipoAgrupacion());
+
+        if (esWC) {
+            idsAgrupados = grupo.getWorkCenters().stream().map(WorkCenter::getId).collect(Collectors.toList());
+        } else {
+            idsAgrupados = grupo.getCentrosCosto().stream().map(CentroCosto::getId).collect(Collectors.toList());
+        }
+
+        List<Turno> turnosActivos = turnoRepository.findByActivoTrue();
+        List<Map<String, Object>> detalleTurnos = new ArrayList<>();
+
+        Integer supervisorNomina = grupo.getSupervisorNomina();
+        boolean mesAperturado = false;
+
+        if (supervisorNomina != null && !turnosActivos.isEmpty()) {
+            mesAperturado = capacidadRepo.findBySupervisorNominaAndMesAndAnioAndTurno_Id(
+                    supervisorNomina, fecha.getMonthValue(), fecha.getYear(), turnosActivos.get(0).getId()
+            ).isPresent();
+        }
+
+        boolean esFeriado = diasFestivosRepository.findByActivoTrue().stream()
+                .anyMatch(f -> f.getFecha().equals(fecha));
+
+        for (Turno t : turnosActivos) {
+            long ocupados = 0;
+            if (!esFeriado && mesAperturado && !idsAgrupados.isEmpty()) {
+                if (esWC) {
+                    List<Integer> finalIds = idsAgrupados;
+                    ocupados = solicitudVacacionesRepository.findAll().stream()
+                            .filter(s -> !List.of("RECHAZADO", "CANCELADO").contains(s.getEstatus().toUpperCase()))
+                            .filter(s -> s.getTipoSolicitud() != null && (s.getTipoSolicitud().toUpperCase().contains("VACACION") || s.getTipoSolicitud().trim().equalsIgnoreCase("V")))
+                            .filter(s -> s.getEmpleado().getWorkCenter() != null && finalIds.contains(s.getEmpleado().getWorkCenter().getId()))
+                            .filter(s -> s.getTurno() != null && s.getTurno().getId().equals(t.getId()))
+                            .filter(s -> !fecha.isBefore(s.getFechaInicio()) && !fecha.isAfter(s.getFechaFin()))
+                            .count();
+                } else {
+                    ocupados = solicitudVacacionesRepository.countVacacionesPorGrupoYTurnoYFecha(idsAgrupados, t.getId(), fecha);
+                }
+            }
+            Map<String, Object> mapTurno = new HashMap<>();
+            mapTurno.put("turnoNombre", t.getNombreTurno());
+            mapTurno.put("ocupados", ocupados);
+            detalleTurnos.add(mapTurno);
+        }
+        return detalleTurnos;
+    }
+
+    @Transactional
+    public void actualizarCupoWorkCenter(Integer wcId, Integer nuevoCupo, Integer nominaSupervisor) {
+        WorkCenter wc = workCenterRepository.findById(wcId)
+                .orElseThrow(() -> new RuntimeException("Work Center no encontrado."));
+
+        List<WorkCenter> misWcs = obtenerWorkCentersPorJefe(nominaSupervisor);
+        boolean tieneAcceso = misWcs.stream().anyMatch(w -> w.getId().equals(wcId)) || esAdminORH(nominaSupervisor);
+
+        if (!tieneAcceso) {
+            throw new SecurityException("No tienes permisos para modificar la capacidad de este Work Center.");
+        }
+
+        if (nuevoCupo == null || nuevoCupo < 1) {
+            throw new IllegalArgumentException("El cupo por turno debe ser al menos de 1 operador.");
+        }
+
+        wc.setCupoConcurrenteTurno(nuevoCupo);
+        workCenterRepository.save(wc);
+    }
+
+    public List<SolicitudVacaciones> obtenerVacacionesParaAuditoriaRH(LocalDate fechaInicioRango) {
+        return solicitudVacacionesRepository.findAll().stream()
+                .filter(v -> v.getEstatus() != null && "Aprobado".equalsIgnoreCase(v.getEstatus()))
+                .filter(v -> v.getTipoSolicitud() != null && (v.getTipoSolicitud().toUpperCase().contains("VACACION") || v.getTipoSolicitud().equalsIgnoreCase("V")))
+                .filter(v -> v.getFechaInicio() != null && !v.getFechaInicio().isBefore(fechaInicioRango))
+                .sorted(java.util.Comparator.comparing(SolicitudVacaciones::getFechaInicio).reversed())
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void rechazarVacacionAuditoria(Integer idSolicitud, String comentario) {
+        SolicitudVacaciones sol = solicitudVacacionesRepository.findById(idSolicitud)
+                .orElseThrow(() -> new RuntimeException("Solicitud no encontrada"));
+
+        if ("Aprobado".equalsIgnoreCase(sol.getEstatus())) {
+            // ✨ DEVOLUCIÓN DE SALDO: Si la vacación estaba aprobada y Nóminas la bota, se regresa el dinero a la bolsa
+            Empleado emp = sol.getEmpleado();
+            BigDecimal saldo = emp.getSaldoVacacionesActual() != null ? emp.getSaldoVacacionesActual() : BigDecimal.ZERO;
+            int dias = sol.getDiasTotalesCalculados() != null ? sol.getDiasTotalesCalculados() : 0;
+            emp.setSaldoVacacionesActual(saldo.add(BigDecimal.valueOf(dias)));
+            empleadoRepository.save(emp);
+        }
+
+        sol.setEstatus("Rechazado");
+        sol.setNotasSistema((sol.getNotasSistema() != null ? sol.getNotasSistema() + "\n" : "") + "[AUDIT_RH / RECHAZO FORZADO]: " + comentario);
+        solicitudVacacionesRepository.save(sol);
+    }
+
+    public List<Map<String, Object>> obtenerEventosCalendarioPlanta(String esquema) {
+        List<Map<String, Object>> eventos = new ArrayList<>();
+
+        List<DiasFestivos> feriados = diasFestivosRepository.findByActivoTrue();
+        for (DiasFestivos f : feriados) {
+            Map<String, Object> evento = new HashMap<>();
+            evento.put("id", "FESTIVO_" + f.getId());
+            evento.put("title", "🇲🇽 " + f.getDescripcion());
+            evento.put("start", f.getFecha().toString());
+            evento.put("allDay", true);
+            evento.put("backgroundColor", "#212529");
+            evento.put("borderColor", "#212529");
+            evento.put("textColor", "#ffffff");
+
+            Map<String, Object> props = new HashMap<>();
+            props.put("tipo", "FERIADO");
+            evento.put("extendedProps", props);
+            eventos.add(evento);
+        }
+
+        Map<LocalDate, Map<String, List<Map<String, Object>>>> acumuladorSemantico = new HashMap<>();
+
+        List<SolicitudVacaciones> vacaciones = solicitudVacacionesRepository.findAll().stream()
+                .filter(s -> "Aprobado".equalsIgnoreCase(s.getEstatus()) || "Aprobada".equalsIgnoreCase(s.getEstatus()))
+                .collect(Collectors.toList());
+
+        for (SolicitudVacaciones sol : vacaciones) {
+            String tipoEmp = sol.getEmpleado().getTipoEmpleado() != null ? sol.getEmpleado().getTipoEmpleado().toUpperCase() : "SINDICALIZADO";
+            if (!"TODOS".equalsIgnoreCase(esquema) && !tipoEmp.contains(esquema.toUpperCase())) continue;
+
+            LocalDate cursor = sol.getFechaInicio();
+            LocalDate fin = sol.getFechaFin();
+            String contexto = sol.getTipoSolicitud() != null ? sol.getTipoSolicitud() : "Incidencia";
+
+            while (cursor != null && fin != null && !cursor.isAfter(fin)) {
+                if (!esDiaDescanso(cursor, sol)) {
+                    agregarAlAcumuladorPlanta(acumuladorSemantico, cursor, tipoEmp, sol.getEmpleado(), contexto);
+                }
+                cursor = cursor.plusDays(1);
+            }
+        }
+
+        List<SolicitudPermiso> permisos = solicitudPermisoRepository.findAll().stream()
+                .filter(p -> "APROBADO".equalsIgnoreCase(p.getEstatus()))
+                .filter(p -> p.getEsPorHoras() == null || !p.getEsPorHoras())
+                .collect(Collectors.toList());
+
+        for (SolicitudPermiso perm : permisos) {
+            String tipoEmp = perm.getEmpleado().getTipoEmpleado() != null ? perm.getEmpleado().getTipoEmpleado().toUpperCase() : "SINDICALIZADO";
+            if (!"TODOS".equalsIgnoreCase(esquema) && !tipoEmp.contains(esquema.toUpperCase())) continue;
+
+            LocalDate dia = perm.getFechaIncidencia();
+            String contexto = perm.getTipoPermiso() != null ? perm.getTipoPermiso().getCodigo() : "Permiso";
+
+            if (dia != null) {
+                agregarAlAcumuladorPlanta(acumuladorSemantico, dia, tipoEmp, perm.getEmpleado(), contexto);
+            }
+        }
+
+        acumuladorSemantico.forEach((fecha, mapaTipos) -> {
+            mapaTipos.forEach((tipo, listaInvolucrados) -> {
+                Map<String, Object> evento = new HashMap<>();
+                int totalAusentes = listaInvolucrados.size();
+
+                evento.put("id", "PL_" + fecha + "_" + tipo);
+                evento.put("start", fecha.toString());
+                evento.put("allDay", true);
+
+                if ("SINDICALIZADO".equals(tipo) || tipo.contains("SIND")) {
+                    evento.put("title", "⚙️ " + totalAusentes + " Planta (Sind)");
+                    evento.put("backgroundColor", "#198754");
+                    evento.put("borderColor", "#198754");
+                } else {
+                    evento.put("title", "🏢 " + totalAusentes + " Admin");
+                    evento.put("backgroundColor", "#0d6efd");
+                    evento.put("borderColor", "#0d6efd");
+                }
+                evento.put("textColor", "#ffffff");
+
+                Map<String, Object> props = new HashMap<>();
+                props.put("tipo", tipo);
+                props.put("empleados", listaInvolucrados);
+                evento.put("extendedProps", props);
+
+                eventos.add(evento);
+            });
+        });
+
+        return eventos;
+    }
+
+    private void agregarAlAcumuladorPlanta(Map<LocalDate, Map<String, List<Map<String, Object>>>> acumulador,
+                                           LocalDate fecha, String tipoEmp, Empleado emp, String contexto) {
+        acumulador.putIfAbsent(fecha, new HashMap<>());
+        acumulador.get(fecha).putIfAbsent(tipoEmp, new ArrayList<>());
+
+        Map<String, Object> datosEmpleado = new HashMap<>();
+        datosEmpleado.put("nomina", emp.getNomina());
+        datosEmpleado.put("nombre", emp.getNombreCompleto() + " [" + contexto + "]");
+        datosEmpleado.put("wc", emp.getWorkCenter() != null ? emp.getWorkCenter().getId().toString() : "N/A");
+
+        acumulador.get(fecha).get(tipoEmp).add(datosEmpleado);
     }
 }

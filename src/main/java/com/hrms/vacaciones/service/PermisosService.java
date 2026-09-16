@@ -38,6 +38,9 @@ public class PermisosService {
     @Autowired
     private SolicitudVacacionesRepository vacacionesRepo;
 
+    @Autowired
+    private ConfiguracionCorteNominaRepository configuracionCorteNominaRepository;
+
     /**
      * Traduce el DayOfWeek nativo de Java a un String en español estandarizado, en mayúsculas y SIN acentos.
      */
@@ -69,23 +72,73 @@ public class PermisosService {
                 .replaceAll("\\s+", "");
     }
 
+    // ✨ NUEVO: Motor de Guillotina con Traductor de Mundos (WC/BCI -> ADMINISTRATIVO)
+    public LocalDate obtenerFechaMinimaPermitida(Empleado empleado) {
+        String tipoBruto = empleado.getTipoEmpleado() != null ? empleado.getTipoEmpleado().toUpperCase() : "SINDICALIZADO";
+
+        // 🛡️ TRADUCTOR CONTABLE: Agrupamos las nuevas jerarquías en las 2 reglas de corte existentes
+        String tipoGuillotina = "SINDICALIZADO";
+        if (tipoBruto.contains("ADMIN") || tipoBruto.contains("WC") || tipoBruto.contains("BCI")) {
+            tipoGuillotina = "ADMINISTRATIVO";
+        }
+
+        ConfiguracionCorteNomina configCorte = configuracionCorteNominaRepository.findByTipoEmpleado(tipoGuillotina).orElse(null);
+
+        LocalDateTime ahora = LocalDateTime.now();
+        LocalDate fechaMinima = ahora.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).toLocalDate();
+
+        if (configCorte != null) {
+            DayOfWeek diaCorte = DayOfWeek.of(configCorte.getDiaCorte() != null ? configCorte.getDiaCorte() : 2);
+            java.time.LocalTime horaCorte = configCorte.getHoraCorte() != null ? configCorte.getHoraCorte() : java.time.LocalTime.of(16, 0);
+
+            LocalDateTime limiteGuillotina = ahora.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+                    .plusDays(diaCorte.getValue() - 1)
+                    .toLocalDate()
+                    .atTime(horaCorte);
+
+            if (ahora.isBefore(limiteGuillotina)) {
+                fechaMinima = ahora.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).minusWeeks(1).toLocalDate();
+            }
+        }
+        return fechaMinima;
+    }
+
+    public LocalDate obtenerFechaMinimaPorNomina(Integer nomina) {
+        Empleado empleado = empleadoRepo.findById(nomina)
+                .orElseThrow(() -> new RuntimeException("Error: No se encontró empleado"));
+        return obtenerFechaMinimaPermitida(empleado);
+    }
+
     /**
-     * Trae la lista de permisos activos filtrando dinámicamente si el empleado es Sindicalizado o Administrativo.
+     * Trae la lista de permisos activos con Soporte para Combinaciones (Ej. "WC,BCI")
      */
     public List<TipoPermiso> obtenerPermisosParaEmpleado(Integer empleadoNomina) {
         Empleado empleado = empleadoRepo.findById(empleadoNomina)
                 .orElseThrow(() -> new RuntimeException("Error: No existe el empleado con nómina: " + empleadoNomina));
 
-        List<String> mundos = new ArrayList<>();
-        mundos.add("TODOS");
+        String tipoPuesto = empleado.getTipoEmpleado() != null ? empleado.getTipoEmpleado().toUpperCase() : "SIND";
 
-        if ("Sindicalizado".equalsIgnoreCase(empleado.getTipoEmpleado()) || "SIND".equalsIgnoreCase(empleado.getTipoEmpleado())) {
-            mundos.add("SIND");
-        } else {
-            mundos.add("ADMIN");
+        // 🎯 Identificamos exactamente qué es el operador (Mapeo de nuevos conceptos)
+        String miPerfil = "SIND";
+        if (tipoPuesto.contains("BCI")) {
+            miPerfil = "BCI";
+        } else if (tipoPuesto.contains("WC") || tipoPuesto.contains("EXTRANJERO")) {
+            miPerfil = "WC";
+        } else if (tipoPuesto.contains("ADMIN")) {
+            miPerfil = "ADMIN";
         }
 
-        return tipoPermisoRepo.findByActivoTrueAndAplicaAIn(mundos);
+        // 🎯 Traemos todos los activos y los filtramos en memoria para soportar el "LIKE / CONTAINS"
+        final String perfilFinal = miPerfil;
+        return tipoPermisoRepo.findAll().stream()
+                .filter(TipoPermiso::getActivo)
+                .filter(p -> {
+                    if (p.getAplicaA() == null) return false;
+                    String aplicaA = p.getAplicaA().toUpperCase();
+                    // Si el permiso dice "TODOS" o contiene mi perfil (Ej. "WC,BCI"), me lo regresa
+                    return aplicaA.contains("TODOS") || aplicaA.contains(perfilFinal);
+                })
+                .collect(Collectors.toList());
     }
 
     /**
@@ -103,16 +156,14 @@ public class PermisosService {
             throw new RuntimeException("Operación Denegada: El permiso de tipo " + tipoPermiso.getDescripcion() + " se encuentra desactivado temporalmente por RH.");
         }
 
-        // 🎯 SOPORTE MULTI-DÍA: Extraemos la lista, si viene vacía usamos la fecha singular.
         List<LocalDate> fechasIncidencia = (request.getFechasIncidencia() != null && !request.getFechasIncidencia().isEmpty())
                 ? request.getFechasIncidencia()
                 : Collections.singletonList(request.getFechaIncidencia());
 
-        LocalDate lunesSemanaActual = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        LocalDate fechaMinima = obtenerFechaMinimaPermitida(empleado);
 
-        // 1. Validar TODAS las fechas antes de intentar guardar
         for (LocalDate fecha : fechasIncidencia) {
-            if (fecha.isBefore(lunesSemanaActual)) {
+            if (fecha.isBefore(fechaMinima)) {
                 throw new RuntimeException("Bloqueo de Nómina: La fecha de la falta (" + fecha + ") pertenece a una semana nominal cerrada contablemente.");
             }
 
@@ -124,8 +175,6 @@ public class PermisosService {
             }
         }
 
-        // 2. Crear las filas contables
-        // 🎯 EL PUENTE: Buscamos el turno en BD usando el nombre que mandó el HTML
         Turno turnoSeleccionado = null;
         if (request.getNombreTurno() != null && !request.getNombreTurno().isEmpty()) {
             turnoSeleccionado = turnoRepo.findByNombreTurno(request.getNombreTurno()).orElse(null);
@@ -137,7 +186,7 @@ public class PermisosService {
             SolicitudPermiso nuevaSolicitud = SolicitudPermiso.builder()
                     .empleado(empleado)
                     .tipoPermiso(tipoPermiso)
-                    .turno(turnoSeleccionado) // 🎯 INYECTAMOS EL TURNO AQUÍ
+                    .turno(turnoSeleccionado)
                     .fechaIncidencia(fechaActual)
                     .fechaSolicitud(LocalDateTime.now())
                     .justificacionSupervisor(request.getJustificacionSupervisor())
@@ -149,10 +198,8 @@ public class PermisosService {
 
             if ("TXT".equalsIgnoreCase(tipoPermiso.getCodigo())) {
                 if (i == 0) {
-                    // Amarra toda la deuda y desglose al DÍA 1
                     procesarValidacionesTXT(nuevaSolicitud, request, empleado, fechasIncidencia.size());
                 } else {
-                    // Los demás días son extensiones sin deuda adicional
                     nuevaSolicitud.setJustificacionSupervisor(request.getJustificacionSupervisor() + " (Día " + (i + 1) + " del bloque TXT)");
                 }
             }
@@ -176,16 +223,25 @@ public class PermisosService {
             throw new RuntimeException("Operación Denegada: El permiso de tipo " + tipoPermiso.getDescripcion() + " se encuentra desactivado temporalmente por RH.");
         }
 
-        // 🎯 SOPORTE MULTI-DÍA: Extraemos la lista
         List<LocalDate> fechasIncidencia = (request.getFechasIncidencia() != null && !request.getFechasIncidencia().isEmpty())
                 ? request.getFechasIncidencia()
                 : Collections.singletonList(request.getFechaIncidencia());
 
-        LocalDate lunesSemanaActual = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        LocalDate fechaMinima = obtenerFechaMinimaPermitida(empleado);
 
-        // 1. Validar el bloque completo
+        // ✨ NUEVO: Detectamos si la petición viene del modal de Recuperación
+        boolean esRecupExtraordinaria = request.getJustificacionSupervisor() != null
+                && request.getJustificacionSupervisor().contains("[RECUPERACIÓN EXTRAORDINARIA]");
+
         for (LocalDate fecha : fechasIncidencia) {
-            if (fecha.isBefore(lunesSemanaActual)) {
+            if (esRecupExtraordinaria) {
+                // Si es recuperación, le damos holgura de 1 mes hacia atrás para la FALTA
+                LocalDate unMesAtras = LocalDate.now().minusMonths(1);
+                if (fecha.isBefore(unMesAtras)) {
+                    throw new RuntimeException("Límite de Retroactividad: La fecha del paro (" + fecha + ") excede el mes de antigüedad permitido para justificaciones.");
+                }
+            } else if (fecha.isBefore(fechaMinima)) {
+                // Si es TXT Colectivo normal, aplicamos guillotina estricta
                 throw new RuntimeException("Bloqueo de Lote: La fecha del paro (" + fecha + ") pertenece a una semana nominal cerrada contablemente.");
             }
 
@@ -197,8 +253,6 @@ public class PermisosService {
             }
         }
 
-        // 2. Inyección Masiva en Caliente
-        // 🎯 EL PUENTE: Buscamos el turno asignado masivamente en el bloque
         Turno turnoSeleccionado = null;
         if (request.getNombreTurno() != null && !request.getNombreTurno().isEmpty()) {
             turnoSeleccionado = turnoRepo.findByNombreTurno(request.getNombreTurno()).orElse(null);
@@ -210,7 +264,7 @@ public class PermisosService {
             SolicitudPermiso nuevaSolicitud = SolicitudPermiso.builder()
                     .empleado(empleado)
                     .tipoPermiso(tipoPermiso)
-                    .turno(turnoSeleccionado) // 🎯 INYECTAMOS EL TURNO AQUÍ TAMBIÉN
+                    .turno(turnoSeleccionado)
                     .fechaIncidencia(fechaActual)
                     .fechaSolicitud(LocalDateTime.now())
                     .justificacionSupervisor(request.getJustificacionSupervisor())
@@ -222,10 +276,8 @@ public class PermisosService {
 
             if ("TXT".equalsIgnoreCase(tipoPermiso.getCodigo())) {
                 if (i == 0) {
-                    // Amarra toda la deuda y desglose al DÍA 1
                     procesarValidacionesTXT(nuevaSolicitud, request, empleado, fechasIncidencia.size());
                 } else {
-                    // Complementos sin duplicar los pagos
                     nuevaSolicitud.setJustificacionSupervisor(request.getJustificacionSupervisor() + " (Día " + (i + 1) + " del bloque colectivo)");
                 }
             }
@@ -244,13 +296,12 @@ public class PermisosService {
             throw new RuntimeException("Error de Captura: Debes especificar las fechas y horas en las que repondrás el tiempo.");
         }
 
-        // 🎯 REGLA DINÁMICA: Máximo 2 exhibiciones de pago por cada DÍA de ausencia.
         int limitePagos = diasParo * 2;
         if (filasPago.size() > limitePagos) {
             throw new RuntimeException("Regla de Nómina: No puedes fraccionar el pago de horas en más de " + limitePagos + " exhibiciones.");
         }
 
-        LocalDate lunesSemanaActual = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        LocalDate fechaMinima = obtenerFechaMinimaPermitida(empleado);
         String nombreTurnoEmpleado = request.getNombreTurno() != null ? request.getNombreTurno() : "1ro";
 
         Turno turnoOficial = turnoRepo.findByNombreTurno(nombreTurnoEmpleado)
@@ -261,13 +312,11 @@ public class PermisosService {
                 ? request.getHorasPermiso()
                 : javaHorasActuales;
 
-        // 🎯 LA ECUACIÓN MAESTRA: Multiplicamos la jornada por la cantidad de días del lote
         BigDecimal horasObjetivoTotal = horasBasePorDia.multiply(new BigDecimal(diasParo));
-
         BigDecimal javaSumaHorasCapturadas = BigDecimal.ZERO;
 
         for (FilaPagoTxtDTO pago : filasPago) {
-            if (pago.getFechaPago().isBefore(lunesSemanaActual)) {
+            if (pago.getFechaPago().isBefore(fechaMinima)) {
                 throw new RuntimeException("Bloqueo de Nómina: No puedes registrar la fecha de pago " + pago.getFechaPago() +
                         " porque pertenece a una semana nominal que ya fue procesada y cerrada contablemente.");
             }
@@ -391,14 +440,41 @@ public class PermisosService {
     }
 
     public List<SolicitudPermiso> obtenerPermisosPendientesPorJefe(Integer nominaJefe, List<Integer> wcIds) {
+        Empleado jefe = empleadoRepo.findById(nominaJefe).orElse(null);
+        String rol = jefe != null && jefe.getRolJerarquico() != null ? jefe.getRolJerarquico().trim().toUpperCase() : "";
+
         return permisoRepo.findAll().stream()
-                .filter(s -> "PENDIENTE".equalsIgnoreCase(s.getEstatus()))
+                .filter(s -> s.getEstatus() != null && s.getEstatus().toUpperCase().startsWith("PENDIENTE"))
                 .filter(s -> s.getTipoPermiso() != null
                         && s.getTipoPermiso().getCodigo() != null
                         && !"V".equalsIgnoreCase(s.getTipoPermiso().getCodigo().trim())
                         && !"VACACIONES".equalsIgnoreCase(s.getTipoPermiso().getCodigo().trim()))
-                .filter(s -> (s.getEmpleado().getJefeDirectoNomina() != null && s.getEmpleado().getJefeDirectoNomina().equals(nominaJefe)) ||
-                        (s.getEmpleado().getWorkCenter() != null && wcIds.contains(s.getEmpleado().getWorkCenter().getId())))
+                .filter(p -> {
+                    String estatus = p.getEstatus() != null ? p.getEstatus().trim().toUpperCase() : "";
+                    String tipoEmp = p.getEmpleado() != null && p.getEmpleado().getTipoEmpleado() != null ? p.getEmpleado().getTipoEmpleado().trim().toUpperCase() : "SINDICALIZADO";
+                    boolean coincidenciaDirecta = p.getEmpleado() != null && p.getEmpleado().getJefeDirectoNomina() != null && p.getEmpleado().getJefeDirectoNomina().equals(nominaJefe);
+                    boolean coincidenciaLinea = p.getEmpleado() != null && p.getEmpleado().getWorkCenter() != null && wcIds.contains(p.getEmpleado().getWorkCenter().getId());
+
+                    // Si no es su empleado directo ni pertenece a sus WCs, lo descartamos de inmediato
+                    if (!(coincidenciaDirecta || coincidenciaLinea)) {
+                        return false;
+                    }
+
+                    if ("SUPERVISOR".equals(rol)) {
+                        if ("SINDICALIZADO".equals(tipoEmp)) {
+                            // El supervisor solo lo ve en su campanita si ya escaló o si es jefe directo
+                            if ("PENDIENTE_SUPERVISOR".equals(estatus)) {
+                                return true;
+                            }
+                            return coincidenciaDirecta && ("PENDIENTE".equals(estatus) || "PENDIENTE_JEFE".equals(estatus));
+                        } else {
+                            return "PENDIENTE_JEFE".equals(estatus) || "PENDIENTE".equals(estatus);
+                        }
+                    } else {
+                        // Shift Leaders y Administrativos
+                        return "PENDIENTE_JEFE".equals(estatus) || "PENDIENTE".equals(estatus);
+                    }
+                })
                 .collect(Collectors.toList());
     }
 
@@ -454,8 +530,10 @@ public class PermisosService {
             throw new RuntimeException("Error Operativo: No se seleccionó ningún operador para la inyección del lote.");
         }
 
-        LocalDate lunesSemanaActual = LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
-        if (fechaIncidencia.isBefore(lunesSemanaActual)) {
+        Empleado empleadoGuia = empleadoRepo.findById(empleadoIds.get(0)).orElseThrow(() -> new RuntimeException("Error en empleado guía"));
+        LocalDate fechaMinima = obtenerFechaMinimaPermitida(empleadoGuia);
+
+        if (fechaIncidencia.isBefore(fechaMinima)) {
             throw new RuntimeException("Bloqueo de Lote: La fecha del paro o afectación masiva pertenece a un periodo contable cerrado.");
         }
 
@@ -469,9 +547,6 @@ public class PermisosService {
             Empleado empleado = empleadoRepo.findById(nominaEmp)
                     .orElseThrow(() -> new RuntimeException("No existe el colaborador con nómina #" + nominaEmp));
 
-            // 🏁 CANDADO DE TRAZABILIDAD: La "barredora" en caliente para reescribir planes de pago TXT
-            // Si el operador ya tiene un TXT registrado EXACTAMENTE para esta misma fecha de paro,
-            // lo exterminamos de la base de datos (con todo y sus pagos viejos) para meter el plan nuevo.
             List<SolicitudPermiso> permisosAnteriores = permisoRepo.findAll().stream()
                     .filter(p -> p.getEmpleado().getNomina().equals(nominaEmp))
                     .filter(p -> p.getTipoPermiso() != null && "TXT".equalsIgnoreCase(p.getTipoPermiso().getCodigo()))
@@ -658,5 +733,176 @@ public class PermisosService {
         metricas.put("ausenciasPermisosManana", (long) ausentesVentanaSet.size());
 
         return metricas;
+    }
+
+    @Transactional
+    public void cancelarPermisoPorEmpleado(Long idSolicitud, Integer nominaEmpleado) {
+        SolicitudPermiso sol = permisoRepo.findById(idSolicitud.intValue())
+                .orElseThrow(() -> new RuntimeException("Permiso o Incidencia no encontrada."));
+
+        if (!sol.getEmpleado().getNomina().equals(nominaEmpleado)) {
+            throw new SecurityException("Bloqueo de Seguridad: No tienes permiso para cancelar este permiso.");
+        }
+
+        if (!"PENDIENTE".equalsIgnoreCase(sol.getEstatus())) {
+            throw new RuntimeException("Solo puedes cancelar incidencias que aún están pendientes de revisión.");
+        }
+
+        sol.setEstatus("CANCELADO");
+        sol.setJustificacionSupervisor(sol.getJustificacionSupervisor() + " | [Cancelado por el Colaborador]");
+        permisoRepo.save(sol);
+    }
+
+    @Transactional
+    public void actualizarSolicitudPermiso(Long idSolicitud, SolicitudPermisoRequestDTO request, Integer nominaEmpleado) {
+        SolicitudPermiso permiso = permisoRepo.findById(idSolicitud.intValue())
+                .orElseThrow(() -> new RuntimeException("Incidencia no encontrada en la base de datos."));
+
+        if (!permiso.getEmpleado().getNomina().equals(nominaEmpleado)) {
+            throw new SecurityException("Bloqueo de Seguridad: No tienes permiso para editar esta solicitud.");
+        }
+
+        if (!"PENDIENTE".equalsIgnoreCase(permiso.getEstatus())) {
+            throw new RuntimeException("Auditoría: Solo puedes editar incidencias que aún están en estatus PENDIENTE.");
+        }
+
+        TipoPermiso tipoPermiso = tipoPermisoRepo.findByCodigo(request.getCodigoPermiso())
+                .orElseThrow(() -> new RuntimeException("Error Operativo: El tipo de permiso seleccionado no existe."));
+
+        Turno turnoSeleccionado = null;
+        if (request.getNombreTurno() != null && !request.getNombreTurno().isEmpty()) {
+            turnoSeleccionado = turnoRepo.findByNombreTurno(request.getNombreTurno()).orElse(null);
+        }
+
+        LocalDate fechaMinima = obtenerFechaMinimaPermitida(permiso.getEmpleado());
+        List<LocalDate> fechasIncidencia = (request.getFechasIncidencia() != null && !request.getFechasIncidencia().isEmpty())
+                ? request.getFechasIncidencia()
+                : Collections.singletonList(request.getFechaIncidencia());
+
+        for (LocalDate fecha : fechasIncidencia) {
+            if (fecha.isBefore(fechaMinima)) {
+                throw new RuntimeException("Bloqueo de Nómina: La fecha " + fecha + " pertenece a una semana contable cerrada.");
+            }
+            boolean chocaConVacaciones = vacacionesRepo.verificarInterferenciaVacaciones(
+                    permiso.getEmpleado().getNomina(), fecha, Arrays.asList("APROBADO", "PENDIENTE_JEFE", "PENDIENTE_SUPERVISOR"));
+            if (chocaConVacaciones) {
+                throw new RuntimeException("Error de Agenda: La fecha " + fecha + " choca con un periodo de vacaciones de este colaborador.");
+            }
+        }
+
+        permiso.setTipoPermiso(tipoPermiso);
+        permiso.setTurno(turnoSeleccionado);
+        permiso.setFechaIncidencia(fechasIncidencia.get(0));
+        permiso.setJustificacionSupervisor(request.getJustificacionSupervisor());
+        permiso.setHorasPermiso(request.getHorasPermiso() != null ? request.getHorasPermiso() : BigDecimal.ZERO);
+        permiso.setEsPorHoras(request.getEsPorHoras() != null ? request.getEsPorHoras() : false);
+
+        if ("TXT".equalsIgnoreCase(tipoPermiso.getCodigo())) {
+            permiso.getDesglosesPago().clear();
+            permisoRepo.flush();
+            procesarValidacionesTXT(permiso, request, permiso.getEmpleado(), fechasIncidencia.size());
+        } else {
+            permiso.getDesglosesPago().clear();
+        }
+
+        permisoRepo.save(permiso);
+    }
+
+    public List<SolicitudPermiso> obtenerPermisosParaAuditoriaRH(LocalDate fechaInicioRango) {
+        return permisoRepo.findAll().stream()
+                .filter(p -> p.getEstatus() != null)
+                .filter(p -> List.of("APROBADO", "RETENIDO").contains(p.getEstatus().toUpperCase()))
+                .filter(p -> p.getTipoPermiso() != null && !"V".equalsIgnoreCase(p.getTipoPermiso().getCodigo()) && !"VACACIONES".equalsIgnoreCase(p.getTipoPermiso().getCodigo()))
+                .filter(p -> p.getFechaIncidencia() != null && !p.getFechaIncidencia().isBefore(fechaInicioRango)) // ✨ FILTRO DE SEMANA
+                .sorted(java.util.Comparator.comparing(SolicitudPermiso::getFechaIncidencia).reversed())
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void rechazarPermisoAuditoria(Long idSolicitud, String comentarioRechazo) {
+        SolicitudPermiso sol = permisoRepo.findById(idSolicitud.intValue())
+                .orElseThrow(() -> new RuntimeException("Error: No se encontró la incidencia."));
+
+        sol.setEstatus("RECHAZADO");
+        if (comentarioRechazo != null && !comentarioRechazo.trim().isEmpty()) {
+            sol.setJustificacionSupervisor((sol.getJustificacionSupervisor() != null ? sol.getJustificacionSupervisor() + " | " : "") + "[AUDIT_RH / RECHAZO FORZADO]: " + comentarioRechazo);
+        }
+        permisoRepo.save(sol);
+    }
+
+    @Transactional
+    public void retenerIncidenciaTxt(Long solicitudId) {
+        SolicitudPermiso permiso = permisoRepo.findById(solicitudId.intValue())
+                .orElseThrow(() -> new RuntimeException("Incidencia no encontrada"));
+
+        permiso.setEstatus("RETENIDO");
+        if (permiso.getJustificacionSupervisor() != null && !permiso.getJustificacionSupervisor().contains("[RETENIDO]")) {
+            permiso.setJustificacionSupervisor("[RETENIDO] " + permiso.getJustificacionSupervisor());
+        }
+        permisoRepo.save(permiso);
+    }
+
+    @Transactional
+    public void auditarPermisoBolsa(Long idSolicitud, boolean aprobado, String comentarioRechazo) {
+        SolicitudPermiso sol = permisoRepo.findById(idSolicitud.intValue())
+                .orElseThrow(() -> new RuntimeException("Error: No se encontró la incidencia."));
+
+        sol.setEstatus(aprobado ? "APLICADO_BOLSA" : "RECHAZADO_BOLSA");
+        if (comentarioRechazo != null && !comentarioRechazo.trim().isEmpty()) {
+            sol.setJustificacionSupervisor((sol.getJustificacionSupervisor() != null ? sol.getJustificacionSupervisor() + " | " : "") + "[AUDIT_RH]: " + comentarioRechazo);
+        }
+        permisoRepo.save(sol);
+    }
+
+    @Transactional
+    public int cerrarNominaLimpiarBandeja() {
+        // Barremos la bolsa
+        List<SolicitudPermiso> bolsa = permisoRepo.findAll().stream()
+                .filter(p -> p.getEstatus() != null && List.of("APLICADO_BOLSA", "RECHAZADO_BOLSA").contains(p.getEstatus().toUpperCase()))
+                .collect(Collectors.toList());
+
+        int count = 0;
+        for (SolicitudPermiso p : bolsa) {
+            p.setEstatus(p.getEstatus() + "_HISTORIAL");
+            permisoRepo.save(p);
+            count++;
+        }
+        return count;
+    }
+
+    /**
+     * Trae el historial reciente de permisos (Aprobados/Rechazados) para la tabla de Revocación.
+     */
+    public List<SolicitudPermiso> obtenerHistorialDecisionesPermisosLinea(Integer nominaJefe, List<Integer> wcIds) {
+        return permisoRepo.findAll().stream()
+                .filter(p -> p.getEstatus() != null &&
+                        (p.getEstatus().equalsIgnoreCase("APROBADO") || p.getEstatus().equalsIgnoreCase("RECHAZADO")))
+                .filter(p -> p.getEmpleado() != null &&
+                        p.getEmpleado().getWorkCenter() != null &&
+                        wcIds.contains(p.getEmpleado().getWorkCenter().getId()))
+                .filter(p -> p.getTipoPermiso() != null &&
+                        !"V".equalsIgnoreCase(p.getTipoPermiso().getCodigo())) // Excluir vacaciones puras
+                .sorted(java.util.Comparator.comparing(SolicitudPermiso::getFechaSolicitud).reversed())
+                .limit(50) // Limitamos a los últimos 50 para no saturar la vista
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Ejecuta el Override del Supervisor sobre un permiso ya procesado.
+     */
+    @Transactional
+    public void aplicarOverrideSupervisorPermiso(Long idSolicitud, Integer nominaSupervisor, String nuevoEstatus, String comentario) {
+        SolicitudPermiso sol = permisoRepo.findById(idSolicitud.intValue())
+                .orElseThrow(() -> new RuntimeException("Error: No se encontró la incidencia #" + idSolicitud));
+
+        Empleado supervisor = empleadoRepo.findById(nominaSupervisor)
+                .orElseThrow(() -> new RuntimeException("Supervisor no encontrado en el sistema."));
+
+        sol.setEstatus(nuevoEstatus);
+        sol.setJustificacionSupervisor((sol.getJustificacionSupervisor() != null ? sol.getJustificacionSupervisor() + " | " : "")
+                + "[REVOCACIÓN SUPERVISOR]: " + comentario);
+        sol.setResueltoPor(supervisor);
+
+        permisoRepo.save(sol);
     }
 }

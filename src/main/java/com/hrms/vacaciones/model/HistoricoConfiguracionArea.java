@@ -17,17 +17,11 @@ public class HistoricoConfiguracionArea {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    @Column(name = "work_center_id", nullable = false)
-    private Integer workCenterId;
-
     @Column(name = "mes", nullable = false)
     private Integer mes;
 
     @Column(name = "anio", nullable = false)
     private Integer anio;
-
-    @Column(name = "max_empleados_por_dia", nullable = false)
-    private Integer maxEmpleadosPorDia;
 
     @Column(name = "fecha_limite_registro", nullable = false)
     private LocalDate fechaLimiteRegistro;
@@ -38,8 +32,12 @@ public class HistoricoConfiguracionArea {
     @Column(name = "fecha_apertura_general", nullable = false)
     private LocalDate fechaAperturaGeneral;
 
-    @Column(name = "dias_minimos_rezago", nullable = false)
-    private Integer diasMinimosRezago;
+    // ✨ LOS NUEVOS CAMPOS DE LA FOTOGRAFÍA V2
+    @Column(name = "resumen_grupos", length = 500)
+    private String resumenGrupos;
+
+    @Column(name = "resumen_bloqueos", length = 500)
+    private String resumenBloqueos;
 
     @Column(name = "accion", nullable = false, length = 20)
     private String accion;

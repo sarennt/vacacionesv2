@@ -37,6 +37,29 @@ public class PrenominaService {
         Map<Integer, List<SolicitudVacaciones>> solicitudesPorEmpleado = solicitudes.stream()
                 .collect(Collectors.groupingBy(s -> s.getEmpleado().getNomina()));
 
+        // ✨ NUEVO: Pre-procesar vacaciones para búsqueda O(1) ultrarrápida
+        Map<Integer, Set<LocalDate>> diasVacacionesPorNomina = new HashMap<>();
+        Map<Integer, Map<LocalDate, String>> autorizadoresPorNomina = new HashMap<>();
+
+        for (Map.Entry<Integer, List<SolicitudVacaciones>> entry : solicitudesPorEmpleado.entrySet()) {
+            Integer nomina = entry.getKey();
+            diasVacacionesPorNomina.put(nomina, new HashSet<>());
+            autorizadoresPorNomina.put(nomina, new HashMap<>());
+
+            for (SolicitudVacaciones s : entry.getValue()) {
+                LocalDate cursor = s.getFechaInicio();
+                String autorizador = (s.getAprobadoPor() != null && s.getAprobadoPor().getNombreCompleto() != null)
+                        ? s.getAprobadoPor().getNombreCompleto().split(" ")[0]
+                        : "DEFAULT";
+
+                while (!cursor.isAfter(s.getFechaFin())) {
+                    diasVacacionesPorNomina.get(nomina).add(cursor);
+                    autorizadoresPorNomina.get(nomina).put(cursor, autorizador);
+                    cursor = cursor.plusDays(1);
+                }
+            }
+        }
+
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.createSheet("Prenómina");
 
@@ -84,34 +107,19 @@ public class PrenominaService {
                 c1.setCellValue(emp.getNombreCompleto());
                 c1.setCellStyle(dataStyle);
 
-                List<SolicitudVacaciones> solsEmp = solicitudesPorEmpleado.getOrDefault(emp.getNomina(),
-                        Collections.emptyList());
-
-                String autorizadoPor = "";
+                String autorizadorDelRenglon = "";
+                Set<LocalDate> diasVacaciones = diasVacacionesPorNomina.getOrDefault(emp.getNomina(), Collections.emptySet());
+                Map<LocalDate, String> mapaAutorizadores = autorizadoresPorNomina.getOrDefault(emp.getNomina(), Collections.emptyMap());
 
                 for (int colDate = 0; colDate < fechasSemana.size(); colDate++) {
                     LocalDate currentDay = fechasSemana.get(colDate);
                     Cell cDate = row.createCell(2 + colDate);
 
-                    boolean tieneVacacion = solsEmp.stream().anyMatch(
-                            s -> !currentDay.isBefore(s.getFechaInicio()) && !currentDay.isAfter(s.getFechaFin()));
-
-                    if (tieneVacacion) {
+                    // Búsqueda en caché, rapidísimo sin iterar colecciones
+                    if (diasVacaciones.contains(currentDay)) {
                         cDate.setCellValue("V");
-                        if (autorizadoPor.isEmpty()) {
-                            // Encontrar la solicitud que cubre este día para obtener el autorizador
-                            SolicitudVacaciones s = solsEmp.stream()
-                                    .filter(sol -> !currentDay.isBefore(sol.getFechaInicio())
-                                            && !currentDay.isAfter(sol.getFechaFin()))
-                                    .findFirst().orElse(null);
-
-                            if (s != null) {
-                                if (s.getAprobadoPor() != null && s.getAprobadoPor().getNombreCompleto() != null) {
-                                    autorizadoPor = s.getAprobadoPor().getNombreCompleto().split(" ")[0];
-                                } else {
-                                    autorizadoPor = "DEFAULT";
-                                }
-                            }
+                        if (autorizadorDelRenglon.isEmpty()) {
+                            autorizadorDelRenglon = mapaAutorizadores.get(currentDay);
                         }
                     } else {
                         cDate.setCellValue("");
@@ -120,7 +128,7 @@ public class PrenominaService {
                 }
 
                 Cell cAutorizado = row.createCell(2 + fechasSemana.size());
-                cAutorizado.setCellValue(autorizadoPor.isEmpty() ? "" : autorizadoPor);
+                cAutorizado.setCellValue(autorizadorDelRenglon == null ? "" : autorizadorDelRenglon);
                 cAutorizado.setCellStyle(dataStyle);
             }
 

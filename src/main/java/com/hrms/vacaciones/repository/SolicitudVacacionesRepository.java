@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.data.jpa.repository.EntityGraph;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -17,11 +18,13 @@ public interface SolicitudVacacionesRepository extends JpaRepository<SolicitudVa
 
         List<SolicitudVacaciones> findByEmpleado_NominaOrderByFechaInicioDesc(Integer nomina);
 
+        @EntityGraph(attributePaths = {"empleado"})
         List<SolicitudVacaciones> findByEstatusIn(List<String> estatus);
 
         List<SolicitudVacaciones> findByEmpleadoInAndEstatusIn(List<Empleado> empleados, List<String> estatus);
 
         // ⏰ CONTRATO DE ESCALAMIENTO: Habilita el barrido automático del Cron Job para solicitudes rezagadas
+        @EntityGraph(attributePaths = {"empleado"})
         List<SolicitudVacaciones> findByEstatusAndFechaCreacionBefore(String estatus, LocalDateTime fechaCreacion);
 
         // 📊 CONTRATO DE PRENÓMINA: Cruza las solicitudes aprobadas que se empalman con la semana del reporte Excel
@@ -45,7 +48,8 @@ public interface SolicitudVacacionesRepository extends JpaRepository<SolicitudVa
 
         // 🔒 Detector de Empalmes de Agenda
         @Query("SELECT s FROM SolicitudVacaciones s WHERE s.empleado.nomina = :nomina " +
-                "AND s.estatus <> 'Rechazado' AND (s.fechaInicio <= :fechaFin AND s.fechaFin >= :fechaInicio)")
+                "AND UPPER(s.estatus) NOT IN ('RECHAZADO', 'CANCELADO') " +
+                "AND (s.fechaInicio <= :fechaFin AND s.fechaFin >= :fechaInicio)")
         Optional<SolicitudVacaciones> encontrarSolicitudEmpalmada(@Param("nomina") Integer nomina,
                                                                   @Param("fechaInicio") LocalDate fechaInicio,
                                                                   @Param("fechaFin") LocalDate fechaFin);
@@ -76,15 +80,25 @@ public interface SolicitudVacacionesRepository extends JpaRepository<SolicitudVa
                                                  @Param("fecha") LocalDate fecha,
                                                  @Param("estatusList") List<String> estatusList);
 
-        @Query("SELECT COUNT(s) FROM SolicitudVacaciones s WHERE s.empleado.workCenter.id = :wcId AND s.turno.id = :turnoId AND s.estatus NOT IN ('Rechazado', 'Cancelado') AND :dia BETWEEN s.fechaInicio AND s.fechaFin")
+        @Query("SELECT COUNT(s) FROM SolicitudVacaciones s WHERE s.empleado.workCenter.id = :wcId AND s.turno.id = :turnoId AND UPPER(s.estatus) NOT IN ('RECHAZADO', 'CANCELADO') AND (UPPER(s.tipoSolicitud) LIKE '%VACACION%' OR UPPER(s.tipoSolicitud) = 'V') AND :dia BETWEEN s.fechaInicio AND s.fechaFin")
         long contarOcupadosPorLineaYTurno(@org.springframework.data.repository.query.Param("wcId") Integer wcId, @org.springframework.data.repository.query.Param("turnoId") Integer turnoId, @org.springframework.data.repository.query.Param("dia") java.time.LocalDate dia);
 
-        @Query("SELECT COUNT(s) FROM SolicitudVacaciones s WHERE s.empleado.workCenter.id IN :wcs AND s.turno.id = :turnoId AND s.estatus NOT IN ('Rechazado', 'Cancelado') AND :dia BETWEEN s.fechaInicio AND s.fechaFin")
+        @Query("SELECT COUNT(s) FROM SolicitudVacaciones s WHERE s.empleado.workCenter.id IN :wcs AND s.turno.id = :turnoId AND UPPER(s.estatus) NOT IN ('RECHAZADO', 'CANCELADO') AND (UPPER(s.tipoSolicitud) LIKE '%VACACION%' OR UPPER(s.tipoSolicitud) = 'V') AND :dia BETWEEN s.fechaInicio AND s.fechaFin")
         long contarOcupadosPorAreaYTurno(@org.springframework.data.repository.query.Param("wcs") java.util.List<Integer> wcs, @org.springframework.data.repository.query.Param("turnoId") Integer turnoId, @org.springframework.data.repository.query.Param("dia") java.time.LocalDate dia);
 
         @Query("SELECT COUNT(s) FROM SolicitudVacaciones s " +
                 "WHERE s.empleado.centroCosto.id IN :ccIds " +
-                "AND s.estatus NOT IN ('Rechazado', 'Cancelada', 'CANCELADA_CORTENOMINA') " +
+                "AND UPPER(s.estatus) NOT IN ('RECHAZADO', 'CANCELADA', 'CANCELADO', 'CANCELADA_CORTENOMINA') " +
+                "AND (UPPER(s.tipoSolicitud) LIKE '%VACACION%' OR UPPER(s.tipoSolicitud) = 'V') " +
                 "AND s.fechaInicio <= :fecha AND s.fechaFin >= :fecha")
         long countVacacionesPorGrupoYFecha(@Param("ccIds") List<Integer> ccIds, @Param("fecha") LocalDate fecha);
+
+        // 📊 Radar: Detalle de ocupación cruda por Grupo y Turno en un día específico
+        @Query("SELECT COUNT(s) FROM SolicitudVacaciones s " +
+                "WHERE s.empleado.centroCosto.id IN :ccIds " +
+                "AND s.turno.id = :turnoId " +
+                "AND UPPER(s.estatus) NOT IN ('RECHAZADO', 'CANCELADA', 'CANCELADO', 'CANCELADA_CORTENOMINA') " +
+                "AND (UPPER(s.tipoSolicitud) LIKE '%VACACION%' OR UPPER(s.tipoSolicitud) = 'V') " +
+                "AND s.fechaInicio <= :fecha AND s.fechaFin >= :fecha")
+        long countVacacionesPorGrupoYTurnoYFecha(@Param("ccIds") List<Integer> ccIds, @Param("turnoId") Integer turnoId, @Param("fecha") LocalDate fecha);
 }

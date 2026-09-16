@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
 
-    <link rel="stylesheet" th:href="@{/css/gestion-saldo.css}">
+    <link rel="stylesheet" th:href="@{/css/gestion-saldos.css}">
     <link rel="stylesheet" th:href="@{/css/estilos-grammer.css}">
 </head>
 <body class="bg-light pb-5">
@@ -31,6 +31,13 @@
 
     <ul class="nav nav-pills nav-fill bg-white shadow-sm rounded-4 p-2 mb-4" id="pills-tab" role="tablist">
         <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-3 fw-bold py-2" id="pills-auditoria-tab" data-bs-toggle="pill" data-bs-target="#pills-auditoria" type="button" role="tab" aria-controls="pills-auditoria" aria-selected="false">
+                <i class="bi bi-shield-lock-fill me-2 text-danger"></i>Auditoría RH (Semana Actual)
+                <!-- ✨ CORRECCIÓN: Variable exclusiva incidenciasAuditoria -->
+                <span th:if="${not #lists.isEmpty(incidenciasAuditoria)}" class="badge bg-danger ms-2 rounded-pill shadow-sm" th:text="${incidenciasAuditoria.size()}">0</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
             <button class="nav-link active rounded-3 fw-bold py-2" id="pills-individual-tab" data-bs-toggle="pill" data-bs-target="#pills-individual" type="button" role="tab" aria-controls="pills-individual" aria-selected="true">
                 <i class="bi bi-person-bounding-box me-2"></i>Ajustes Individuales y Fichas
             </button>
@@ -38,7 +45,7 @@
         <li class="nav-item" role="presentation">
             <button class="nav-link rounded-3 fw-bold py-2" id="pills-recuperaciones-tab" data-bs-toggle="pill" data-bs-target="#pills-recuperaciones" type="button" role="tab" aria-controls="pills-recuperaciones" aria-selected="false">
                 <i class="bi bi-clock-history me-2"></i>Bandeja e Historial de Recuperaciones
-                <span th:if="${recuperacionesPendientes != null and !recuperacionesPendientes.isEmpty()}" class="badge bg-danger ms-2 rounded-pill" th:text="${recuperacionesPendientes.size()}">0</span>
+                <span th:if="${not #lists.isEmpty(recuperacionesPendientes)}" class="badge bg-danger ms-2 rounded-pill" th:text="${recuperacionesPendientes.size()}">0</span>
             </button>
         </li>
         <li class="nav-item" role="presentation">
@@ -52,6 +59,11 @@
             </button>
         </li>
         <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-3 fw-bold py-2" id="pills-calendario-tab" data-bs-toggle="pill" data-bs-target="#pills-calendario" type="button" role="tab" aria-controls="pills-calendario" aria-selected="false">
+                <i class="bi bi-calendar-week-fill me-2 text-primary"></i>Calendario de Planta
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
             <button class="nav-link rounded-3 fw-bold py-2" id="pills-exportador-tab" data-bs-toggle="pill" data-bs-target="#pills-exportador" type="button" role="tab" aria-controls="pills-exportador" aria-selected="false">
                 <i class="bi bi-file-earmark-excel-fill me-2 text-success"></i>Exportador de Prenómina
             </button>
@@ -60,6 +72,7 @@
 
     <div class="tab-content" id="pills-tabContent">
 
+        <!-- PESTAÑA 1: AJUSTES INDIVIDUALES -->
         <div class="tab-pane fade show active" id="pills-individual" role="tabpanel" aria-labelledby="pills-individual-tab">
             <section class="custom-card p-4 mb-4 bg-white shadow-sm rounded-3">
                 <form action="/pantallas/gestion-saldos" method="GET" class="row g-3 align-items-end">
@@ -190,9 +203,9 @@
                             <div class="input-group">
                                 <span class="input-group-text bg-white"><i class="bi bi-gavel text-muted" style="font-size: 18px;"></i></span>
                                 <select class="form-select bg-light text-dark" id="tipoEmpleado" name="tipoEmpleado" required onchange="conmutarCamposExtranjero()">
-                                    <option value="SINDICALIZADO" th:selected="${empleadoEncontrado.tipoEmpleado != null && #strings.equalsIgnoreCase(empleadoEncontrado.tipoEmpleado, 'SINDICALIZADO')}">Sindicalizado (Tope estricto de negativos .9)</option>
-                                    <option value="ADMINISTRATIVO" th:selected="${empleadoEncontrado.tipoEmpleado != null && #strings.equalsIgnoreCase(empleadoEncontrado.tipoEmpleado, 'ADMINISTRATIVO')}">Administrativo (Barra Libre)</option>
-                                    <option value="EXTRANJERO" th:selected="${empleadoEncontrado.tipoEmpleado != null && #strings.equalsIgnoreCase(empleadoEncontrado.tipoEmpleado, 'EXTRANJERO')}">Extranjero (Contrato Especial / Visa)</option>
+                                    <option value="SINDICALIZADO" th:selected="${empleadoEncontrado.tipoEmpleado != null and #strings.equalsIgnoreCase(empleadoEncontrado.tipoEmpleado, 'SINDICALIZADO')}">Sindicalizado (Tope estricto de negativos .9)</option>
+                                    <option value="ADMINISTRATIVO" th:selected="${empleadoEncontrado.tipoEmpleado != null and #strings.equalsIgnoreCase(empleadoEncontrado.tipoEmpleado, 'ADMINISTRATIVO')}">Administrativo (Barra Libre)</option>
+                                    <option value="EXTRANJERO" th:selected="${empleadoEncontrado.tipoEmpleado != null and #strings.equalsIgnoreCase(empleadoEncontrado.tipoEmpleado, 'EXTRANJERO')}">Extranjero (Contrato Especial / Visa)</option>
                                 </select>
                             </div>
                             <div class="form-text text-muted">Establece el comportamiento de validación del saldo para este colaborador.</div>
@@ -256,132 +269,535 @@
                             </tr>
                             </thead>
                             <tbody style="font-size: 0.88rem;">
+                            <!-- ✨ LA CIRUGÍA FUE AQUÍ: Variables correctas diasModificados y comentarioJustificacion -->
                             <tr th:each="audit : ${historialAuditoria}">
                                 <td class="px-3 font-monospace fw-bold text-dark" th:text="${audit.fechaMovimiento != null ? #temporals.format(audit.fechaMovimiento, 'dd/MM/yyyy HH:mm:ss') : 'N/A'}"></td>
 
                                 <td>
                                     <span class="badge rounded-2 px-3 py-1"
-                                          th:classappend="${audit.diasAjustados >= 0} ? 'bg-success' : 'bg-danger'"
-                                          th:text="${audit.diasAjustados >= 0 ? 'REEMBOLSO' : 'DESCUENTO'}"></span>
+                                          th:classappend="${audit.diasModificados != null and audit.diasModificados >= 0} ? 'bg-success' : 'bg-danger'"
+                                          th:text="${audit.diasModificados != null and audit.diasModificados >= 0 ? 'REEMBOLSO' : 'DESCUENTO'}"></span>
                                 </td>
 
                                 <td class="fw-bold text-center"
-                                    th:classappend="${audit.diasAjustados >= 0} ? 'text-success' : 'text-danger'"
-                                    th:text="${audit.diasAjustados >= 0 ? '+' + audit.diasAjustados : audit.diasAjustados}"></td>
+                                    th:classappend="${audit.diasModificados != null and audit.diasModificados >= 0} ? 'text-success' : 'text-danger'"
+                                    th:text="${audit.diasModificados != null and audit.diasModificados >= 0 ? '+' + audit.diasModificados : audit.diasModificados}"></td>
 
-                                <td class="text-muted style-mini" th:text="${audit.justificacion}"></td>
+                                <td class="text-muted style-mini" th:text="${audit.comentarioJustificacion}"></td>
                             </tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
 
-                <section class="custom-card p-4 mb-4 border-top border-4 border-primary shadow-sm" th:if="${historialGeneral != null}">
+                <section class="custom-card p-4 mb-4 border-top border-4 border-primary shadow-sm" th:if="${historialVacacionesIndiv != null or historialPermisosIndiv != null}">
                     <div class="d-flex align-items-center gap-2 border-bottom pb-3 mb-4">
                         <div class="rounded p-2 d-flex align-items-center" style="background-color: #e0e7ff; color: #3b82f6;">
                             <i class="bi bi-clock-history fs-4"></i>
                         </div>
-                        <h3 class="h5 mb-0 fw-bold text-dark">Línea de Timeline del Colaborador (Vista Espejo)</h3>
+                        <h3 class="h5 mb-0 fw-bold text-dark">Línea de Timeline del Colaborador (Vista Dividida)</h3>
                     </div>
 
-                    <div class="text-center mt-4 text-muted" th:if="${historialGeneral.isEmpty()}">
-                        <i class="bi bi-inbox fs-1 opacity-50"></i>
-                        <p class="mb-0 fw-medium mt-1">El colaborador aún no tiene solicitudes ni movimientos de vacaciones registrados.</p>
-                    </div>
+                    <div class="row g-4">
+                        <!-- COLUMNA VACACIONES -->
+                        <div class="col-md-6 border-end">
+                            <h6 class="fw-bold text-secondary mb-3"><i class="bi bi-sun-fill text-warning me-1"></i> Historial de Vacaciones</h6>
 
-                    <div class="d-flex flex-column gap-3" style="max-height: 500px; overflow-y: auto; padding-right: 10px;" th:if="${!historialGeneral.isEmpty()}">
-                        <div class="card p-3 mb-2 border-0 shadow-sm" th:each="solicitud : ${historialGeneral}" style="background-color: #f8f9fa;">
-                            <div class="mb-2 d-flex justify-content-between align-items-center">
-                                <span class="badge bg-info text-dark small fw-bold" th:text="${solicitud.tipoSolicitud}">AJUSTE</span>
-                                <span class="badge rounded-pill px-3 py-2" th:classappend="${solicitud.estatus == 'Aprobado' ? 'bg-success' : 'bg-danger'}" th:text="${solicitud.estatus}">Aprobado</span>
+                            <div class="text-center mt-4 text-muted" th:if="${#lists.isEmpty(historialVacacionesIndiv)}">
+                                <i class="bi bi-inbox fs-2 opacity-50"></i>
+                                <p class="mb-0 fw-medium mt-1 small">Sin solicitudes de vacaciones registradas.</p>
                             </div>
-                            <div class="fw-bold text-dark" th:text="${solicitud.fechaInicio} + ' al ' + ${solicitud.fechaFin}"></div>
-                            <div class="small text-muted" th:text="${solicitud.diasTotalesCalculados} + ' días calculados'"></div>
+
+                            <div class="d-flex flex-column gap-3" style="max-height: 400px; overflow-y: auto; padding-right: 10px;" th:if="${not #lists.isEmpty(historialVacacionesIndiv)}">
+                                <div class="card p-3 mb-2 border-0 shadow-sm" th:each="solicitud : ${historialVacacionesIndiv}" style="background-color: #f8f9fa;">
+                                    <div class="mb-2 d-flex justify-content-between align-items-center">
+                                        <span class="badge bg-success text-white small fw-bold">VACACIONES</span>
+                                        <span class="badge rounded-pill px-3 py-1" th:classappend="${solicitud.estatus == 'Aprobado' ? 'bg-success' : (solicitud.estatus == 'Rechazado' ? 'bg-danger' : 'bg-secondary')}" th:text="${solicitud.estatus}">Aprobado</span>
+                                    </div>
+                                    <div class="fw-bold text-dark small" th:text="${solicitud.fechaInicio} + ' al ' + ${solicitud.fechaFin}"></div>
+                                    <div class="small text-muted" th:text="${solicitud.diasTotalesCalculados} + ' días calculados'"></div>
+
+                                    <!-- Auditoría de Vacaciones -->
+                                    <div class="small text-muted mt-2 border-top pt-2" style="font-size: 0.75rem;">
+                                        <div class="mb-1"><i class="bi bi-calendar-plus me-1"></i>Ingresada: <span class="fw-bold text-dark" th:text="${solicitud.fechaCreacion != null ? #temporals.format(solicitud.fechaCreacion, 'dd/MM/yyyy HH:mm') : 'N/A'}"></span></div>
+                                        <div><i class="bi bi-person-check-fill me-1"></i>Autorizó: <span class="fw-bold text-dark" th:text="${solicitud.jefeAutorizadorNombre ?: 'Mando Directo / Sistema'}"></span></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- COLUMNA PERMISOS E INCIDENCIAS -->
+                        <div class="col-md-6">
+                            <h6 class="fw-bold text-secondary mb-3"><i class="bi bi-ticket-detailed-fill text-info me-1"></i> Permisos e Incidencias Operativas</h6>
+
+                            <div class="text-center mt-4 text-muted" th:if="${#lists.isEmpty(historialPermisosIndiv)}">
+                                <i class="bi bi-inbox fs-2 opacity-50"></i>
+                                <p class="mb-0 fw-medium mt-1 small">Sin incidencias operativas registradas.</p>
+                            </div>
+
+                            <div class="d-flex flex-column gap-3" style="max-height: 400px; overflow-y: auto; padding-right: 10px;" th:if="${not #lists.isEmpty(historialPermisosIndiv)}">
+                                <div class="card p-3 mb-2 border-0 shadow-sm" th:each="solicitud : ${historialPermisosIndiv}" style="background-color: #f8f9fa;">
+                                    <div class="mb-2 d-flex justify-content-between align-items-center">
+                                        <span class="badge bg-info text-dark small fw-bold" th:text="${solicitud.tipoSolicitud != null ? solicitud.tipoSolicitud : 'INCIDENCIA'}">INCIDENCIA</span>
+                                        <span class="badge rounded-pill px-3 py-1" th:classappend="${solicitud.estatus == 'Aprobado' ? 'bg-success' : (solicitud.estatus == 'Rechazado' ? 'bg-danger' : 'bg-secondary')}" th:text="${solicitud.estatus}">Aprobado</span>
+                                    </div>
+                                    <div class="fw-bold text-dark small" th:text="${solicitud.fechaInicio} + ' al ' + ${solicitud.fechaFin}"></div>
+                                    <div class="small text-muted" th:text="${solicitud.diasTotalesCalculados} + ' días calculados'"></div>
+
+                                    <!-- Agregamos el contexto extra del jefe (TXT, HO, etc.) -->
+                                    <div class="small text-secondary mt-1 fst-italic border-top pt-2 mt-2" th:if="${solicitud.comentarioJefe != null and !#strings.isEmpty(solicitud.comentarioJefe)}" th:text="${solicitud.comentarioJefe}"></div>
+
+                                    <!-- Desglose de Pagos TXT -->
+                                    <div th:if="${solicitud.detallePagos != null and !#lists.isEmpty(solicitud.detallePagos)}" class="mt-2 bg-warning bg-opacity-10 p-2 rounded border border-warning border-opacity-50">
+                                        <div class="fw-bold text-dark small mb-1" style="font-size: 0.75rem;"><i class="bi bi-stopwatch-fill text-warning me-1"></i>Fechas de Reposición (Pagos):</div>
+                                        <div th:each="pagoStr : ${solicitud.detallePagos}" class="text-muted fw-medium" style="font-size: 0.75rem;">
+                                            <i class="bi bi-calendar-check text-success me-1"></i>
+                                            <span th:text="${pagoStr}"></span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Auditoría de Permisos -->
+                                    <div class="small text-muted mt-2 border-top pt-2" style="font-size: 0.75rem;">
+                                        <div class="mb-1"><i class="bi bi-calendar-plus me-1"></i>Ingresada: <span class="fw-bold text-dark" th:text="${solicitud.fechaCreacion != null ? #temporals.format(solicitud.fechaCreacion, 'dd/MM/yyyy HH:mm') : 'N/A'}"></span></div>
+                                        <div><i class="bi bi-person-check-fill me-1"></i>Autorizó: <span class="fw-bold text-dark" th:text="${solicitud.jefeAutorizadorNombre ?: 'Mando Directo / Sistema'}"></span></div>
+                                    </div>
+
+                                    <!-- Auditoría de Permisos -->
+                                    <div class="small text-muted mt-2 border-top pt-2" style="font-size: 0.75rem;">
+                                        <div class="mb-1"><i class="bi bi-calendar-plus me-1"></i>Ingresada: <span class="fw-bold text-dark" th:text="${solicitud.fechaCreacion != null ? #temporals.format(solicitud.fechaCreacion, 'dd/MM/yyyy HH:mm') : 'N/A'}"></span></div>
+                                        <div><i class="bi bi-person-check-fill me-1"></i>Autorizó: <span class="fw-bold text-dark" th:text="${solicitud.jefeAutorizadorNombre ?: 'Mando Directo / Sistema'}"></span></div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </section>
             </section>
         </div>
 
-        <div class="tab-pane fade" id="pills-recuperaciones" role="tabpanel" aria-labelledby="pills-recuperaciones-tab">
-            <section class="custom-card p-4 mb-4 bg-white shadow-sm rounded-3 border-top border-4 border-primary">
+        <!-- PESTAÑA NUEVA: AUDITORÍA RH Y RECHAZOS (SEMANA VIVA) -->
+        <div class="tab-pane fade" id="pills-auditoria" role="tabpanel" aria-labelledby="pills-auditoria-tab">
+            <section class="custom-card p-4 mb-4 bg-white shadow-sm rounded-3 border-top border-4 border-danger">
 
-                <div id="bulkActionsBarRecuperaciones" class="d-none sticky-top bg-dark text-white p-3 shadow-lg mb-4" style="top: 80px; z-index: 1020; border-radius: 12px;">
+                <!-- BARRA FLOTANTE (SOLO RECHAZO) -->
+                <div id="bulkActionsBarAuditoria" class="d-none sticky-top bg-dark text-white p-3 shadow-lg mb-4 border" style="top: 80px; z-index: 1020; border-radius: 12px;">
                     <div class="d-flex justify-content-between align-items-center">
-                        <span class="badge bg-warning text-dark px-3 py-2 rounded-pill fw-bold"><span id="selectedCountRecuperaciones">0</span> Seleccionados</span>
-                        <div class="d-flex gap-2">
-                            <button type="button" class="btn btn-success btn-sm px-3 fw-bold" onclick="abrirModalMasivo('APROBADO')">Aplicar Lote</button>
-                            <button type="button" class="btn btn-outline-light btn-sm px-3 fw-bold" onclick="abrirModalMasivo('RECHAZADO')">Rechazar Lote</button>
+                        <span class="fw-bold"><i class="bi bi-exclamation-triangle text-warning me-2 fs-5"></i><span id="selectedCountAuditoria">0</span> Seleccionadas para Rechazo</span>
+                        <button type="button" class="btn btn-danger btn-sm px-4 fw-bold shadow-sm" onclick="abrirModalMasivoRechazo()">
+                            <i class="bi bi-x-lg me-1"></i> Rechazar Lote y Devolver Saldos
+                        </button>
+                    </div>
+                </div>
+
+                <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between border-bottom pb-3 mb-4 gap-3">
+                    <div>
+                        <h3 class="h5 mb-1 fw-bold text-dark"><i class="bi bi-search text-danger me-2"></i>Auditoría de Incidencias (Semana Presente)</h3>
+                        <p class="text-muted mb-0 small">Todo lo mostrado aquí ya está autorizado y afectará la nómina en curso. Selecciona únicamente lo que debas rechazar (se devolverá el saldo si es vacación) o retener.</p>
+                    </div>
+                </div>
+
+                <div class="row mb-4">
+                    <div class="col-md-8">
+                        <div class="input-group shadow-sm">
+                            <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                            <input type="text" id="buscadorBandejaAuditoria" class="form-control bg-light border-start-0" placeholder="Buscar por Nómina, Nombre o Fecha..." onkeyup="filtrarBandejaAuditoria()">
                         </div>
                     </div>
                 </div>
 
-                <div class="d-flex align-items-center justify-content-between border-bottom pb-3 mb-4">
-                    <div>
-                        <h3 class="h5 mb-1 fw-bold text-dark"><i class="bi bi-mailbox2 text-primary me-2"></i>Bandeja de Pendientes Actuales</h3>
-                        <p class="text-muted mb-0 small">Muestra solicitudes semanales enviadas por supervisores a cuenta de vacaciones.</p>
+                <!-- TABS PRINCIPALES: MUNDOS -->
+                <ul class="nav nav-tabs border-0 border-bottom mb-4 pb-2" id="subTabAuditoria" role="tablist">
+                    <li class="nav-item">
+                        <button class="nav-link active fw-bold text-success" id="auditoria-sind-tab" data-bs-toggle="tab" data-bs-target="#auditoria-sind" type="button" role="tab">
+                            <i class="bi bi-gear-fill me-1"></i> BCD Sindicalizados
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link fw-bold text-primary" id="auditoria-admin-tab" data-bs-toggle="tab" data-bs-target="#auditoria-admin" type="button" role="tab">
+                            <i class="bi bi-person-badge-fill me-1"></i> Administrativos (BCI/WC)
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content" id="subTabAuditoriaContent">
+
+                    <!-- ====== MUNDO SINDICALIZADOS ====== -->
+                    <div class="tab-pane fade show active" id="auditoria-sind" role="tabpanel">
+                        <ul class="nav nav-pills mb-3 bg-light p-2 rounded-3 border" role="tablist">
+                            <li class="nav-item" role="presentation"><button class="nav-link active fw-bold text-dark" data-bs-toggle="pill" data-bs-target="#aud-sind-vacs" type="button"><i class="bi bi-sun-fill text-warning me-1"></i>Vacaciones</button></li>
+                            <li class="nav-item" role="presentation"><button class="nav-link fw-bold text-dark" data-bs-toggle="pill" data-bs-target="#aud-sind-perms" type="button"><i class="bi bi-ticket-detailed-fill text-info me-1"></i>Permisos (TXT, HO, ETC)</button></li>
+                        </ul>
+
+                        <div class="tab-content">
+                            <!-- SUB-TAB SIND: VACACIONES -->
+                            <div class="tab-pane fade show active" id="aud-sind-vacs">
+                                <div class="d-flex justify-content-end mb-2">
+                                    <button class="btn btn-sm btn-outline-success fw-bold" onclick="exportarTablaEspecífica('tablaAudSindVacs', 'Auditoria_Vacaciones_Sind')"><i class="bi bi-file-excel"></i> Exportar</button>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle border text-start tabla-filtrable-auditoria" id="tablaAudSindVacs">
+                                        <thead class="table-light text-secondary" style="font-size: 0.85rem;">
+                                        <tr>
+                                            <th class="text-center" style="width: 50px;"><input class="form-check-input fs-5" type="checkbox" onclick="toggleAllAuditoria(this)"></th>
+                                            <th style="cursor: pointer;" onclick="ordenarPorColumna('tablaAudSindVacs', 1, 'str')">Nómina / Colaborador <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                                            <th class="text-center" style="cursor: pointer;" onclick="ordenarPorColumna('tablaAudSindVacs', 2, 'int')">Semana <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                                            <th style="cursor: pointer;" onclick="ordenarPorColumna('tablaAudSindVacs', 3, 'date')">Periodo Vacacional <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                                            <th class="text-center" style="cursor: pointer;" onclick="ordenarPorColumna('tablaAudSindVacs', 4, 'int')">Días <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                                            <th style="cursor: pointer;" onclick="ordenarPorColumna('tablaAudSindVacs', 5, 'str')">Jefe Autorizador <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                                            <th class="text-end px-3">Acción de Rechazo</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody style="font-size: 0.9rem;">
+                                        <tr th:each="vac : ${auditoriaVacaciones}" th:if="${vac.empleado != null and #strings.equalsIgnoreCase(vac.empleado.tipoEmpleado, 'SINDICALIZADO')}">
+                                            <td class="text-center"><input class="form-check-input fs-5 auditoria-check" type="checkbox" th:value="'VAC-' + ${vac.id}" onclick="updateSelectedCountAuditoria()"></td>
+                                            <td><div class="fw-bold text-dark" th:text="${vac.empleado.nombreCompleto}"></div><small class="font-monospace text-secondary" th:text="'#' + ${vac.empleado.nomina}"></small></td>
+
+                                            <!-- ✨ COLUMNA SEMANA CALENDARIO -->
+                                            <td class="text-center"><span class="badge bg-secondary bg-opacity-10 text-dark border fw-bold" th:text="'W' + ${#temporals.format(vac.fechaInicio, 'ww')}"></span></td>
+
+                                            <td><span class="badge bg-success bg-opacity-10 text-success rounded-pill px-3 py-1 fw-semibold" th:text="${vac.fechaInicio} + ' al ' + ${vac.fechaFin}"></span></td>
+                                            <td class="fw-bold text-center" th:text="${vac.diasTotalesCalculados}"></td>
+                                            <td th:text="${vac.aprobadoPor != null ? vac.aprobadoPor.nombreCompleto : 'Sistema'}"></td>
+                                            <td class="text-end px-3">
+                                                <button type="button" class="btn btn-sm btn-danger fw-bold px-3 rounded-pill shadow-sm" th:data-id="'VAC-' + ${vac.id}" th:data-nombre="${vac.empleado.nombreCompleto}" onclick="abrirModalRechazoAuditoria(this.getAttribute('data-id'), this.getAttribute('data-nombre'), 'Vacación', 'Revisión de Auditoría')"><i class="bi bi-x-circle me-1"></i> Rechazar y Devolver Saldo</button>
+                                            </td>
+                                        </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <!-- SUB-TAB SIND: PERMISOS -->
+                            <div class="tab-pane fade" id="aud-sind-perms">
+                                <div class="d-flex justify-content-end mb-2">
+                                    <button class="btn btn-sm btn-outline-info fw-bold" onclick="exportarTablaEspecífica('tablaAudSindPerms', 'Auditoria_Permisos_Sind')"><i class="bi bi-file-excel"></i> Exportar</button>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle border text-start tabla-filtrable-auditoria" id="tablaAudSindPerms">
+                                        <thead class="table-light text-secondary" style="font-size: 0.85rem;">
+                                        <tr>
+                                            <th class="text-center" style="width: 50px;"><input class="form-check-input fs-5" type="checkbox" onclick="toggleAllAuditoria(this)"></th>
+                                            <th style="cursor: pointer;" onclick="ordenarPorColumna('tablaAudSindPerms', 1, 'str')">Nómina / Colaborador <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                                            <th class="text-center" style="cursor: pointer;" onclick="ordenarPorColumna('tablaAudSindPerms', 2, 'int')">Semana <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                                            <th style="cursor: pointer;" onclick="ordenarPorColumna('tablaAudSindPerms', 3, 'date')">Fecha Falta <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                                            <th>Contexto / Reposición TXT</th>
+                                            <th style="cursor: pointer;" onclick="ordenarPorColumna('tablaAudSindPerms', 5, 'str')">Jefe Autorizador <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                                            <th class="text-end px-3">Acciones de RH</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody style="font-size: 0.9rem;">
+                                        <tr th:each="perm : ${auditoriaPermisos}" th:if="${perm.empleado != null and #strings.equalsIgnoreCase(perm.empleado.tipoEmpleado, 'SINDICALIZADO')}">
+                                            <td class="text-center"><input class="form-check-input fs-5 auditoria-check" type="checkbox" th:value="'PERM-' + ${perm.id}" onclick="updateSelectedCountAuditoria()"></td>
+                                            <td><div class="fw-bold text-dark" th:text="${perm.empleado.nombreCompleto}"></div><small class="font-monospace text-secondary" th:text="'#' + ${perm.empleado.nomina}"></small></td>
+
+                                            <!-- ✨ COLUMNA SEMANA CALENDARIO -->
+                                            <td class="text-center"><span class="badge bg-secondary bg-opacity-10 text-dark border fw-bold" th:text="'W' + ${#temporals.format(perm.fechaIncidencia, 'ww')}"></span></td>
+
+                                            <td><span class="badge bg-danger bg-opacity-10 text-danger rounded-pill px-3 py-1 fw-semibold" th:text="${perm.fechaIncidencia}"></span></td>
+                                            <td>
+                                                <span th:if="${perm.estatus == 'RETENIDO'}" class="badge bg-warning text-dark mb-1"><i class="bi bi-pause-circle-fill"></i> FORMATO RETENIDO</span>
+                                                <span class="fw-bold ms-1" th:text="${perm.tipoPermiso.codigo}"></span>
+                                                <small class="d-block text-muted mb-2" th:text="${perm.justificacionSupervisor}"></small>
+
+                                                <div th:if="${perm.tipoPermiso.codigo == 'TXT' and not #lists.isEmpty(perm.desglosesPago)}" class="p-2 bg-light border border-warning border-opacity-50 rounded-2" style="font-size: 0.75rem;">
+                                                    <div class="fw-bold text-dark mb-1" style="font-size: 0.70rem; letter-spacing: 0.5px;"><i class="bi bi-stopwatch-fill text-warning me-1"></i>FECHAS DE PAGO PACTADAS:</div>
+                                                    <div th:each="pago : ${perm.desglosesPago}" class="text-secondary fw-semibold ms-1">
+                                                        <i class="bi bi-calendar2-check text-success me-1"></i>
+                                                        <span th:text="${#temporals.format(pago.fechaPago, 'dd/MM/yyyy')} + ' (' + ${pago.horasPago} + ' hrs)'"></span>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td th:text="${perm.resueltoPor != null ? perm.resueltoPor.nombreCompleto : 'Sistema'}"></td>
+                                            <td class="text-end px-3">
+                                                <button type="button" class="btn btn-sm btn-outline-danger fw-bold px-3 rounded-pill shadow-sm" th:data-id="'PERM-' + ${perm.id}" th:data-nombre="${perm.empleado.nombreCompleto}" onclick="abrirModalRechazoAuditoria(this.getAttribute('data-id'), this.getAttribute('data-nombre'), 'Incidencia', 'Revisión de Auditoría')">Rechazar Permiso</button>
+                                                <form th:action="@{/pantallas/gestion-saldos/retener-txt}" method="POST" class="d-inline ms-1" th:if="${perm.tipoPermiso.codigo == 'TXT' and perm.estatus != 'RETENIDO'}">
+                                                    <input type="hidden" name="solicitudId" th:value="${perm.id}">
+                                                    <button type="submit" class="btn btn-sm btn-warning fw-bold px-3 rounded-pill shadow-sm text-dark" title="Mandar a 'F' temporal y retener para la próxima semana"><i class="bi bi-pause-circle-fill"></i> Retener</button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ====== MUNDO ADMINISTRATIVOS ====== -->
+                    <div class="tab-pane fade" id="auditoria-admin" role="tabpanel">
+                        <ul class="nav nav-pills mb-3 bg-light p-2 rounded-3 border" role="tablist">
+                            <li class="nav-item" role="presentation"><button class="nav-link active fw-bold text-dark" data-bs-toggle="pill" data-bs-target="#aud-admin-vacs" type="button"><i class="bi bi-sun-fill text-warning me-1"></i>Vacaciones</button></li>
+                            <li class="nav-item" role="presentation"><button class="nav-link fw-bold text-dark" data-bs-toggle="pill" data-bs-target="#aud-admin-perms" type="button"><i class="bi bi-ticket-detailed-fill text-info me-1"></i>Permisos (TXT, HO, ETC)</button></li>
+                        </ul>
+
+                        <div class="tab-content">
+                            <!-- SUB-TAB ADMIN: VACACIONES -->
+                            <div class="tab-pane fade show active" id="aud-admin-vacs">
+                                <div class="d-flex justify-content-end mb-2">
+                                    <button class="btn btn-sm btn-outline-success fw-bold" onclick="exportarTablaEspecífica('tablaAudAdminVacs', 'Auditoria_Vacaciones_Admin')"><i class="bi bi-file-excel"></i> Exportar</button>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle border text-start tabla-filtrable-auditoria" id="tablaAudAdminVacs">
+                                        <thead class="table-light text-secondary" style="font-size: 0.85rem;">
+                                        <tr>
+                                            <th class="text-center" style="width: 50px;"><input class="form-check-input fs-5" type="checkbox" onclick="toggleAllAuditoria(this)"></th>
+                                            <th style="cursor: pointer;" onclick="ordenarPorColumna('tablaAudAdminVacs', 1, 'str')">Nómina / Colaborador <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                                            <th class="text-center" style="cursor: pointer;" onclick="ordenarPorColumna('tablaAudAdminVacs', 2, 'int')">Semana <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                                            <th style="cursor: pointer;" onclick="ordenarPorColumna('tablaAudAdminVacs', 3, 'date')">Periodo Vacacional <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                                            <th class="text-center" style="cursor: pointer;" onclick="ordenarPorColumna('tablaAudAdminVacs', 4, 'int')">Días <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                                            <th style="cursor: pointer;" onclick="ordenarPorColumna('tablaAudAdminVacs', 5, 'str')">Jefe Autorizador <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                                            <th class="text-end px-3">Acción de Rechazo</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody style="font-size: 0.9rem;">
+                                        <tr th:each="vac : ${auditoriaVacaciones}" th:if="${vac.empleado != null and #strings.equalsIgnoreCase(vac.empleado.tipoEmpleado, 'ADMINISTRATIVO')}">
+                                            <td class="text-center"><input class="form-check-input fs-5 auditoria-check" type="checkbox" th:value="'VAC-' + ${vac.id}" onclick="updateSelectedCountAuditoria()"></td>
+                                            <td><div class="fw-bold text-dark" th:text="${vac.empleado.nombreCompleto}"></div><small class="font-monospace text-secondary" th:text="'#' + ${vac.empleado.nomina}"></small></td>
+
+                                            <!-- ✨ COLUMNA SEMANA CALENDARIO -->
+                                            <td class="text-center"><span class="badge bg-secondary bg-opacity-10 text-dark border fw-bold" th:text="'W' + ${#temporals.format(vac.fechaInicio, 'ww')}"></span></td>
+
+                                            <td><span class="badge bg-success bg-opacity-10 text-success rounded-pill px-3 py-1 fw-semibold" th:text="${vac.fechaInicio} + ' al ' + ${vac.fechaFin}"></span></td>
+                                            <td class="fw-bold text-center" th:text="${vac.diasTotalesCalculados}"></td>
+                                            <td th:text="${vac.aprobadoPor != null ? vac.aprobadoPor.nombreCompleto : 'Sistema'}"></td>
+                                            <td class="text-end px-3">
+                                                <button type="button" class="btn btn-sm btn-danger fw-bold px-3 rounded-pill shadow-sm" th:data-id="'VAC-' + ${vac.id}" th:data-nombre="${vac.empleado.nombreCompleto}" onclick="abrirModalRechazoAuditoria(this.getAttribute('data-id'), this.getAttribute('data-nombre'), 'Vacación', 'Revisión de Auditoría')"><i class="bi bi-x-circle me-1"></i> Rechazar y Devolver Saldo</button>
+                                            </td>
+                                        </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <!-- SUB-TAB ADMIN: PERMISOS -->
+                            <div class="tab-pane fade" id="aud-admin-perms">
+                                <div class="d-flex justify-content-end mb-2">
+                                    <button class="btn btn-sm btn-outline-info fw-bold" onclick="exportarTablaEspecífica('tablaAudAdminPerms', 'Auditoria_Permisos_Admin')"><i class="bi bi-file-excel"></i> Exportar</button>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle border text-start tabla-filtrable-auditoria" id="tablaAudAdminPerms">
+                                        <thead class="table-light text-secondary" style="font-size: 0.85rem;">
+                                        <tr>
+                                            <th class="text-center" style="width: 50px;"><input class="form-check-input fs-5" type="checkbox" onclick="toggleAllAuditoria(this)"></th>
+                                            <th style="cursor: pointer;" onclick="ordenarPorColumna('tablaAudAdminPerms', 1, 'str')">Nómina / Colaborador <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                                            <th class="text-center" style="cursor: pointer;" onclick="ordenarPorColumna('tablaAudAdminPerms', 2, 'int')">Semana <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                                            <th style="cursor: pointer;" onclick="ordenarPorColumna('tablaAudAdminPerms', 3, 'date')">Fecha Falta <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                                            <th>Contexto / Reposición TXT</th>
+                                            <th style="cursor: pointer;" onclick="ordenarPorColumna('tablaAudAdminPerms', 5, 'str')">Jefe Autorizador <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                                            <th class="text-end px-3">Acciones de RH</th>
+                                        </tr>
+                                        </thead>
+                                        <tbody style="font-size: 0.9rem;">
+                                        <tr th:each="perm : ${auditoriaPermisos}" th:if="${perm.empleado != null and #strings.equalsIgnoreCase(perm.empleado.tipoEmpleado, 'ADMINISTRATIVO')}">
+                                            <td class="text-center"><input class="form-check-input fs-5 auditoria-check" type="checkbox" th:value="'PERM-' + ${perm.id}" onclick="updateSelectedCountAuditoria()"></td>
+                                            <td><div class="fw-bold text-dark" th:text="${perm.empleado.nombreCompleto}"></div><small class="font-monospace text-secondary" th:text="'#' + ${perm.empleado.nomina}"></small></td>
+
+                                            <!-- ✨ COLUMNA SEMANA CALENDARIO -->
+                                            <td class="text-center"><span class="badge bg-secondary bg-opacity-10 text-dark border fw-bold" th:text="'W' + ${#temporals.format(perm.fechaIncidencia, 'ww')}"></span></td>
+
+                                            <td><span class="badge bg-danger bg-opacity-10 text-danger rounded-pill px-3 py-1 fw-semibold" th:text="${perm.fechaIncidencia}"></span></td>
+                                            <td>
+                                                <span th:if="${perm.estatus == 'RETENIDO'}" class="badge bg-warning text-dark mb-1"><i class="bi bi-pause-circle-fill"></i> FORMATO RETENIDO</span>
+                                                <span class="fw-bold ms-1" th:text="${perm.tipoPermiso.codigo}"></span>
+                                                <small class="d-block text-muted mb-2" th:text="${perm.justificacionSupervisor}"></small>
+
+                                                <div th:if="${perm.tipoPermiso.codigo == 'TXT' and not #lists.isEmpty(perm.desglosesPago)}" class="p-2 bg-light border border-warning border-opacity-50 rounded-2" style="font-size: 0.75rem;">
+                                                    <div class="fw-bold text-dark mb-1" style="font-size: 0.70rem; letter-spacing: 0.5px;"><i class="bi bi-stopwatch-fill text-warning me-1"></i>FECHAS DE PAGO PACTADAS:</div>
+                                                    <div th:each="pago : ${perm.desglosesPago}" class="text-secondary fw-semibold ms-1">
+                                                        <i class="bi bi-calendar2-check text-success me-1"></i>
+                                                        <span th:text="${#temporals.format(pago.fechaPago, 'dd/MM/yyyy')} + ' (' + ${pago.horasPago} + ' hrs)'"></span>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td th:text="${perm.resueltoPor != null ? perm.resueltoPor.nombreCompleto : 'Sistema'}"></td>
+                                            <td class="text-end px-3">
+                                                <button type="button" class="btn btn-sm btn-outline-danger fw-bold px-3 rounded-pill shadow-sm" th:data-id="'PERM-' + ${perm.id}" th:data-nombre="${perm.empleado.nombreCompleto}" onclick="abrirModalRechazoAuditoria(this.getAttribute('data-id'), this.getAttribute('data-nombre'), 'Incidencia', 'Revisión de Auditoría')">Rechazar Permiso</button>
+                                                <form th:action="@{/pantallas/gestion-saldos/retener-txt}" method="POST" class="d-inline ms-1" th:if="${perm.tipoPermiso.codigo == 'TXT' and perm.estatus != 'RETENIDO'}">
+                                                    <input type="hidden" name="solicitudId" th:value="${perm.id}">
+                                                    <button type="submit" class="btn btn-sm btn-warning fw-bold px-3 rounded-pill shadow-sm text-dark" title="Mandar a 'F' temporal y retener para la próxima semana"><i class="bi bi-pause-circle-fill"></i> Retener</button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+        </div>
+
+        <!-- PESTAÑA 2: BANDEJA DE RECUPERACIONES E HISTORIAL -->
+        <div class="tab-pane fade" id="pills-recuperaciones" role="tabpanel" aria-labelledby="pills-recuperaciones-tab">
+
+            <!-- SECCIÓN 1: BANDEJA DE PENDIENTES -->
+            <section class="custom-card p-4 mb-4 bg-white shadow-sm rounded-3 border-top border-4 border-primary">
+
+                <!-- BARRA DE ACCIONES MASIVAS (APLICAR Y RECHAZAR) -->
+                <div id="bulkActionsBarRecuperaciones" class="d-none sticky-top bg-dark text-white p-3 shadow-lg mb-4 border" style="top: 80px; z-index: 1020; border-radius: 12px;">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="fw-bold"><i class="bi bi-check2-square text-success me-2 fs-5"></i><span id="selectedCountRecuperaciones">0</span> Solicitudes Seleccionadas</span>
+                        <div class="d-flex gap-2">
+                            <!-- REVISA QUE ESTE BOTÓN VERDE SÍ ESTÉ AQUÍ -->
+                            <button type="button" class="btn btn-success btn-sm px-4 fw-bold shadow-sm" onclick="abrirModalMasivoAplicar()">
+                                <i class="bi bi-check-lg me-1"></i> Marcar como Aplicadas
+                            </button>
+
+                            <button type="button" class="btn btn-danger btn-sm px-4 fw-bold shadow-sm" onclick="abrirModalMasivoRechazo()">
+                                <i class="bi bi-x-lg me-1"></i> Rechazar Lote
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                <div th:if="${recuperacionesPendientes != null and !recuperacionesPendientes.isEmpty()}" class="table-responsive">
-                    <table class="table table-hover align-middle border text-start" id="tablaRecuperacionesNomina">
-                        <thead class="table-light text-secondary" style="font-size: 0.85rem;">
-                        <tr>
-                            <th class="text-center" style="width: 50px;"><input class="form-check-input fs-5" type="checkbox" id="selectAllRecuperaciones" onclick="toggleAllRecuperaciones(this)"></th>
-                            <th>Folio</th>
-                            <th>Colaborador</th>
-                            <th>Fecha Falta</th>
-                            <th>Tipo / Notas del Supervisor</th>
-                            <th>Ingresada El</th>
-                            <th>Reportado Por</th>
-                            <th class="text-end px-3">Acciones</th>
-                        </tr>
-                        </thead>
-                        <tbody style="font-size: 0.9rem;">
-                        <tr th:each="pendiente : ${recuperacionesPendientes}">
-                            <td class="text-center"><input class="form-check-input fs-5 recuperacion-check" type="checkbox" th:value="${pendiente.id}" onclick="updateSelectedCountRecuperaciones()"></td>
-                            <td class="fw-bold text-dark" th:text="'#' + ${pendiente.id}"></td>
-                            <td>
-                                <div class="fw-bold text-dark" th:text="${pendiente.empleado != null ? pendiente.empleado.nombreCompleto : 'Sin Asignar'}"></div>
-                                <small class="text-muted font-monospace" th:text="'Nómina: #' + ${pendiente.empleado != null ? pendiente.empleado.nomina : '0'}"></small>
-                            </td>
-                            <td><span class="badge bg-danger bg-opacity-10 text-danger rounded-pill px-3 py-1 fw-semibold" th:text="${pendiente.fechaInicio}"></span></td>
+                <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between border-bottom pb-3 mb-4 gap-3">
+                    <div>
+                        <h3 class="h5 mb-1 fw-bold text-dark"><i class="bi bi-mailbox2 text-primary me-2"></i>Bandeja de Pendientes Actuales (Solo Lectura)</h3>
+                        <p class="text-muted mb-0 small">Las solicitudes entran pre-autorizadas por el supervisor. Utiliza esta bandeja únicamente para rebotar incidencias anómalas o aplicarlas a tu control.</p>
+                    </div>
+                </div>
 
-                            <td>
-                                <div class="d-flex flex-column gap-1">
-                                    <span th:if="${pendiente.comentarioJefe != null and #strings.contains(pendiente.comentarioJefe, '[TXT]')}" class="badge bg-warning text-dark rounded-pill px-2 py-1 align-self-start fw-bold" style="font-size: 0.72rem;"><i class="bi bi-stopwatch-fill me-1"></i>TXT (Tiempo por Tiempo)</span>
-                                    <span th:if="${pendiente.comentarioJefe != null and #strings.contains(pendiente.comentarioJefe, '[HO]')}" class="badge bg-info text-dark rounded-pill px-2 py-1 align-self-start fw-bold" style="font-size: 0.72rem;"><i class="bi bi-house-fill me-1"></i>Home Office (HO)</span>
-                                    <span th:if="${pendiente.comentarioJefe != null and #strings.contains(pendiente.comentarioJefe, '[C]')}" class="badge bg-primary text-white rounded-pill px-2 py-1 align-self-start fw-bold" style="font-size: 0.72rem;"><i class="bi bi-building-fill me-1"></i>Visita Cliente</span>
-                                    <span th:if="${pendiente.comentarioJefe != null and #strings.contains(pendiente.comentarioJefe, '[P]')}" class="badge bg-secondary text-white rounded-pill px-2 py-1 align-self-start fw-bold" style="font-size: 0.72rem;"><i class="bi bi-truck me-1"></i>Visita Proveedor</span>
-                                    <span th:if="${pendiente.comentarioJefe != null and #strings.contains(pendiente.comentarioJefe, '[TET]')}" class="badge bg-dark text-white rounded-pill px-2 py-1 align-self-start fw-bold" style="font-size: 0.72rem;"><i class="bi bi-geo-alt-fill me-1"></i>Planta Tetla</span>
+                <!-- BUSCADOR EN TIEMPO REAL -->
+                <div class="row mb-4">
+                    <div class="col-md-8">
+                        <div class="input-group shadow-sm">
+                            <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                            <input type="text" id="buscadorBandejaRecup" class="form-control bg-light border-start-0" placeholder="Buscar por Nómina, Nombre o Fecha de Falta..." onkeyup="filtrarBandejaRecuperaciones()">
+                        </div>
+                    </div>
+                </div>
 
-                                    <span th:if="${pendiente.comentarioJefe == null or (!#strings.contains(pendiente.comentarioJefe, '[TXT]') and !#strings.contains(pendiente.comentarioJefe, '[HO]') and !#strings.contains(pendiente.comentarioJefe, '[C]') and !#strings.contains(pendiente.comentarioJefe, '[P]') and !#strings.contains(pendiente.comentarioJefe, '[TET]'))}" class="badge bg-success text-white rounded-pill px-2 py-1 align-self-start fw-bold" style="font-size: 0.72rem;"><i class="bi bi-calendar-check-fill me-1"></i>A Cuenta Vacaciones</span>
+                <!-- TABS INTERNOS PARA SEPARAR MUNDOS EN BANDEJA -->
+                <ul class="nav nav-tabs mb-3" id="subTabBandejaRecup" role="tablist">
+                    <li class="nav-item">
+                        <button class="nav-link active fw-bold text-success" id="bandeja-sind-tab" data-bs-toggle="tab" data-bs-target="#bandeja-sind" type="button" role="tab">
+                            <i class="bi bi-gear-fill me-1"></i> Sindicalizados
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link fw-bold text-primary" id="bandeja-admin-tab" data-bs-toggle="tab" data-bs-target="#bandeja-admin" type="button" role="tab">
+                            <i class="bi bi-person-badge-fill me-1"></i> Administrativos
+                        </button>
+                    </li>
+                </ul>
 
-                                    <small class="text-secondary text-wrap fw-medium" style="max-width: 320px; font-size: 0.8rem;" th:text="${pendiente.comentarioJefe ?: 'Sin comentarios registrados'}"></small>
-                                </div>
-                            </td>
+                <div class="tab-content" id="subTabBandejaRecupContent">
+                    <!-- TABLA SINDICALIZADOS -->
+                    <div class="tab-pane fade show active" id="bandeja-sind" role="tabpanel">
+                        <div class="d-flex justify-content-end mb-2">
+                            <button class="btn btn-sm btn-outline-success fw-bold shadow-sm" onclick="exportarTablaEspecífica('tablaRecuperacionesSind', 'Recuperaciones_Sindicalizados')">
+                                <i class="bi bi-file-earmark-excel-fill"></i> Exportar Sindicalizados
+                            </button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle border text-start tabla-filtrable-recup" id="tablaRecuperacionesSind">
+                                <thead class="table-light text-secondary" style="font-size: 0.85rem;">
+                                <tr>
+                                    <th class="text-center" style="width: 50px;"><input class="form-check-input fs-5" type="checkbox" onclick="toggleAllRecuperaciones(this)"></th>
+                                    <th>Folio</th>
+                                    <th>Nómina</th>
+                                    <th>Colaborador</th>
+                                    <th>Fecha Falta</th>
+                                    <th>Tipo / Notas del Supervisor</th>
+                                    <th>Ingresada El</th>
+                                    <th>Reportado Por</th>
+                                    <th class="text-end px-3">Auditoría</th>
+                                </tr>
+                                </thead>
+                                <tbody style="font-size: 0.9rem;">
+                                <tr th:each="pendiente : ${recuperacionesPendientes}" th:if="${pendiente.empleado != null and #strings.equalsIgnoreCase(pendiente.empleado.tipoEmpleado, 'SINDICALIZADO')}">
+                                    <td class="text-center"><input class="form-check-input fs-5 recuperacion-check" type="checkbox" th:value="${pendiente.id}" onclick="updateSelectedCountRecuperaciones()"></td>
+                                    <td class="fw-bold text-dark" th:text="'#' + ${pendiente.id}"></td>
+                                    <td class="font-monospace fw-bold text-secondary" th:text="${pendiente.empleado.nomina}"></td>
+                                    <td class="fw-bold text-dark" th:text="${pendiente.empleado.nombreCompleto}"></td>
+                                    <td><span class="badge bg-danger bg-opacity-10 text-danger rounded-pill px-3 py-1 fw-semibold" th:text="${pendiente.fechaInicio}"></span></td>
+                                    <td>
+                                        <div class="d-flex flex-column gap-1">
+                                            <span th:if="${pendiente.comentarioJefe != null and #strings.contains(pendiente.comentarioJefe, '[TXT]')}" class="badge bg-warning text-dark rounded-pill px-2 py-1 align-self-start fw-bold" style="font-size: 0.72rem;"><i class="bi bi-stopwatch-fill me-1"></i>TXT (Tiempo por Tiempo)</span>
+                                            <span th:if="${pendiente.comentarioJefe == null or !#strings.contains(pendiente.comentarioJefe, '[TXT]')}" class="badge bg-success text-white rounded-pill px-2 py-1 align-self-start fw-bold" style="font-size: 0.72rem;"><i class="bi bi-calendar-check-fill me-1"></i>A Cuenta Vacaciones</span>
+                                            <small class="text-secondary text-wrap fw-medium" style="max-width: 320px; font-size: 0.8rem;" th:text="${pendiente.comentarioJefe ?: 'Sin comentarios registrados'}"></small>
+                                        </div>
+                                    </td>
+                                    <td th:text="${pendiente.fechaCreacion != null ? #temporals.format(pendiente.fechaCreacion, 'dd/MM/yyyy HH:mm') : 'N/A'}"></td>
+                                    <td th:text="${pendiente.creadaPor != null ? pendiente.creadaPor.nombreCompleto : 'Sistema'}"></td>
+                                    <td class="text-end px-3 text-nowrap">
+                                        <button type="button" class="btn btn-sm btn-outline-success fw-bold px-3 rounded-pill shadow-sm me-1"
+                                                th:data-id="${pendiente.id}" th:data-nombre="${pendiente.empleado.nombreCompleto}"
+                                                onclick="abrirModalAplicarAuditoria(this.getAttribute('data-id'), this.getAttribute('data-nombre'))">
+                                            <i class="bi bi-check2-all"></i> Aplicada
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger fw-bold px-3 rounded-pill shadow-sm"
+                                                th:data-id="${pendiente.id}" th:data-nombre="${pendiente.empleado.nombreCompleto}" th:data-justificacion="${pendiente.comentarioJefe}"
+                                                onclick="abrirModalRechazoAuditoria(this.getAttribute('data-id'), this.getAttribute('data-nombre'), 'Corte Semanal', this.getAttribute('data-justificacion'))">
+                                            Rechazar
+                                        </button>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
 
-                            <td th:text="${pendiente.fechaCreacion != null ? #temporals.format(pendiente.fechaCreacion, 'dd/MM/yyyy HH:mm') : 'N/A'}"></td>
-                            <td th:text="${pendiente.creadaPor != null ? pendiente.creadaPor.nombreCompleto : 'Sistema'}"></td>
-                            <td class="text-end px-3">
-                                <button type="button" class="btn btn-sm btn-success fw-bold px-3 rounded-pill"
-                                        th:data-id="${pendiente.id}"
-                                        th:data-nombre="${pendiente.empleado?.nombreCompleto}"
-                                        th:data-justificacion="${pendiente.comentarioJefe != null ? pendiente.comentarioJefe : 'Sin comentarios registrados'}"
-                                        onclick="abrirModalIndividual(this.getAttribute('data-id'), true, this.getAttribute('data-nombre'), 'Corte Semanal', this.getAttribute('data-justificacion'))">Aplicar</button>
-
-                                <button type="button" class="btn btn-sm btn-outline-danger fw-bold px-3 rounded-pill ms-1"
-                                        th:data-id="${pendiente.id}"
-                                        th:data-nombre="${pendiente.empleado?.nombreCompleto}"
-                                        th:data-justificacion="${pendiente.comentarioJefe != null ? pendiente.comentarioJefe : 'Sin comentarios registrados'}"
-                                        onclick="abrirModalIndividual(this.getAttribute('data-id'), false, this.getAttribute('data-nombre'), 'Corte Semanal', this.getAttribute('data-justificacion'))">Rechazar</button>
-                            </td>
-                        </tr>
-                        </tbody>
-                    </table>
+                    <!-- TABLA ADMINISTRATIVOS -->
+                    <div class="tab-pane fade" id="bandeja-admin" role="tabpanel">
+                        <div class="d-flex justify-content-end mb-2">
+                            <button class="btn btn-sm btn-outline-primary fw-bold shadow-sm" onclick="exportarTablaEspecífica('tablaRecuperacionesAdmin', 'Recuperaciones_Administrativos')">
+                                <i class="bi bi-file-earmark-excel-fill"></i> Exportar Administrativos
+                            </button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle border text-start tabla-filtrable-recup" id="tablaRecuperacionesAdmin">
+                                <thead class="table-light text-secondary" style="font-size: 0.85rem;">
+                                <tr>
+                                    <th class="text-center" style="width: 50px;"><input class="form-check-input fs-5" type="checkbox" onclick="toggleAllRecuperaciones(this)"></th>
+                                    <th>Folio</th>
+                                    <th>Nómina</th>
+                                    <th>Colaborador</th>
+                                    <th>Fecha Falta</th>
+                                    <th>Tipo / Notas del Supervisor</th>
+                                    <th>Ingresada El</th>
+                                    <th>Reportado Por</th>
+                                    <th class="text-end px-3">Auditoría</th>
+                                </tr>
+                                </thead>
+                                <tbody style="font-size: 0.9rem;">
+                                <tr th:each="pendiente : ${recuperacionesPendientes}" th:if="${pendiente.empleado != null and #strings.equalsIgnoreCase(pendiente.empleado.tipoEmpleado, 'ADMINISTRATIVO')}">
+                                    <td class="text-center"><input class="form-check-input fs-5 recuperacion-check" type="checkbox" th:value="${pendiente.id}" onclick="updateSelectedCountRecuperaciones()"></td>
+                                    <td class="fw-bold text-dark" th:text="'#' + ${pendiente.id}"></td>
+                                    <td class="font-monospace fw-bold text-secondary" th:text="${pendiente.empleado.nomina}"></td>
+                                    <td class="fw-bold text-dark" th:text="${pendiente.empleado.nombreCompleto}"></td>
+                                    <td><span class="badge bg-danger bg-opacity-10 text-danger rounded-pill px-3 py-1 fw-semibold" th:text="${pendiente.fechaInicio}"></span></td>
+                                    <td>
+                                        <div class="d-flex flex-column gap-1">
+                                            <span th:if="${pendiente.comentarioJefe != null and #strings.contains(pendiente.comentarioJefe, '[HO]')}" class="badge bg-info text-dark rounded-pill px-2 py-1 align-self-start fw-bold" style="font-size: 0.72rem;"><i class="bi bi-house-fill me-1"></i>Home Office</span>
+                                            <span th:if="${pendiente.comentarioJefe != null and #strings.contains(pendiente.comentarioJefe, '[C]')}" class="badge bg-primary text-white rounded-pill px-2 py-1 align-self-start fw-bold" style="font-size: 0.72rem;"><i class="bi bi-building-fill me-1"></i>Visita Cliente</span>
+                                            <span th:if="${pendiente.comentarioJefe == null or (!#strings.contains(pendiente.comentarioJefe, '[HO]') and !#strings.contains(pendiente.comentarioJefe, '[C]'))}" class="badge bg-success text-white rounded-pill px-2 py-1 align-self-start fw-bold" style="font-size: 0.72rem;"><i class="bi bi-calendar-check-fill me-1"></i>A Cuenta Vacaciones</span>
+                                            <small class="text-secondary text-wrap fw-medium" style="max-width: 320px; font-size: 0.8rem;" th:text="${pendiente.comentarioJefe ?: 'Sin comentarios registrados'}"></small>
+                                        </div>
+                                    </td>
+                                    <td th:text="${pendiente.fechaCreacion != null ? #temporals.format(pendiente.fechaCreacion, 'dd/MM/yyyy HH:mm') : 'N/A'}"></td>
+                                    <td th:text="${pendiente.creadaPor != null ? pendiente.creadaPor.nombreCompleto : 'Sistema'}"></td>
+                                    <td class="text-end px-3 text-nowrap">
+                                        <button type="button" class="btn btn-sm btn-outline-success fw-bold px-3 rounded-pill shadow-sm me-1"
+                                                th:data-id="${pendiente.id}" th:data-nombre="${pendiente.empleado.nombreCompleto}"
+                                                onclick="abrirModalAplicarAuditoria(this.getAttribute('data-id'), this.getAttribute('data-nombre'))">
+                                            <i class="bi bi-check2-all"></i> Aplicada
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger fw-bold px-3 rounded-pill shadow-sm"
+                                                th:data-id="${pendiente.id}" th:data-nombre="${pendiente.empleado.nombreCompleto}" th:data-justificacion="${pendiente.comentarioJefe}"
+                                                onclick="abrirModalRechazoAuditoria(this.getAttribute('data-id'), this.getAttribute('data-nombre'), 'Corte Semanal', this.getAttribute('data-justificacion'))">
+                                            Rechazar
+                                        </button>
+                                    </td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </section>
 
+            <!-- SECCIÓN 2: HISTORIAL -->
             <section class="custom-card p-4 mb-4 bg-white shadow-sm rounded-3 border-top border-4 border-secondary">
                 <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 border-bottom pb-3 mb-4">
                     <h3 class="h5 mb-1 fw-bold text-dark"><i class="bi bi-archive-fill text-secondary me-2"></i>Historial e Índices de Aplicación de la Planta</h3>
@@ -390,57 +806,120 @@
                         <span class="text-muted small fw-bold">a</span>
                         <input type="date" id="filtroRecupHasta" class="form-control form-control-sm">
                         <button type="button" class="btn btn-sm btn-outline-secondary fw-bold px-3" onclick="filtrarHistorialRecuperaciones()"><i class="bi bi-filter"></i> Filtrar</button>
-
-                        <button type="button" class="btn btn-sm btn-success fw-bold text-white text-nowrap shadow-sm" onclick="exportarHistorialRecuperacionesAExcel()">
-                            <i class="bi bi-file-earmark-excel-fill"></i> Exportar Historial
-                        </button>
                     </div>
                 </div>
 
-                <div class="table-responsive">
-                    <table class="table table-sm table-striped align-middle border text-start" id="tablaHistorialRecuperaciones">
-                        <thead class="table-light text-secondary" style="font-size: 0.85rem;">
-                        <tr>
-                            <th>Folio</th>
-                            <th>Colaborador</th>
-                            <th>Fecha Falta</th>
-                            <th>Supervisor Emisor</th>
-                            <th>Tipo / Justificación de Origen</th>
-                            <th>Estatus Final</th>
-                        </tr>
-                        </thead>
-                        <tbody style="font-size: 0.88rem;">
-                        <tr th:each="sol : ${historialRecuperacionesGlobal}">
-                            <td class="fw-bold" th:text="'#' + ${sol.id}"></td>
-                            <td>
-                                <div class="fw-bold text-dark" th:text="${sol.empleado != null ? sol.empleado.nombreCompleto : 'Sin Asignar'}"></div>
-                                <small class="text-muted font-monospace" th:text="'Nómina: #' + ${sol.empleado != null ? sol.empleado.nomina : '0'}"></small>
-                            </td>
-                            <td class="fecha-falta-registro"><span class="badge bg-danger bg-opacity-10 text-danger rounded-pill px-3 py-1 fw-semibold" th:text="${sol.fechaInicio}"></span></td>
-                            <td th:text="${sol.creadaPor != null ? sol.creadaPor.nombreCompleto : 'Sistema Automático'}"></td>
+                <!-- TABS INTERNOS PARA SEPARAR HISTORIAL -->
+                <ul class="nav nav-tabs mb-3" id="subTabHistorialRecup" role="tablist">
+                    <li class="nav-item">
+                        <button class="nav-link active fw-bold text-success" id="historial-sind-tab" data-bs-toggle="tab" data-bs-target="#historial-sind" type="button" role="tab">
+                            <i class="bi bi-gear-fill me-1"></i> Sindicalizados
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link fw-bold text-primary" id="historial-admin-tab" data-bs-toggle="tab" data-bs-target="#historial-admin" type="button" role="tab">
+                            <i class="bi bi-person-badge-fill me-1"></i> Administrativos
+                        </button>
+                    </li>
+                </ul>
 
-                            <td>
-                                <div class="d-flex flex-column gap-1">
-                                    <span th:if="${sol.comentarioJefe != null and #strings.contains(sol.comentarioJefe, '[TXT]')}" class="badge bg-warning text-dark rounded-pill px-2 py-0.5 align-self-start fw-bold" style="font-size: 0.68rem;"><i class="bi bi-stopwatch-fill me-1"></i>TXT (Tiempo x Tiempo)</span>
-                                    <span th:if="${sol.comentarioJefe != null and #strings.contains(sol.comentarioJefe, '[HO]')}" class="badge bg-info text-dark rounded-pill px-2 py-0.5 align-self-start fw-bold" style="font-size: 0.68rem;"><i class="bi bi-house-fill me-1"></i>Home Office</span>
-                                    <span th:if="${sol.comentarioJefe != null and #strings.contains(sol.comentarioJefe, '[C]')}" class="badge bg-primary text-white rounded-pill px-2 py-0.5 align-self-start fw-bold" style="font-size: 0.68rem;"><i class="bi bi-building-fill me-1"></i>Visita Cliente</span>
-                                    <span th:if="${sol.comentarioJefe != null and #strings.contains(sol.comentarioJefe, '[P]')}" class="badge bg-secondary text-white rounded-pill px-2 py-0.5 align-self-start fw-bold" style="font-size: 0.68rem;"><i class="bi bi-truck me-1"></i>Proveedor</span>
-                                    <span th:if="${sol.comentarioJefe != null and #strings.contains(sol.comentarioJefe, '[TET]')}" class="badge bg-dark text-white rounded-pill px-2 py-0.5 align-self-start fw-bold" style="font-size: 0.68rem;"><i class="bi bi-geo-alt-fill me-1"></i>Planta Tetla</span>
+                <div class="tab-content" id="subTabHistorialRecupContent">
+                    <!-- HISTORIAL SINDICALIZADOS -->
+                    <div class="tab-pane fade show active" id="historial-sind" role="tabpanel">
+                        <div class="d-flex justify-content-end mb-2">
+                            <button type="button" class="btn btn-sm btn-outline-success fw-bold shadow-sm" onclick="exportarHistorialEspecifico('tablaHistorialSind', 'Historial_Sindicalizados')">
+                                <i class="bi bi-file-earmark-excel-fill"></i> Exportar Historial Sindicalizados
+                            </button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-striped align-middle border text-start tabla-historial-filtrable" id="tablaHistorialSind">
+                                <thead class="table-light text-secondary" style="font-size: 0.85rem;">
+                                <tr>
+                                    <th>Folio</th>
+                                    <th>Colaborador</th>
+                                    <th>Fecha Falta</th>
+                                    <th>Supervisor Emisor</th>
+                                    <th>Tipo / Justificación de Origen</th>
+                                    <th>Estatus Final</th>
+                                </tr>
+                                </thead>
+                                <tbody style="font-size: 0.88rem;">
+                                <tr th:each="sol : ${historialRecuperacionesGlobal}" th:if="${sol.empleado != null and #strings.equalsIgnoreCase(sol.empleado.tipoEmpleado, 'SINDICALIZADO')}">
+                                    <td class="fw-bold" th:text="'#' + ${sol.id}"></td>
+                                    <td>
+                                        <div class="fw-bold text-dark" th:text="${sol.empleado != null ? sol.empleado.nombreCompleto : 'Sin Asignar'}"></div>
+                                        <small class="text-muted font-monospace" th:text="'Nómina: #' + ${sol.empleado != null ? sol.empleado.nomina : '0'}"></small>
+                                    </td>
+                                    <td class="fecha-falta-registro"><span class="badge bg-danger bg-opacity-10 text-danger rounded-pill px-3 py-1 fw-semibold" th:text="${sol.fechaInicio}"></span></td>
+                                    <td th:text="${sol.creadaPor != null ? sol.creadaPor.nombreCompleto : 'Sistema Automático'}"></td>
+                                    <td>
+                                        <div class="d-flex flex-column gap-1">
+                                            <span th:if="${sol.comentarioJefe != null and #strings.contains(sol.comentarioJefe, '[TXT]')}" class="badge bg-warning text-dark rounded-pill px-2 py-0.5 align-self-start fw-bold" style="font-size: 0.68rem;"><i class="bi bi-stopwatch-fill me-1"></i>TXT (Tiempo x Tiempo)</span>
+                                            <span th:if="${sol.comentarioJefe != null and #strings.contains(sol.comentarioJefe, '[HO]')}" class="badge bg-info text-dark rounded-pill px-2 py-0.5 align-self-start fw-bold" style="font-size: 0.68rem;"><i class="bi bi-house-fill me-1"></i>Home Office</span>
+                                            <span th:if="${sol.comentarioJefe != null and #strings.contains(sol.comentarioJefe, '[C]')}" class="badge bg-primary text-white rounded-pill px-2 py-0.5 align-self-start fw-bold" style="font-size: 0.68rem;"><i class="bi bi-building-fill me-1"></i>Visita Cliente</span>
+                                            <span th:if="${sol.comentarioJefe != null and #strings.contains(sol.comentarioJefe, '[P]')}" class="badge bg-secondary text-white rounded-pill px-2 py-0.5 align-self-start fw-bold" style="font-size: 0.68rem;"><i class="bi bi-truck me-1"></i>Proveedor</span>
+                                            <span th:if="${sol.comentarioJefe != null and #strings.contains(sol.comentarioJefe, '[TET]')}" class="badge bg-dark text-white rounded-pill px-2 py-0.5 align-self-start fw-bold" style="font-size: 0.68rem;"><i class="bi bi-geo-alt-fill me-1"></i>Planta Tetla</span>
+                                            <span th:if="${sol.comentarioJefe == null or (!#strings.contains(sol.comentarioJefe, '[TXT]') and !#strings.contains(sol.comentarioJefe, '[HO]') and !#strings.contains(sol.comentarioJefe, '[C]') and !#strings.contains(sol.comentarioJefe, '[P]') and !#strings.contains(sol.comentarioJefe, '[TET]'))}" class="badge bg-success text-white rounded-pill px-2 py-0.5 align-self-start fw-bold" style="font-size: 0.68rem;"><i class="bi bi-calendar-check-fill me-1"></i>A Cuenta Vacaciones</span>
+                                            <small class="text-muted text-wrap text-break italic" style="max-width: 300px; font-size: 0.78rem;" th:text="${sol.comentarioJefe ?: 'Sin notas de supervisor'}"></small>
+                                        </div>
+                                    </td>
+                                    <td><span th:classappend="${sol.estatus == 'Aprobado'} ? 'badge bg-success' : 'badge bg-danger'" th:text="${sol.estatus}"></span></td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
 
-                                    <span th:if="${sol.comentarioJefe == null or (!#strings.contains(sol.comentarioJefe, '[TXT]') and !#strings.contains(sol.comentarioJefe, '[HO]') and !#strings.contains(sol.comentarioJefe, '[C]') and !#strings.contains(sol.comentarioJefe, '[P]') and !#strings.contains(sol.comentarioJefe, '[TET]'))}" class="badge bg-success text-white rounded-pill px-2 py-0.5 align-self-start fw-bold" style="font-size: 0.68rem;"><i class="bi bi-calendar-check-fill me-1"></i>A Cuenta Vacaciones</span>
-
-                                    <small class="text-muted text-wrap text-break italic" style="max-width: 300px; font-size: 0.78rem;" th:text="${sol.comentarioJefe ?: 'Sin notas de supervisor'}"></small>
-                                </div>
-                            </td>
-
-                            <td><span th:classappend="${sol.estatus == 'Aprobado'} ? 'badge bg-success' : 'badge bg-danger'" th:text="${sol.estatus}"></span></td>
-                        </tr>
-                        </tbody>
-                    </table>
+                    <!-- HISTORIAL ADMINISTRATIVOS -->
+                    <div class="tab-pane fade" id="historial-admin" role="tabpanel">
+                        <div class="d-flex justify-content-end mb-2">
+                            <button type="button" class="btn btn-sm btn-outline-primary fw-bold shadow-sm" onclick="exportarHistorialEspecifico('tablaHistorialAdmin', 'Historial_Administrativos')">
+                                <i class="bi bi-file-earmark-excel-fill"></i> Exportar Historial Administrativos
+                            </button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-striped align-middle border text-start tabla-historial-filtrable" id="tablaHistorialAdmin">
+                                <thead class="table-light text-secondary" style="font-size: 0.85rem;">
+                                <tr>
+                                    <th>Folio</th>
+                                    <th>Colaborador</th>
+                                    <th>Fecha Falta</th>
+                                    <th>Supervisor Emisor</th>
+                                    <th>Tipo / Justificación de Origen</th>
+                                    <th>Estatus Final</th>
+                                </tr>
+                                </thead>
+                                <tbody style="font-size: 0.88rem;">
+                                <tr th:each="sol : ${historialRecuperacionesGlobal}" th:if="${sol.empleado != null and #strings.equalsIgnoreCase(sol.empleado.tipoEmpleado, 'ADMINISTRATIVO')}">
+                                    <td class="fw-bold" th:text="'#' + ${sol.id}"></td>
+                                    <td>
+                                        <div class="fw-bold text-dark" th:text="${sol.empleado != null ? sol.empleado.nombreCompleto : 'Sin Asignar'}"></div>
+                                        <small class="text-muted font-monospace" th:text="'Nómina: #' + ${sol.empleado != null ? sol.empleado.nomina : '0'}"></small>
+                                    </td>
+                                    <td class="fecha-falta-registro"><span class="badge bg-danger bg-opacity-10 text-danger rounded-pill px-3 py-1 fw-semibold" th:text="${sol.fechaInicio}"></span></td>
+                                    <td th:text="${sol.creadaPor != null ? sol.creadaPor.nombreCompleto : 'Sistema Automático'}"></td>
+                                    <td>
+                                        <div class="d-flex flex-column gap-1">
+                                            <span th:if="${sol.comentarioJefe != null and #strings.contains(sol.comentarioJefe, '[TXT]')}" class="badge bg-warning text-dark rounded-pill px-2 py-0.5 align-self-start fw-bold" style="font-size: 0.68rem;"><i class="bi bi-stopwatch-fill me-1"></i>TXT (Tiempo x Tiempo)</span>
+                                            <span th:if="${sol.comentarioJefe != null and #strings.contains(sol.comentarioJefe, '[HO]')}" class="badge bg-info text-dark rounded-pill px-2 py-0.5 align-self-start fw-bold" style="font-size: 0.68rem;"><i class="bi bi-house-fill me-1"></i>Home Office</span>
+                                            <span th:if="${sol.comentarioJefe != null and #strings.contains(sol.comentarioJefe, '[C]')}" class="badge bg-primary text-white rounded-pill px-2 py-0.5 align-self-start fw-bold" style="font-size: 0.68rem;"><i class="bi bi-building-fill me-1"></i>Visita Cliente</span>
+                                            <span th:if="${sol.comentarioJefe != null and #strings.contains(sol.comentarioJefe, '[P]')}" class="badge bg-secondary text-white rounded-pill px-2 py-0.5 align-self-start fw-bold" style="font-size: 0.68rem;"><i class="bi bi-truck me-1"></i>Proveedor</span>
+                                            <span th:if="${sol.comentarioJefe != null and #strings.contains(sol.comentarioJefe, '[TET]')}" class="badge bg-dark text-white rounded-pill px-2 py-0.5 align-self-start fw-bold" style="font-size: 0.68rem;"><i class="bi bi-geo-alt-fill me-1"></i>Planta Tetla</span>
+                                            <span th:if="${sol.comentarioJefe == null or (!#strings.contains(sol.comentarioJefe, '[TXT]') and !#strings.contains(sol.comentarioJefe, '[HO]') and !#strings.contains(sol.comentarioJefe, '[C]') and !#strings.contains(sol.comentarioJefe, '[P]') and !#strings.contains(sol.comentarioJefe, '[TET]'))}" class="badge bg-success text-white rounded-pill px-2 py-0.5 align-self-start fw-bold" style="font-size: 0.68rem;"><i class="bi bi-calendar-check-fill me-1"></i>A Cuenta Vacaciones</span>
+                                            <small class="text-muted text-wrap text-break italic" style="max-width: 300px; font-size: 0.78rem;" th:text="${sol.comentarioJefe ?: 'Sin notas de supervisor'}"></small>
+                                        </div>
+                                    </td>
+                                    <td><span th:classappend="${sol.estatus == 'Aprobado'} ? 'badge bg-success' : 'badge bg-danger'" th:text="${sol.estatus}"></span></td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </section>
         </div>
 
+        <!-- PESTAÑA 3: PLANTILLA GENERAL -->
         <div class="tab-pane fade" id="pills-plantilla" role="tabpanel" aria-labelledby="pills-plantilla-tab">
 
             <div class="card bg-light border-warning shadow-sm mb-4 rounded-3">
@@ -485,6 +964,7 @@
                 </ul>
 
                 <div class="tab-content" id="subTabPlantillaContent">
+
                     <div class="tab-pane fade show active" id="plantilla-activos" role="tabpanel">
                         <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
                             <table class="table table-hover align-middle border text-start" id="tablaPlantillaActivos">
@@ -513,16 +993,14 @@
                                     <td th:text="${emp.workCenter != null ? emp.workCenter.nombre : 'N/A'}"></td>
                                     <td class="text-center font-monospace" th:text="${emp.fechaIngreso != null ? #temporals.format(emp.fechaIngreso, 'dd/MM/yyyy') : 'N/A'}"></td>
                                     <td class="text-center fw-bold" th:classappend="${emp.saldoVacacionesActual != null and emp.saldoVacacionesActual < 0} ? 'text-danger' : 'text-success'" th:text="${emp.saldoVacacionesActual}"></td>
-                                    <td class="text-center fw-bold" th:classappend="${emp.saldoProporcional != null and emp.saldoProporcional < 0} ? 'text-danger' : 'text-info'" th:text="${emp.saldoProporcional != null ? emp.saldoProporcional : '0.0'}"></td>
-                                    <td class="text-center fw-bold"
-                                        th:with="acumulado=${(emp.saldoVacacionesActual ?: 0.0) + (emp.saldoProporcional ?: 0.0)}"
-                                        th:classappend="${acumulado < 0} ? 'text-danger' : 'text-dark'"
-                                        th:text="${acumulado}">0.0</td>
+                                    <td class="text-center fw-bold text-info" th:text="${emp.saldoProporcionalRaw != null ? emp.saldoProporcionalRaw : '0.0'}"></td>
+                                    <td class="text-center fw-bold" th:classappend="${emp.saldoTotalDisponible != null and emp.saldoTotalDisponible < 0} ? 'text-danger' : 'text-dark'" th:text="${emp.saldoTotalDisponible}">0.0</td>
                                     <td class="text-center">
                                         <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 py-1 fw-bold d-inline-flex align-items-center gap-1"
                                                 th:data-nomina="${emp.nomina}"
                                                 th:data-nombre="${emp.nombreCompleto}"
                                                 th:data-tipo="${emp.tipoEmpleado}"
+                                                th:data-radar="${(emp.tipoEmpleado != null ? emp.tipoEmpleado : '') + ' ' + (emp.contrato != null ? emp.contrato : '') + ' ' + (emp.puesto != null ? emp.puesto : '')}"
                                                 th:data-ingreso="${emp.fechaIngreso != null ? #temporals.format(emp.fechaIngreso, 'yyyy-MM-dd') : ''}"
                                                 th:data-ingresoview="${emp.fechaIngreso != null ? #temporals.format(emp.fechaIngreso, 'dd/MM/yyyy') : 'N/A'}"
                                                 th:data-base="${emp.diasBaseManual}"
@@ -536,10 +1014,65 @@
                             </table>
                         </div>
                     </div>
+
+                    <!-- PESTAÑA DE BAJAS ACTUALIZADA -->
+                    <div class="tab-pane fade" id="plantilla-bajas" role="tabpanel">
+                        <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                            <table class="table table-hover align-middle border text-start bg-light" id="tablaPlantillaBajas">
+                                <thead class="table-secondary text-secondary sticky-top" style="font-size: 0.85rem; top: 0; z-index: 5;">
+                                <tr>
+                                    <th style="cursor: pointer;" onclick="ordenarPorColumna('tablaPlantillaBajas', 0, 'int')">Nómina <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                                    <th style="cursor: pointer;" onclick="ordenarPorColumna('tablaPlantillaBajas', 1, 'str')">Nombre Completo <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                                    <th class="text-center">Estatus</th>
+                                    <th style="cursor: pointer;" onclick="ordenarPorColumna('tablaPlantillaBajas', 3, 'int')">CC <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                                    <th style="cursor: pointer;" onclick="ordenarPorColumna('tablaPlantillaBajas', 4, 'int')">WC <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+                                    <th style="cursor: pointer;" class="text-center" onclick="ordenarPorColumna('tablaPlantillaBajas', 5, 'date')">Fecha Ingreso <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+
+                                    <!-- NUEVA COLUMNA: SALDO PARA FINIQUITO -->
+                                    <th style="cursor: pointer; width: 140px;" class="text-center bg-warning bg-opacity-10 text-dark fw-bold" onclick="ordenarPorColumna('tablaPlantillaBajas', 6, 'float')">Saldo Finiquito <i class="bi bi-arrow-down-up ms-1 small"></i></th>
+
+                                    <!-- NUEVA COLUMNA: ACCESO A HISTÓRICO -->
+                                    <th class="text-center" style="width: 150px;">Auditoría LFT</th>
+                                </tr>
+                                </thead>
+                                <tbody style="font-size: 0.88rem; opacity: 0.85;">
+                                <tr th:each="emp : ${plantillaCompleta}" th:if="${emp.estatus == 'BAJA'}">
+                                    <td class="fw-bold text-muted" th:text="${emp.nomina}"></td>
+                                    <td class="fw-semibold text-muted" th:text="${emp.nombreCompleto}"></td>
+                                    <td class="text-center"><span class="badge bg-danger shadow-sm">BAJA</span></td>
+                                    <td class="text-muted" th:text="${emp.centroCosto != null ? emp.centroCosto.id : 'N/A'}"></td>
+                                    <td class="text-muted" th:text="${emp.workCenter != null ? emp.workCenter.id : 'N/A'}"></td>
+                                    <td class="text-center font-monospace text-muted" th:text="${emp.fechaIngreso != null ? #temporals.format(emp.fechaIngreso, 'dd/MM/yyyy') : 'N/A'}"></td>
+
+                                    <!-- MOSTRAR SALDO CONGELADO AL MOMENTO DE LA BAJA -->
+                                    <td class="text-center fw-bold text-dark bg-warning bg-opacity-10 font-monospace" th:text="${emp.saldoTotalDisponible != null ? emp.saldoTotalDisponible : (emp.saldoVacacionesActual != null ? emp.saldoVacacionesActual : '0.0')}">0.0</td>
+
+                                    <td class="text-center">
+                                        <!-- BOTÓN QUE DISPARA LA BÚSQUEDA DEL EXPEDIENTE HACIA LA PESTAÑA INDIVIDUAL -->
+                                        <a th:href="@{/pantallas/gestion-saldos(buscarNomina=${emp.nomina})}" class="btn btn-sm btn-outline-primary rounded-pill px-3 py-1 fw-bold d-inline-flex align-items-center gap-1 shadow-sm bg-white" title="Revisar Fechas y Solicitudes Previas">
+                                            <i class="bi bi-search"></i> Ver Expediente
+                                        </a>
+                                    </td>
+                                </tr>
+
+                                <!-- CORRECCIÓN DE COLSPAN A 8 -->
+                                <tr th:if="${#lists.isEmpty(plantillaCompleta)}">
+                                    <td colspan="8" class="text-center py-4 text-muted">
+                                        <i class="bi bi-person-check fs-2 d-block mb-2"></i>
+                                        No hay personal registrado en el histórico.
+                                    </td>
+                                </tr>
+
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
                 </div>
             </section>
         </div>
 
+        <!-- PESTAÑA 4: DEPURACIÓN VENCIDA -->
         <div class="tab-pane fade" id="pills-depuracion" role="tabpanel" aria-labelledby="pills-depuracion-tab">
             <section class="custom-card p-4 mb-4 bg-white shadow-sm rounded-3 border-top border-4 border-danger">
                 <div class="row g-3 mb-4 align-items-end">
@@ -593,7 +1126,7 @@
                             <td class="text-center fw-bold text-dark bg-light font-monospace"
                                 th:with="sumaCiclos=${(emp.getSaldoCiclosAnteriores() != null ? emp.getSaldoCiclosAnteriores().doubleValue() : 0.0) + (emp.getSaldoPeriodoActual() != null ? emp.getSaldoPeriodoActual().doubleValue() : 0.0)}"
                                 th:text="${#numbers.formatDecimal(sumaCiclos, 1, 'COMMA', 2, 'POINT')}">0.00</td>
-                            <td class="text-center fw-bold text-info" th:text="${emp.saldoProporcional != null ? emp.saldoProporcional : '0.00'}">0.00</td>
+                            <td class="text-center fw-bold text-info" th:text="${emp.saldoProporcionalRaw != null ? emp.saldoProporcionalRaw : '0.00'}">0.00</td>
 
                             <td class="text-center font-monospace fw-bold"
                                 th:classappend="${emp.getFechaLimiteExpiracion() != null and T(java.time.LocalDate).now().isAfter(emp.getFechaLimiteExpiracion()) and emp.getSaldoCiclosAnteriores() != null and emp.getSaldoCiclosAnteriores().doubleValue() > 0} ? 'text-danger fw-bolder' : 'text-secondary'"
@@ -650,7 +1183,7 @@
                                     <small class="text-muted" th:text="'Removido por: ' + ${depura.aprobadoPor != null ? depura.aprobadoPor.nombreCompleto : 'Sistema'}"></small>
                                 </td>
                             </tr>
-                            <tr th:if="${historialDepuracionesGlobal == null or historialDepuracionesGlobal.isEmpty()}">
+                            <tr th:if="${#lists.isEmpty(historialDepuracionesGlobal)}">
                                 <td colspan="5" class="text-center py-3 text-muted italic">
                                     <i class="bi bi-shield-check text-success me-1"></i> No se han registrado depuraciones coactivas de saldos en este periodo contable.
                                 </td>
@@ -662,6 +1195,48 @@
             </section>
         </div>
 
+        <!-- PESTAÑA NUEVA: CALENDARIO DE PLANTA -->
+        <div class="tab-pane fade" id="pills-calendario" role="tabpanel" aria-labelledby="pills-calendario-tab">
+            <section class="custom-card p-4 mb-4 bg-white shadow-sm rounded-3 border-top border-4 border-info">
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4 border-bottom pb-3">
+                    <div>
+                        <h4 class="fw-bold text-dark mb-1"><i class="bi bi-calendar3 text-info me-2"></i>Visibilidad Total de Planta</h4>
+                        <p class="text-muted small mb-0">Control visual de ausencias autorizadas de día completo (Excluye permisos por horas).</p>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <label class="fw-bold small text-secondary text-nowrap">Esquema Operativo:</label>
+                        <select id="filtroCalendarioEsquema" class="form-select form-select-sm fw-bold border-secondary text-dark" style="width: 200px;" onchange="recargarCalendarioPlanta()">
+                            <option value="TODOS">Toda la Planta</option>
+                            <option value="SINDICALIZADO">Solo Sindicalizados</option>
+                            <option value="ADMINISTRATIVO">Solo Administrativos</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    <span class="badge bg-success bg-opacity-10 text-success border border-success px-3 py-2 rounded-pill font-monospace small">⚙ Planta (Sind)</span>
+                    <span class="badge bg-primary bg-opacity-10 text-primary border border-primary px-3 py-2 rounded-pill font-monospace small">🏢 Administrativos</span>
+                    <span class="badge bg-dark bg-opacity-10 text-dark border border-dark px-3 py-2 rounded-pill font-monospace small">🇲🇽 Feriados</span>
+                </div>
+                <div id="calendarViewAuditoria" class="p-1"></div>
+            </section>
+
+            <!-- Modal Detalle Calendario -->
+            <div class="modal fade" id="modalDetalleAusenciasAuditoria" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content rounded-4 shadow border-0">
+                        <div class="modal-header bg-light border-0 py-3">
+                            <h5 class="modal-title fw-bold text-dark" id="modalTituloFechaAud"><i class="bi bi-people-fill text-info me-2"></i>Personal Ausente</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body p-4" style="max-height: 400px; overflow-y: auto;">
+                            <ul class="list-group list-group-flush shadow-sm rounded-3 border" id="listaAusentesAuditoria"></ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PESTAÑA 5: EXPORTADOR -->
         <div class="tab-pane fade" id="pills-exportador" role="tabpanel" aria-labelledby="pills-exportador-tab">
             <section class="custom-card p-4 mb-4 bg-white shadow-sm rounded-3 border-top border-4 border-success">
                 <div class="border-bottom pb-2 mb-4">
@@ -821,12 +1396,18 @@
     <input type="hidden" name="status" id="bulkStatusRecuperaciones">
     <input type="hidden" name="comentario" id="bulkComentarioRecuperaciones">
 </form>
+<form id="bulkFormAuditoria" action="/pantallas/gestion-saldos/resolver-auditoria-masiva" method="POST" class="d-none">
+    <input type="hidden" name="ids" id="bulkIdsAuditoria">
+    <input type="hidden" name="status" id="bulkStatusAuditoria">
+    <input type="hidden" name="comentario" id="bulkComentarioAuditoria">
+</form>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://npmcdn.com/flatpickr/dist/l10n/es.js"></script>
 
-<script>
+<script th:inline="javascript">
     function ejecutarBuscarPlantilla() {
         const query = document.getElementById("buscadorPlantilla").value.toLowerCase().trim();
         const panelActivo = document.querySelector("#subTabPlantillaContent .tab-pane.active");
@@ -957,86 +1538,226 @@
         return true;
     }
 
-    function abrirModalIndividual(id, aprobado, nombreEmp, semana, justificacion) {
-        modoEnvioModal = "INDIVIDUAL";
-        idIndividualTarget = id;
-        statusTarget = aprobado ? "APROBADO" : "RECHAZADO";
+    // ==========================================
+    // NUEVAS FUNCIONES BANDEJA RECUPERACIONES
+    // ==========================================
 
-        let tipoIncidencia = "A Cuenta de Vacaciones (Ordinaria)";
-        let mensajeAprobacion = "Se procederá a aplicar el descuento de 1 día del <strong>Saldo de Vacaciones</strong> corriente al operador.";
+    function filtrarBandejaRecuperaciones() {
+        const query = document.getElementById("buscadorBandejaRecup").value.toLowerCase().trim();
+        const filas = document.querySelectorAll(".tabla-filtrable-recup tbody tr");
 
-        if (justificacion && justificacion.includes("[TXT]")) {
-            tipoIncidencia = "Tiempo por Tiempo (TXT)";
-            mensajeAprobacion = "Se autorizará la recuperación de la falta vía <strong>Tiempo por Tiempo (TXT)</strong>. Esta acción NO restará días de sus vacaciones de Ley.";
-        } else if (justificacion && justificacion.includes("[HO]")) {
-            tipoIncidencia = "Home Office (HO)";
-            mensajeAprobacion = "Se autorizará la justificación de la falta bajo el esquema de <strong>Home Office (HO)</strong> administrado. Esta acción NO restará días de sus vacaciones.";
-        } else if (justificacion && justificacion.includes("[C]")) {
-            tipoIncidencia = "Visita Cliente";
-            mensajeAprobacion = "Se autorizará la incidencia como comisión externa por <strong>Visita Cliente</strong>. Esta acción NO restará días de sus vacaciones.";
-        } else if (justificacion && justificacion.includes("[P]")) {
-            tipoIncidencia = "Visita Proveedor";
-            mensajeAprobacion = "Se autorizará la incidencia como comisión externa por <strong>Visita Proveedor</strong>. Esta acción NO restará días de sus vacaciones.";
-        } else if (justificacion && justificacion.includes("[TET]")) {
-            tipoIncidencia = "Visita Planta Tetla";
-            mensajeAprobacion = "Se autorizará la incidencia como comisión por viaje a <strong>Planta Hermana Tetla</strong>. Esta acción NO restará días de sus vacaciones.";
-        }
+        filas.forEach(row => {
+            if(row.cells.length < 5) return;
+            const textoNomina = row.cells[2].textContent.toLowerCase();
+            const textoNombre = row.cells[3].textContent.toLowerCase();
+            const textoFecha = row.cells[4].textContent.toLowerCase();
 
-        document.getElementById('modalDetalleCard').classList.remove('d-none');
-        document.getElementById('modalDetalleTexto').innerHTML = `
-            <strong>Colaborador:</strong> ${nombreEmp} <br>
-            <strong>Contexto:</strong> ${semana} <br>
-            <strong>Esquema Aplicado:</strong> <span class="badge bg-dark text-white fw-bold mt-1">${tipoIncidencia}</span>
-            <div class="mt-2 p-2 rounded bg-white border text-secondary" style="font-size: 0.82rem; line-height: 1.4;">
-                <strong><i class="bi bi-chat-left-quote-fill text-primary"></i> Justificación del Supervisor:</strong><br>
-                <span>${justificacion}</span>
-            </div>
-        `;
-
-        document.getElementById('modalComentarioTexto').value = "";
-
-        if(aprobado) {
-            document.getElementById('modalHeaderStyle').style.background = "linear-gradient(135deg, #1e7e34, #28a745)";
-            document.getElementById('modalTitulo').innerText = "Autorizar Incidencia";
-            document.getElementById('modalMensaje').innerHTML = mensajeAprobacion;
-            document.getElementById('boxMotivoRechazo').classList.add('d-none');
-        } else {
-            document.getElementById('modalHeaderStyle').style.background = "linear-gradient(135deg, #bd2130, #dc3545)";
-            document.getElementById('modalTitulo').innerText = "Rechazar Incidencia";
-            document.getElementById('modalMensaje').innerText = "La incidencia será rebotada al portal de origen del supervisor.";
-            document.getElementById('boxMotivoRechazo').classList.remove('d-none');
-        }
-        new bootstrap.Modal(document.getElementById('modalConfirmacionNomina')).show();
+            if (query === "" || textoNomina.includes(query) || textoNombre.includes(query) || textoFecha.includes(query)) {
+                row.style.display = "";
+            } else {
+                row.style.display = "none";
+            }
+        });
     }
 
-    function abrirModalMasivo(status) {
-        modoEnvioModal = "MASIVO";
-        statusTarget = status;
-        const checkedBoxes = document.querySelectorAll('.recuperacion-check:checked');
-        document.getElementById('modalDetalleCard').classList.remove('d-none');
-        document.getElementById('modalDetalleTexto').innerText = "Procesando un lote masivo de " + checkedBoxes.length + " incidencias.";
-        document.getElementById('modalComentarioTexto').value = "";
-        if(status === 'APROBADO') {
-            document.getElementById('modalHeaderStyle').style.background = "linear-gradient(135deg, #1e7e34, #28a745)";
-            document.getElementById('modalTitulo').innerText = "Autorizar Lote Masivo";
-            document.getElementById('modalMensaje').innerText = "Se aplicarán descuentos en lote a los saldos de todos los operadores seleccionados.";
-            document.getElementById('boxMotivoRechazo').classList.add('d-none');
+    function exportarTablaEspecífica(idTabla, fileNamePrefix) {
+    var tabla = document.getElementById(idTabla);
+    if (!tabla) return;
+
+    var csv = "\uFEFF"; // Codificación UTF-8 para Excel
+    var ths = tabla.querySelectorAll("thead th");
+    var headers = [];
+    var splitIndex = -1;
+
+    // Leemos los encabezados dinámicamente y separamos si encontramos la columna fusionada
+    for (var i = 1; i < ths.length - 1; i++) {
+        var headerText = ths[i].textContent.trim().replace(/"/g, '""');
+        if (headerText === "Nómina / Colaborador") {
+            headers.push('"Nómina"');
+            headers.push('"Colaborador"');
+            splitIndex = i;
         } else {
-            document.getElementById('modalHeaderStyle').style.background = "linear-gradient(135deg, #bd2130, #dc3545)";
-            document.getElementById('modalTitulo').innerText = "Rechazar Lote Masivo";
-            document.getElementById('modalMensaje').innerText = "Se rebotarán todas las incidencias seleccionadas de forma masiva.";
-            document.getElementById('boxMotivoRechazo').classList.remove('d-none');
+            headers.push('"' + headerText + '"');
         }
-        new bootstrap.Modal(document.getElementById('modalConfirmacionNomina')).show();
+    }
+    csv += headers.join(",") + "\n";
+
+    // Leemos las filas
+    tabla.querySelectorAll("tbody tr").forEach(r => {
+        if (r.style.display !== "none" && !r.classList.contains("d-none")) {
+            var c = r.querySelectorAll("td");
+            if (c.length > 2) {
+                var rowData = [];
+                for (var j = 1; j < c.length - 1; j++) {
+
+                    // ✨ Lógica para dividir la celda en Nómina y Nombre
+                    if (j === splitIndex) {
+                        var smallEl = c[j].querySelector("small");
+                        var divEl = c[j].querySelector("div");
+
+                        if (smallEl && divEl) {
+                            var nominaText = smallEl.textContent.replace(/[^0-9]/g, ''); // Extrae solo los números
+                            var nombreText = divEl.textContent.trim().replace(/"/g, '""');
+                            rowData.push('"' + nominaText + '"');
+                            rowData.push('"' + nombreText + '"');
+                        } else {
+                            // Fallback de seguridad
+                            var text = c[j].textContent.trim().replace(/\n/g, ' - ').replace(/\s+/g, ' ').replace(/"/g, '""');
+                            rowData.push('""');
+                            rowData.push('"' + text + '"');
+                        }
+                    } else {
+                        var text = c[j].textContent.trim().replace(/\n/g, ' - ').replace(/\s+/g, ' ').replace(/"/g, '""');
+                        rowData.push('"' + text + '"');
+                    }
+                }
+                csv += rowData.join(",") + "\n";
+            }
+        }
+    });
+
+    descargarCSV(csv, fileNamePrefix);
+}
+
+    // ==========================================
+// VARIABLES GLOBALES (BLINDAJE DE MODALES)
+// ==========================================
+let modoEnvioModal = "";
+let idIndividualTarget = "";
+let statusTarget = "";
+
+// ==========================================
+// LÓGICA DE BARRA MASIVA (MODO ESCRITORIO RH - PURAS CLASES BOOTSTRAP)
+// ==========================================
+function updateSelectedCountRecuperaciones() {
+    // 1. Contamos las casillas activas
+    const checkboxes = document.querySelectorAll('.recuperacion-check:checked');
+    const count = checkboxes.length;
+
+    // 2. Ubicamos la barra
+    const bar = document.getElementById('bulkActionsBarRecuperaciones');
+    const countLabel = document.getElementById('selectedCountRecuperaciones');
+
+    if (!bar) return; // Seguridad anticaídas
+
+    if (count > 0) {
+        // Actualizamos el numerito
+        if (countLabel) countLabel.innerText = count;
+
+        // ✨ EL EXORCISMO: Destruimos el estilo inline de tu HTML original
+        bar.removeAttribute("style");
+
+        // 🎨 PURA MAGIA BOOTSTRAP 5: Ya incluimos el d-flex para separar botones de texto
+        bar.className = "fixed-bottom mx-auto mb-4 w-75 rounded-4 bg-dark text-white p-3 shadow-lg border border-secondary d-flex justify-content-between align-items-center";
+
+    } else {
+        // La desaparecemos limpiamente
+        bar.className = "d-none";
+    }
+}
+
+function toggleAllRecuperaciones(source) {
+    const table = source.closest('table');
+    const checkboxes = table.querySelectorAll('.recuperacion-check');
+    checkboxes.forEach(cb => { cb.checked = source.checked; });
+    updateSelectedCountRecuperaciones();
+}
+// ==========================================
+// INICIALIZADORES Y PREVENCIÓN DE CONTAMINACIÓN
+// ==========================================
+document.addEventListener("DOMContentLoaded", function() {
+    conmutarCamposAjuste();
+    conmutarCamposExtranjero();
+
+    // 1. Cargar estado previo de TODAS las pestañas de Bootstrap en la página
+    document.querySelectorAll('ul.nav-pills, ul.nav-tabs').forEach(ul => {
+        const savedTabId = sessionStorage.getItem('memoriaPestaña_' + ul.id);
+        if (savedTabId) {
+            const tabBtn = document.getElementById(savedTabId);
+            if (tabBtn) bootstrap.Tab.getOrCreateInstance(tabBtn).show();
+        }
+    });
+
+    // 2. Escuchar clics y guardar la ubicación actual en el navegador
+    document.querySelectorAll('button[data-bs-toggle="pill"], button[data-bs-toggle="tab"]').forEach(btn => {
+        btn.addEventListener('shown.bs.tab', event => {
+            const ulId = event.target.closest('ul').id;
+            sessionStorage.setItem('memoriaPestaña_' + ulId, event.target.id);
+        });
+    });
+
+    // (El resto de tu código DOMContentLoaded que ya tenías para la Guilloina o subTabs...)
+    const subTabs = document.querySelectorAll('#subTabBandejaRecup button[data-bs-toggle="tab"], #subTabAuditoria button[data-bs-toggle="tab"]');
+    subTabs.forEach(tab => {
+        tab.addEventListener('shown.bs.tab', function () {
+            // Desmarcamos las casillas al cambiar de mundo
+            document.querySelectorAll('.recuperacion-check, .auditoria-check').forEach(cb => cb.checked = false);
+            document.querySelectorAll('input[type="checkbox"]').forEach(cb => { if(cb.hasAttribute('onclick')) cb.checked = false; });
+            if(typeof updateSelectedCountRecuperaciones === 'function') updateSelectedCountRecuperaciones();
+            if(typeof updateSelectedCountAuditoria === 'function') updateSelectedCountAuditoria();
+        });
+    });
+});
+
+function updateSelectedCountAuditoria() {
+    const checkboxes = document.querySelectorAll('.auditoria-check:checked');
+    const bar = document.getElementById('bulkActionsBarAuditoria');
+    const countLabel = document.getElementById('selectedCountAuditoria');
+
+    if (!bar) return;
+    if (checkboxes.length > 0) {
+        if (countLabel) countLabel.innerText = checkboxes.length;
+        bar.removeAttribute("style");
+        bar.className = "fixed-bottom mx-auto mb-4 w-75 rounded-4 bg-dark text-white p-3 shadow-lg border border-secondary d-flex justify-content-between align-items-center";
+    } else {
+        bar.className = "d-none";
+    }
+}
+
+function toggleAllAuditoria(source) {
+    const table = source.closest('table');
+    const checkboxes = table.querySelectorAll('.auditoria-check');
+    checkboxes.forEach(cb => { cb.checked = source.checked; });
+    updateSelectedCountAuditoria();
+}
+
+function filtrarBandejaAuditoria() {
+    const query = document.getElementById("buscadorBandejaAuditoria").value.toLowerCase().trim();
+    const filas = document.querySelectorAll(".tabla-filtrable-auditoria tbody tr");
+
+    filas.forEach(row => {
+        if(row.cells.length < 5) return;
+        const textoNomina = row.cells[2].textContent.toLowerCase();
+        const textoNombre = row.cells[3].textContent.toLowerCase();
+        const textoFecha = row.cells[4].textContent.toLowerCase();
+
+        if (query === "" || textoNomina.includes(query) || textoNombre.includes(query) || textoFecha.includes(query)) {
+            row.style.display = "";
+        } else {
+            row.style.display = "none";
+        }
+    });
+}
+
+// ==========================================
+// PROCESAMIENTO FINAL EN BACKEND
+// ==========================================
+function ejecutarSubmitConfirmado() {
+    const comentario = document.getElementById('modalComentarioTexto').value.trim();
+    if (statusTarget === 'RECHAZADO' && comentario.length < 5) {
+        alert("⚠️ Por favor ingresa una justificación contable para el rechazo.");
+        return;
     }
 
-    function ejecutarSubmitConfirmado() {
-        const comentario = document.getElementById('modalComentarioTexto').value.trim();
-        if (statusTarget === 'RECHAZADO' && comentario.length < 5) {
-            alert("⚠️ Por favor ingresa una justificación contable para el rechazo.");
-            return;
-        }
-        if (modoEnvioModal === "INDIVIDUAL") {
+    const isAuditoria = document.getElementById('pills-auditoria-tab').classList.contains('active');
+
+    if (modoEnvioModal === "INDIVIDUAL") {
+        if (isAuditoria) {
+            document.getElementById('bulkIdsAuditoria').value = idIndividualTarget;
+            document.getElementById('bulkStatusAuditoria').value = statusTarget;
+            document.getElementById('bulkComentarioAuditoria').value = comentario;
+            document.getElementById('bulkFormAuditoria').submit();
+        } else {
             if(statusTarget === "RECHAZADO") {
                 document.getElementById('bulkIdsRecuperaciones').value = idIndividualTarget;
                 document.getElementById('bulkStatusRecuperaciones').value = "RECHAZADO";
@@ -1047,34 +1768,79 @@
                 document.getElementById('indivAprobado').value = true;
                 document.getElementById('individualFormRecuperacion').submit();
             }
-        } else if (modoEnvioModal === "MASIVO") {
-            const checkedBoxes = document.querySelectorAll('.recuperacion-check:checked');
+        }
+    } else if (modoEnvioModal === "MASIVO") {
+        if (isAuditoria) {
+            const panelActivo = document.querySelector("#subTabAuditoriaContent .tab-pane.active") || document;
+            const checkedBoxes = panelActivo.querySelectorAll('.auditoria-check:checked');
             const ids = Array.from(checkedBoxes).map(cb => cb.value).join(',');
+
+            document.getElementById('bulkIdsAuditoria').value = ids;
+            document.getElementById('bulkStatusAuditoria').value = statusTarget;
+            document.getElementById('bulkComentarioAuditoria').value = comentario;
+            document.getElementById('bulkFormAuditoria').submit();
+        } else {
+            const panelActivo = document.querySelector("#subTabBandejaRecupContent .tab-pane.active") || document;
+            const checkedBoxes = panelActivo.querySelectorAll('.recuperacion-check:checked');
+            const ids = Array.from(checkedBoxes).map(cb => cb.value).join(',');
+
             document.getElementById('bulkIdsRecuperaciones').value = ids;
             document.getElementById('bulkStatusRecuperaciones').value = statusTarget;
             document.getElementById('bulkComentarioRecuperaciones').value = comentario;
             document.getElementById('bulkFormRecuperaciones').submit();
         }
     }
+}
 
-    function toggleAllRecuperaciones(source) {
-        const checkboxes = document.querySelectorAll('.recuperacion-check');
-        checkboxes.forEach(cb => { cb.checked = source.checked; });
-        updateSelectedCountRecuperaciones();
+    // ==========================================
+    // MODALES DE RECHAZO (AUDITORÍA RH)
+    // ==========================================
+    function abrirModalRechazoAuditoria(id, nombreEmp, semana, justificacion) {
+        modoEnvioModal = "INDIVIDUAL";
+        idIndividualTarget = id;
+        statusTarget = "RECHAZADO";
+
+        document.getElementById('modalDetalleCard').classList.remove('d-none');
+        document.getElementById('modalDetalleTexto').innerHTML = `
+            <strong>Colaborador:</strong> ${nombreEmp} <br>
+            <strong>Contexto:</strong> Incidencia Anómala <br>
+            <div class="mt-2 p-2 rounded bg-white border text-secondary" style="font-size: 0.82rem; line-height: 1.4;">
+                <strong><i class="bi bi-chat-left-quote-fill text-primary"></i> Justificación de Origen:</strong><br>
+                <span>${justificacion || 'Sin comentarios'}</span>
+            </div>
+        `;
+
+        document.getElementById('modalComentarioTexto').value = "";
+        document.getElementById('modalHeaderStyle').style.background = "linear-gradient(135deg, #bd2130, #dc3545)";
+        document.getElementById('modalTitulo').innerText = "Rechazar Incidencia (Auditoría)";
+        document.getElementById('modalMensaje').innerText = "Esta incidencia será rebotada por incumplimiento. El saldo no será afectado.";
+        document.getElementById('boxMotivoRechazo').classList.remove('d-none');
+
+        new bootstrap.Modal(document.getElementById('modalConfirmacionNomina')).show();
     }
 
-    function updateSelectedCountRecuperaciones() {
-        const selected = document.querySelectorAll('.recuperacion-check:checked');
-        const bar = document.getElementById('bulkActionsBarRecuperaciones');
-        const countLabel = document.getElementById('selectedCountRecuperaciones');
-        if (countLabel) countLabel.innerText = selected.length;
-        if (bar) bar.classList.toggle('d-none', selected.length === 0);
+    function abrirModalMasivoRechazo() {
+        modoEnvioModal = "MASIVO";
+        statusTarget = "RECHAZADO";
+        const checkedBoxes = document.querySelectorAll('.recuperacion-check:checked');
+
+        document.getElementById('modalDetalleCard').classList.remove('d-none');
+        document.getElementById('modalDetalleTexto').innerText = "Rebotando un lote masivo de " + checkedBoxes.length + " incidencias anómalas.";
+        document.getElementById('modalComentarioTexto').value = "";
+        document.getElementById('modalHeaderStyle').style.background = "linear-gradient(135deg, #bd2130, #dc3545)";
+        document.getElementById('modalTitulo').innerText = "Rechazar Lote Masivo";
+        document.getElementById('modalMensaje').innerText = "Las incidencias volverán al portal del supervisor con estatus de rechazo.";
+        document.getElementById('boxMotivoRechazo').classList.remove('d-none');
+
+        new bootstrap.Modal(document.getElementById('modalConfirmacionNomina')).show();
     }
 
     function filtrarHistorialRecuperaciones() {
         const desdeVal = document.getElementById('filtroRecupDesde').value;
         const hastaVal = document.getElementById('filtroRecupHasta').value;
-        const filas = document.querySelectorAll('#tablaHistorialRecuperaciones tbody tr');
+
+        // Cambiamos el selector para que apunte a ambas tablas del historial mediante su nueva clase
+        const filas = document.querySelectorAll('.tabla-historial-filtrable tbody tr');
         filas.forEach(fila => {
             const el = fila.querySelector('.fecha-falta-registro');
             if (!el) return;
@@ -1099,41 +1865,60 @@
     }
 
     function exportarPlantillaGeneralAExcel() {
-        var csv = "\uFEFF";
-        csv += '"Nómina","Nombre Completo","CC","Nombre CC","WC","Nombre WC","Fecha Ingreso","Saldo Devengado","Saldo Proporcional","Saldo Acumulado","Estatus"\n';
-        document.querySelectorAll("#tablaPlantillaActivos tbody tr").forEach(f => {
-            var c = f.querySelectorAll("td");
-            if (c.length >= 10) {
-                var d = [];
-                c.forEach((cell, idx) => { if(idx < 10) d.push('="' + cell.textContent.trim() + '"'); });
-                d.push('"ACTIVO"');
-                csv += d.join(",") + "\n";
-            }
-        });
-        descargarCSV(csv, "Roster_Saldos_RH_Completo");
-    }
+    var csv = "\uFEFF";
+    csv += '"Nómina","Nombre Completo","CC","Nombre CC","WC","Nombre WC","Fecha Ingreso","Saldo Devengado","Saldo Proporcional","Saldo Acumulado","Estatus"\n';
 
-    function exportarHistorialRecuperacionesAExcel() {
-        var tabla = document.getElementById("tablaHistorialRecuperaciones");
-        if (!tabla) return;
-        var csv = "\uFEFF";
-        csv += '"Folio","Colaborador y Nómina","Fecha Falta","Supervisor Emisor","Tipo / Justificación de Origen","Estatus Final"\n';
-        tabla.querySelectorAll("tbody tr").forEach(r => {
-            if (r.style.display !== "none" && !r.classList.contains("d-none")) {
-                var c = r.querySelectorAll("td");
-                if (c.length >= 6) {
-                    var folio = c[0].textContent.trim().replace(/"/g, '""');
-                    var colaborador = c[1].textContent.trim().replace(/\n/g, ' ').replace(/"/g, '""');
-                    var fechaFalta = c[2].textContent.trim().replace(/"/g, '""');
-                    var supervisor = c[3].textContent.trim().replace(/"/g, '""');
-                    var justificacion = c[4].textContent.trim().replace(/\n/g, ' — ').replace(/"/g, '""');
-                    var estatus = c[5].textContent.trim().replace(/"/g, '""');
-                    csv += '"' + folio + '","' + colaborador + '","' + fechaFalta + '","' + supervisor + '","' + justificacion + '","' + estatus + '"\n';
+    document.querySelectorAll("#tablaPlantillaActivos tbody tr").forEach(f => {
+        var c = f.querySelectorAll("td");
+        if (c.length >= 10) {
+            var d = [];
+            c.forEach((cell, idx) => {
+                if(idx < 10) {
+                    // Limpiamos saltos de línea y escapamos comillas dobles para no romper el CSV
+                    var txt = cell.textContent.trim().replace(/\n/g, ' ').replace(/"/g, '""');
+
+                    // Aplicamos el formato CSV estándar a todas las columnas
+                    d.push('"' + txt + '"');
                 }
+            });
+            d.push('"ACTIVO"');
+            csv += d.join(",") + "\n";
+        }
+    });
+    descargarCSV(csv, "Roster_Saldos_RH_Completo");
+}
+
+    function exportarHistorialEspecifico(idTabla, fileNamePrefix) {
+    var tabla = document.getElementById(idTabla);
+    if (!tabla) return;
+
+    var csv = "\uFEFF";
+    // ✨ Actualizamos los encabezados para incluir la Nómina separada
+    csv += '"Folio","Nómina","Colaborador","Fecha Falta","Supervisor Emisor","Tipo / Justificación de Origen","Estatus Final"\n';
+
+    tabla.querySelectorAll("tbody tr").forEach(r => {
+        if (r.style.display !== "none" && !r.classList.contains("d-none")) {
+            var c = r.querySelectorAll("td");
+            if (c.length >= 6) {
+                var folio = c[0].textContent.trim().replace(/"/g, '""');
+
+                // ✨ Partimos el HTML de la celda en Nómina y Nombre
+                var smallEl = c[1].querySelector("small");
+                var divEl = c[1].querySelector("div");
+                var nomina = smallEl ? smallEl.textContent.replace(/[^0-9]/g, '') : "";
+                var colaborador = divEl ? divEl.textContent.trim().replace(/"/g, '""') : c[1].textContent.trim().replace(/\n/g, ' ').replace(/"/g, '""');
+
+                var fechaFalta = c[2].textContent.trim().replace(/"/g, '""');
+                var supervisor = c[3].textContent.trim().replace(/"/g, '""');
+                var justificacion = c[4].textContent.trim().replace(/\n/g, ' — ').replace(/"/g, '""');
+                var estatus = c[5].textContent.trim().replace(/"/g, '""');
+
+                csv += '"' + folio + '","' + nomina + '","' + colaborador + '","' + fechaFalta + '","' + supervisor + '","' + justificacion + '","' + estatus + '"\n';
             }
-        });
-        descargarCSV(csv, "Historial_Recuperaciones_Nomina");
-    }
+        }
+    });
+    descargarCSV(csv, fileNamePrefix);
+}
 
     function exportarSaldosVencidosAExcel() {
         var csv = "\uFEFF";
@@ -1146,8 +1931,11 @@
                     var d = [];
                     c.forEach((cell, idx) => {
                         if(idx < 10) {
+                            // Limpiamos saltos de línea y escapamos comillas dobles
                             var txt = cell.textContent.trim().replace(/\n/g, ' ').replace(/"/g, '""');
-                            d.push('="' + txt + '"');
+
+                            // Formato CSV estándar limpio
+                            d.push('"' + txt + '"');
                         }
                     });
                     csv += d.join(",") + "\n";
@@ -1223,7 +2011,13 @@
     function abrirAuditorMatematico(element) {
         const nomina = element.getAttribute('data-nomina');
         const nombre = element.getAttribute('data-nombre');
-        const tipo = (element.getAttribute('data-tipo') || 'SINDICALIZADO').toUpperCase();
+
+        // El tipo limpio para mostrar en pantalla (ej. "ADMINISTRATIVO")
+        const tipoLimpio = (element.getAttribute('data-tipo') || 'SINDICALIZADO').toUpperCase();
+
+        // El radar oculto para que no falle la matemática
+        const radarOculto = (element.getAttribute('data-radar') || tipoLimpio).toUpperCase();
+
         const ingresoRaw = element.getAttribute('data-ingreso');
         const ingresoView = element.getAttribute('data-ingresoview');
         const baseManual = parseFloat(element.getAttribute('data-base')) || 0;
@@ -1231,7 +2025,7 @@
 
         document.getElementById('auditNombre').innerText = nombre;
         document.getElementById('auditNomina').innerText = nomina;
-        document.getElementById('auditTipo').innerText = tipo;
+        document.getElementById('auditTipo').innerText = tipoLimpio; // <-- Aquí mostramos el limpio
         document.getElementById('auditIngreso').innerText = ingresoView;
 
         if (!ingresoRaw) {
@@ -1249,45 +2043,55 @@
         const anosCumplidos = realAnos < 0 ? 0 : realAnos;
         document.getElementById('auditAnos').innerText = anosCumplidos;
 
-        let diasLey = 12;
-        if (anosCumplidos === 2) diasLey = 14;
-        else if (anosCumplidos === 3) diasLey = 16;
-        else if (anosCumplidos === 4) diasLey = 18;
-        else if (anosCumplidos === 5) diasLey = 20;
-        else if (anosCumplidos >= 6 && anosCumplidos <= 10) diasLey = 22;
-        else if (anosCumplidos >= 11 && anosCumplidos <= 15) diasLey = 24;
-        else if (anosCumplidos >= 16 && anosCumplidos <= 20) diasLey = 26;
-        else if (anosCumplidos >= 21 && anosCumplidos <= 25) diasLey = 28;
-        else if (anosCumplidos > 25) diasLey = 30;
+        // MATEMÁTICA CON EL AÑO EN CURSO
+        let anoEnCurso = anosCumplidos + 1;
+        let diasLey = 12; // Valor por defecto
+
+        // ✨ Leemos la base de datos en tiempo real inyectada por Spring
+        const tabuladorDB = /*[[${tabuladorLey}]]*/ [];
+        const bonoAdministrativoDB = /*[[${bonoAdmin}]]*/ 2; // ✨ EL NUEVO BONO DINÁMICO
+
+        if (tabuladorDB && tabuladorDB.length > 0) {
+            let rowConfig = tabuladorDB.find(t => t.anioAntiguedad === anoEnCurso);
+            if (rowConfig) {
+                diasLey = rowConfig.diasLey;
+            } else {
+                diasLey = tabuladorDB[tabuladorDB.length - 1].diasLey;
+            }
+        }
 
         let derechoAnualBase = diasLey;
         let desglosePaso1Html = "";
 
-        if (tipo === 'EXTRANJERO') {
+        // USAMOS EL RADAR OCULTO PARA EVALUAR CON .includes()
+        if (radarOculto.includes('EXTRANJERO')) {
             let baseOrigen = baseManual > 0 ? baseManual : 12;
             if (esCongelado) {
                 derechoAnualBase = baseOrigen;
                 desglosePaso1Html = `<strong>Régimen:</strong> Extranjero Especial. <br>Escalación bloqueada por contrato/visa: <strong>${derechoAnualBase} días</strong> fijos anuales.`;
             } else {
                 let beneficioAdicional = baseOrigen - 12;
-                derechoAnualBase = diasLey + beneficioAdicional;
+                derechoAnualBase = diasLey + bonoAdministrativoDB + beneficioAdicional;
                 desglosePaso1Html = `
                     <strong>Régimen:</strong> Extranjero Evolutivo (Mantiene beneficio de contrato).<br>
                     <div class="p-2 rounded bg-white border text-secondary font-monospace mt-1" style="font-size: 0.85rem; line-height: 1.5;">
-                        • Días por Ley Actual LFT (${anosCumplidos} años): ${diasLey} días.<br>
+                        • Días por Ley Actual LFT (Año ${anoEnCurso}): ${diasLey} días.<br>
+                        • Bono Corporativo Oficina: +${bonoAdministrativoDB} días.<br>
                         • Beneficio Adicional por Contrato: +${beneficioAdicional} días.<br>
-                        <strong>Fórmula Simple:</strong> Ley Actual (${diasLey}) + Beneficio Contrato (+${beneficioAdicional}) = <strong class="text-success">${derechoAnualBase} días</strong> Derecho Anual Base.
+                        <strong>Fórmula Simple:</strong> Ley Actual (${diasLey}) + Bono (+${bonoAdministrativoDB}) + Beneficio (+${beneficioAdicional}) = <strong class="text-success">${derechoAnualBase} días</strong> Derecho Anual Base.
                     </div>
                 `;
             }
-        } else if (tipo === 'ADMINISTRATIVO') {
-            derechoAnualBase = diasLey + 2.0;
-            desglosePaso1Html = `<strong>Régimen:</strong> Administrativo / Confianza. <br>Fórmula Core: Ley LFT (${diasLey}) + Bono Corporativo Oficina (+2.0) = <strong class="text-success">${derechoAnualBase} días</strong> Derecho Base.`;
+        } else if (radarOculto.includes('ADMIN') || radarOculto.includes('CONFIANZA')) {
+            derechoAnualBase = diasLey + bonoAdministrativoDB;
+            desglosePaso1Html = `<strong>Régimen:</strong> Administrativo / Confianza. <br>Fórmula Core: Ley LFT (${diasLey}) + Bono Corporativo Oficina (+${bonoAdministrativoDB}) = <strong class="text-success">${derechoAnualBase} días</strong> Derecho Base.`;
         } else {
-            desglosePaso1Html = `<strong>Régimen:</strong> Sindicalizado / Personal Operativo. <br>Tabulador de Ley LFT estricto: <strong>${derechoAnualBase} días</strong> base por antigüedad de ${anosCumplidos} años.`;
+            desglosePaso1Html = `<strong>Régimen:</strong> Sindicalizado / Personal Operativo. <br>Tabulador de Ley LFT estricto: <strong>${derechoAnualBase} días</strong> base generados en el año ${anoEnCurso}.`;
         }
 
         document.getElementById('desglosePaso1').innerHTML = desglosePaso1Html;
+
+        // ... [El resto de tu código de desglosePaso2 y el Modal se queda exactamente igual] ...
 
         let ultimoAniversario = new Date(hoy.getFullYear(), fechaIngreso.getMonth(), fechaIngreso.getDate());
         if (ultimoAniversario > hoy) {
@@ -1314,18 +2118,21 @@
         let tableId = row && row.closest('table') ? row.closest('table').id : '';
 
         let saldoPeriodoActual = 0;
-        let saldoProporcionalDOM = 0;
         let sumaTotalNeto = 0;
 
         if (row) {
+            // Sacamos exclusivamente el Devengado de la tabla
             if (tableId === 'tablaDepuracionSaldos') {
                 saldoPeriodoActual = parseFloat(row.cells[6]?.textContent.replace(/[^0-9.-]/g, '')) || 0;
-                saldoProporcionalDOM = parseFloat(row.cells[8]?.textContent.replace(/[^0-9.-]/g, '')) || 0;
             } else {
                 saldoPeriodoActual = parseFloat(row.cells[7]?.textContent.replace(/[^0-9.-]/g, '')) || 0;
-                saldoProporcionalDOM = parseFloat(row.cells[8]?.textContent.replace(/[^0-9.-]/g, '')) || 0;
             }
-            sumaTotalNeto = saldoPeriodoActual + saldoProporcionalDOM;
+
+            // ✨ CIRUGÍA: Tomamos el Proporcional BRUTO calculado aquí mismo en Javascript (21.04)
+            let proporcionalBruto = parseFloat(totalProporcionalCalculado);
+
+            // Dejamos que las matemáticas naturales hagan lo suyo (-7 + 21.04 = 14.04)
+            sumaTotalNeto = saldoPeriodoActual + proporcionalBruto;
         }
 
         desglosePaso2Html += `
@@ -1336,14 +2143,14 @@
                         <thead class="table-light text-secondary">
                             <tr>
                                 <th>Saldo Ley (Devengado)</th>
-                                <th>Saldo Proporcional</th>
+                                <th>Saldo Proporcional (Bruto)</th>
                                 <th class="table-primary fw-bold text-primary">Suma Final Neto</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr>
                                 <td class="${saldoPeriodoActual < 0 ? 'text-danger fw-bold' : 'text-success fw-bold'}">${saldoPeriodoActual.toFixed(2)}</td>
-                                <td class="text-info fw-bold">${saldoProporcionalDOM.toFixed(2)}</td>
+                                <td class="text-info fw-bold">${parseFloat(totalProporcionalCalculado).toFixed(2)}</td>
                                 <td class="table-primary fw-bold ${sumaTotalNeto < 0 ? 'text-danger' : 'text-dark'}">${sumaTotalNeto.toFixed(2)} días</td>
                             </tr>
                         </tbody>
@@ -1356,20 +2163,107 @@
 
         new bootstrap.Modal(document.getElementById('modalAuditorMatematico')).show();
     }
+    // ==========================================
+    // MODALES DE APLICACIÓN (CONTROL INTERNO RH)
+    // ==========================================
+    function abrirModalAplicarAuditoria(id, nombreEmp) {
+        modoEnvioModal = "INDIVIDUAL";
+        idIndividualTarget = id;
+        statusTarget = "APROBADO";
 
-    document.addEventListener("DOMContentLoaded", function() {
-        conmutarCamposAjuste();
-        conmutarCamposExtranjero();
+        document.getElementById('modalDetalleCard').classList.remove('d-none');
+        document.getElementById('modalDetalleTexto').innerHTML = `
+            <strong>Colaborador:</strong> ${nombreEmp} <br>
+            <strong>Acción:</strong> Marcar como Aplicada en Nómina
+        `;
 
-        const urlParams = new URLSearchParams(window.location.search);
-        const activeTab = urlParams.get('tab');
-        if (activeTab === 'depuracion') {
-            const tabBtn = document.querySelector('#pills-depuracion-tab');
-            if (tabBtn) {
-                bootstrap.Tab.getOrCreateInstance(tabBtn).show();
-            }
+        document.getElementById('modalComentarioTexto').value = ""; // No se exige comentario
+        document.getElementById('modalHeaderStyle').style.background = "linear-gradient(135deg, #1e7e34, #28a745)";
+        document.getElementById('modalTitulo').innerText = "Limpiar de la Bandeja";
+        document.getElementById('modalMensaje').innerHTML = "La solicitud desaparecerá de los pendientes y se registrará en el <strong>Historial de Planta</strong>. (Solo para tu control interno).";
+        document.getElementById('boxMotivoRechazo').classList.add('d-none'); // Escondemos el textarea rojo
+
+        new bootstrap.Modal(document.getElementById('modalConfirmacionNomina')).show();
+    }
+
+    function abrirModalMasivoAplicar() {
+        modoEnvioModal = "MASIVO";
+        statusTarget = "APROBADO";
+        const checkedBoxes = document.querySelectorAll('.recuperacion-check:checked');
+
+        document.getElementById('modalDetalleCard').classList.remove('d-none');
+        document.getElementById('modalDetalleTexto').innerText = "Limpiando un lote de " + checkedBoxes.length + " incidencias procesadas.";
+        document.getElementById('modalComentarioTexto').value = "";
+        document.getElementById('modalHeaderStyle').style.background = "linear-gradient(135deg, #1e7e34, #28a745)";
+        document.getElementById('modalTitulo').innerText = "Marcar Lote como Aplicado";
+        document.getElementById('modalMensaje').innerHTML = "Las solicitudes seleccionadas se moverán al <strong>Historial de Planta</strong> para limpiar tu bandeja.";
+        document.getElementById('boxMotivoRechazo').classList.add('d-none');
+
+        new bootstrap.Modal(document.getElementById('modalConfirmacionNomina')).show();
+    }
+</script>
+<script th:inline="javascript">
+    var calendarAuditoria;
+    document.addEventListener('DOMContentLoaded', function() {
+        var calendarEl = document.getElementById('calendarViewAuditoria');
+        if (calendarEl) {
+            calendarAuditoria = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                locale: 'es',
+                firstDay: 1,
+                contentHeight: 650,
+                dayMaxEvents: true,
+                headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,dayGridWeek' },
+                buttonText: { today: 'Hoy', month: 'Mes', week: 'Semana' },
+                events: function(info, successCallback, failureCallback) {
+                    var esquema = document.getElementById('filtroCalendarioEsquema').value;
+                    // Llama al endpoint de auditoría con la exclusión de horas
+                    fetch('/pantallas/gestion-saldos/api/calendario-planta?esquema=' + esquema + '&soloDiasCompletos=true')
+                        .then(response => response.json())
+                        .then(data => successCallback(data))
+                        .catch(error => failureCallback(error));
+                },
+                eventClick: function(info) {
+                    var props = info.event.extendedProps;
+                    if (props.tipo === 'FERIADO') return;
+
+                    var fechaFormateada = info.event.start.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' });
+                    document.getElementById('modalTituloFechaAud').innerHTML = `
+                        <i class="bi bi-calendar-check text-info me-2"></i> ${info.event.title} <br>
+                        <span class="text-muted small fw-normal">Día Operativo: ${fechaFormateada}</span>
+                    `;
+
+                    var contenedorLista = document.getElementById('listaAusentesAuditoria');
+                    contenedorLista.innerHTML = '';
+
+                    if(props.empleados && props.empleados.length > 0) {
+                        props.empleados.forEach(function(emp) {
+                            var li = document.createElement('li');
+                            li.className = "list-group-item d-flex justify-content-between align-items-center px-3 py-2.5 border-bottom bg-white";
+                            li.innerHTML = `<div><span class="badge bg-light text-secondary border me-2 font-monospace">#${emp.nomina}</span><span class="fw-bold text-dark small">${emp.nombre}</span></div><span class="badge bg-secondary-subtle text-secondary border rounded-pill px-2.5 py-1 small fw-bold">WC ${emp.wc || 'N/A'}</span>`;
+                            contenedorLista.appendChild(li);
+                        });
+                    } else {
+                        contenedorLista.innerHTML = '<li class="list-group-item text-muted text-center py-3">Sin detalles.</li>';
+                    }
+
+                    new bootstrap.Modal(document.getElementById('modalDetalleAusenciasAuditoria')).show();
+                }
+            });
+            calendarAuditoria.render();
         }
+
+        // Renderizado dinámico al abrir la pestaña
+        document.querySelector('#pills-calendario-tab')?.addEventListener('shown.bs.tab', function () {
+            if (calendarAuditoria) calendarAuditoria.render();
+        });
     });
+
+    function recargarCalendarioPlanta() {
+        if (calendarAuditoria) {
+            calendarAuditoria.refetchEvents();
+        }
+    }
 </script>
 </body>
 </html>

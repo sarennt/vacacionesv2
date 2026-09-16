@@ -9,6 +9,8 @@ import com.hrms.vacaciones.repository.SolicitudVacacionesRepository;
 import com.hrms.vacaciones.repository.MotivoRechazoRepository;
 import com.hrms.vacaciones.service.PermisosService;
 import com.hrms.vacaciones.service.VacacionesService;
+import com.hrms.vacaciones.dto.SolicitudPermisoRequestDTO;
+import com.hrms.vacaciones.dto.FilaPagoTxtDTO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -46,6 +48,9 @@ public class PermisosWebController {
     @Autowired
     private MotivoRechazoRepository motivoRechazoRepo;
 
+    @Autowired
+    private com.hrms.vacaciones.repository.ConfiguracionCorteNominaRepository configCorteNominaRepository;
+
     /**
      * Endpoint Maestro: Muestra la bandeja de aprobaciones unificada y control de piso.
      */
@@ -59,6 +64,8 @@ public class PermisosWebController {
 
         Empleado jefe = empleadoRepository.findById(nominaJefe)
                 .orElseThrow(() -> new RuntimeException("Error: No se encontró el jefe con la nómina: " + nominaJefe));
+
+        String rol = jefe.getRolJerarquico() != null ? jefe.getRolJerarquico().trim().toUpperCase() : "";
 
         model.addAttribute("jefe", jefe);
 
@@ -78,12 +85,32 @@ public class PermisosWebController {
 
         List<Integer> wcIds = (misLineas != null) ? misLineas.stream().map(com.hrms.vacaciones.model.WorkCenter::getId).toList() : new ArrayList<>();
 
-        // 🔒 LISTA BLANCA INDIVIDUAL: Solo permitimos incidencias operativas de un día que no sean vacaciones
+        // 🔒 LISTA BLANCA INDIVIDUAL Y CADENERO VISUAL: Solo incidencias y respetando el escalamiento jerárquico
         List<SolicitudPermiso> permisosFiltrados = permisosService.obtenerPermisosPendientesPorJefe(nominaJefe, wcIds).stream()
                 .filter(p -> p.getTipoPermiso() != null
                         && p.getTipoPermiso().getCodigo() != null
                         && !"V".equalsIgnoreCase(p.getTipoPermiso().getCodigo().trim())
                         && !"VACACIONES".equalsIgnoreCase(p.getTipoPermiso().getCodigo().trim()))
+                .filter(p -> {
+                    String estatus = p.getEstatus() != null ? p.getEstatus().trim().toUpperCase() : "";
+                    String tipoEmp = p.getEmpleado() != null && p.getEmpleado().getTipoEmpleado() != null ? p.getEmpleado().getTipoEmpleado().trim().toUpperCase() : "SINDICALIZADO";
+                    boolean coincidenciaDirecta = p.getEmpleado() != null && p.getEmpleado().getJefeDirectoNomina() != null && p.getEmpleado().getJefeDirectoNomina().equals(nominaJefe);
+
+                    if ("SUPERVISOR".equals(rol)) {
+                        if ("SINDICALIZADO".equals(tipoEmp)) {
+                            // El supervisor solo lo ve si ya escaló, o si el operador lo tiene a él como jefe directo
+                            if ("PENDIENTE_SUPERVISOR".equals(estatus)) {
+                                return true;
+                            }
+                            return coincidenciaDirecta && ("PENDIENTE".equals(estatus) || "PENDIENTE_JEFE".equals(estatus));
+                        } else {
+                            return "PENDIENTE_JEFE".equals(estatus) || "PENDIENTE".equals(estatus);
+                        }
+                    } else {
+                        // Shift Leaders y Administrativos lo ven en estado normal
+                        return "PENDIENTE_JEFE".equals(estatus) || "PENDIENTE".equals(estatus);
+                    }
+                })
                 .toList();
         model.addAttribute("permisosPendientes", permisosFiltrados);
 
@@ -109,6 +136,19 @@ public class PermisosWebController {
 
         // 🛡️ Tubería de Motivos de Rechazo oficiales para Permisos (TXT, HO, PT, etc.)
         model.addAttribute("motivosRechazo", motivoRechazoRepo.findByModuloAndActivoTrue("PERMISOS"));
+
+        // ✨ Leemos la configuración de cortes en tiempo real desde la BD
+        com.hrms.vacaciones.model.ConfiguracionCorteNomina cSind = configCorteNominaRepository.findByTipoEmpleado("SINDICALIZADO").orElse(new com.hrms.vacaciones.model.ConfiguracionCorteNomina());
+        model.addAttribute("corteSindDia", cSind.getDiaCorte() != null ? cSind.getDiaCorte() : 2);
+        model.addAttribute("corteSindHora", cSind.getHoraCorte() != null ? cSind.getHoraCorte().toString() : "16:00");
+
+        com.hrms.vacaciones.model.ConfiguracionCorteNomina cAdmin = configCorteNominaRepository.findByTipoEmpleado("ADMINISTRATIVO").orElse(new com.hrms.vacaciones.model.ConfiguracionCorteNomina());
+        model.addAttribute("corteAdminDia", cAdmin.getDiaCorte() != null ? cAdmin.getDiaCorte() : 3);
+        model.addAttribute("corteAdminHora", cAdmin.getHoraCorte() != null ? cAdmin.getHoraCorte().toString() : "14:00");
+
+        if ("SUPERVISOR".equals(rol)) {
+            model.addAttribute("historialDecisionesPermisos", permisosService.obtenerHistorialDecisionesPermisosLinea(nominaJefe, wcIds));
+        }
 
         return "aprobaciones-permisos";
     }
@@ -283,14 +323,61 @@ public class PermisosWebController {
             @RequestParam("fechaFalta") String fechaFaltaStr,
             @RequestParam("tipoIncidencia") String tipoIncidencia,
             @RequestParam("justificacion") String justificacion,
+            @RequestParam(value = "modalidad", defaultValue = "COMPLETO") String modalidad,
+            @RequestParam(value = "turno", required = false) String turno,
+            @RequestParam(value = "horasFalta", required = false) BigDecimal horasFalta,
+            @RequestParam(value = "fechasPago[]", required = false) List<String> fechasPago,
+            @RequestParam(value = "horasPago[]", required = false) List<BigDecimal> horasPago,
             RedirectAttributes redirectAttributes) {
 
         try {
             LocalDate fechaFalta = LocalDate.parse(fechaFaltaStr);
-            String justificacionConTipo = "[" + tipoIncidencia.toUpperCase() + "] " + justificacion;
+            boolean esParcial = "PARCIAL".equalsIgnoreCase(modalidad);
 
-            vacacionesService.crearSolicitudRecuperacion(nominaJefe, userName, fechaFalta, justificacionConTipo);
-            redirectAttributes.addFlashAttribute("mensajeExito", "La solicitud extraordinaria de recuperación [" + tipoIncidencia + "] fue enviada con éxito a Nóminas.");
+            // ✨ Ruteo contable inteligente si es TXT
+            if ("TXT".equalsIgnoreCase(tipoIncidencia)) {
+                Empleado empleadoRecup = empleadoRepository.findById(userName)
+                        .orElseThrow(() -> new RuntimeException("Empleado no encontrado."));
+
+                SolicitudPermisoRequestDTO dto = new SolicitudPermisoRequestDTO();
+                dto.setEmpleadoNomina(userName);
+                dto.setCodigoPermiso(tipoIncidencia);
+                dto.setFechaIncidencia(fechaFalta);
+                dto.setJustificacionSupervisor("[RECUPERACIÓN EXTRAORDINARIA] " + justificacion);
+
+                // 🎯 Inyectamos Turno y Horas Dinámicas
+                String turnoAUsar = turno != null && !turno.isEmpty() ? turno : (empleadoRecup.getTurno() != null ? empleadoRecup.getTurno().getNombreTurno() : "1ro");
+                dto.setNombreTurno(turnoAUsar);
+                dto.setEsPorHoras(esParcial);
+                dto.setHorasPermiso(esParcial && horasFalta != null ? horasFalta : BigDecimal.ZERO);
+
+                List<FilaPagoTxtDTO> desgloses = new ArrayList<>();
+                if (fechasPago != null && horasPago != null && fechasPago.size() == horasPago.size()) {
+                    for (int i = 0; i < fechasPago.size(); i++) {
+                        if (fechasPago.get(i) != null && !fechasPago.get(i).isEmpty()) {
+                            desgloses.add(new FilaPagoTxtDTO(LocalDate.parse(fechasPago.get(i)), horasPago.get(i)));
+                        }
+                    }
+                }
+                dto.setDesglosesPago(desgloses);
+
+                // 💥 1. Inyecta la solicitud con pagos al motor de Permisos (Para Piso)
+                permisosService.registrarSolicitudPermisoDirectoAprobado(dto);
+
+                // ✨ NUEVO: 2. Clonamos el aviso hacia Nóminas (Gestión de Saldos) para que RH pueda auditar
+                String horasDetalle = esParcial ? " (" + horasFalta + " hrs) " : " (Día Completo) ";
+                String justificacionConTipo = "[" + tipoIncidencia.toUpperCase() + "]" + horasDetalle + "- Turno: " + turnoAUsar + " | " + justificacion;
+                vacacionesService.crearSolicitudRecuperacion(nominaJefe, userName, fechaFalta, justificacionConTipo);
+
+            } else {
+                // Ruta tradicional para las recuperaciones (HO, Paros, Visitas)
+                String horasDetalle = esParcial ? " (" + horasFalta + " hrs) " : " (Día Completo) ";
+                String justificacionConTipo = "[" + tipoIncidencia.toUpperCase() + "]" + horasDetalle + "- Turno: " + (turno != null ? turno : "N/A") + " | " + justificacion;
+
+                vacacionesService.crearSolicitudRecuperacion(nominaJefe, userName, fechaFalta, justificacionConTipo);
+            }
+
+            redirectAttributes.addFlashAttribute("mensajeExito", "La solicitud extraordinaria de recuperación [" + tipoIncidencia + "] fue procesada y enviada a pre-nómina con éxito.");
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("mensajeError", "Rechazo contable: " + e.getMessage());
         }
@@ -345,5 +432,32 @@ public class PermisosWebController {
         }
 
         return "redirect:/pantallas/aprobaciones-permisos?nomina=" + nominaJefe;
+    }
+
+    @PostMapping("/jefe/permisos/override")
+    public String overridePermiso(
+            @RequestParam("idSolicitud") Long idSolicitud,
+            @RequestParam("nuevoEstatus") String nuevoEstatus,
+            @RequestParam("comentario") String comentario,
+            HttpSession session,
+            RedirectAttributes redirectAttributes) {
+
+        Object logueadoObj = session.getAttribute("usuarioLogueado");
+        if (logueadoObj == null) return "redirect:/login";
+        Integer nominaSupervisor = Integer.parseInt(logueadoObj.toString());
+
+        if (comentario == null || comentario.trim().isEmpty() || comentario.trim().length() < 8) {
+            redirectAttributes.addFlashAttribute("mensajeError", "El comentario de auditoría es estrictamente obligatorio para realizar un Override (Mínimo 8 letras).");
+            return "redirect:/pantallas/aprobaciones-permisos";
+        }
+
+        try {
+            permisosService.aplicarOverrideSupervisorPermiso(idSolicitud, nominaSupervisor, nuevoEstatus, comentario);
+            redirectAttributes.addFlashAttribute("mensajeExito", "¡Revocación Exitosa! La decisión ha sido modificada contablemente.");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("mensajeError", "No se pudo aplicar el Override: " + e.getMessage());
+        }
+
+        return "redirect:/pantallas/aprobaciones-permisos";
     }
 }

@@ -12,12 +12,12 @@ public record SolicitudDTO(
         String comentarioJefe,
         LocalDateTime fechaCreacion,
         String jefeAutorizadorNombre,
-
-        // --- LOS CAMPOS PARA EL SEMÁFORO VISUAL ---
         String tipoSolicitud,
         String comentarioSupervisor,
         String comentarioExcepcion,
-
-        // ✨ NUEVO: El hilo conductor para fusionar tarjetas parciales en el Dashboard
-        String grupoFolio
+        String grupoFolio,
+        String turno,
+        Boolean esPorHoras,
+        java.math.BigDecimal horasPermiso,
+        java.util.List<String> detallePagos
 ) {}

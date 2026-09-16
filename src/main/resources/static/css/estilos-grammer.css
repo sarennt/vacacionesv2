@@ -580,3 +580,11 @@ nav.navbar.navbar-grammer-custom {
     color: #c5221f;
     border: 1px solid #fad2cf;
 }
+/* ✨ FESTIVOS EN FLATPICKR */
+.dia-festivo-flatpickr {
+    background-color: #ffd700 !important;
+    border-color: #ffd700 !important;
+    color: #000 !important;
+    font-weight: bold;
+    box-shadow: inset 0 0 0 2px #fff; /* Efecto 3D para que resalte del resto */
+}

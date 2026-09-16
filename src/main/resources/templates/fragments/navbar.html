@@ -12,10 +12,16 @@
             <div class="navbar-nav align-items-lg-center w-100">
 
                 <a th:href="@{/pantallas/dashboard}" class="nav-link nav-link-custom mx-1">
-                    <i class="bi bi-house-door text-nav-dashboard"></i> Mi Dashboard
+                    <i class="bi bi-house-door text-nav-dashboard"></i> <span th:text="#{nav.dashboard}"></span>
                 </a>
+
+                <!-- ACCESO UNIVERSAL A LA PRENÓMINA -->
+                <a th:href="@{/pantallas/prenomina}" class="nav-link nav-link-custom mx-1">
+                    <i class="bi bi-wallet2 text-nav-permisos"></i> <span th:text="#{nav.prenomina}"></span>
+                </a>
+
                 <a th:href="@{/pantallas/solicitar-vacaciones}" class="nav-link nav-link-custom mx-1">
-                    <i class="bi bi-file-earmark-plus text-nav-solicitar"></i> Solicitar
+                    <i class="bi bi-file-earmark-plus text-nav-solicitar"></i> <span th:text="#{nav.solicitar}"></span>
                 </a>
 
                 <th:block th:with="rol=${session.rolUsuario != null ? session.rolUsuario.trim().toUpperCase() : 'OPERADOR'},
@@ -24,31 +30,43 @@
                     <th:block th:if="${rol == 'SHIFT' || rol == 'SHIFT LEADER' || rol == 'SUPERVISOR' || rol == 'GERENTE'
                                        || rol == 'ADMIN' || rol == 'RH' || #lists.contains({'1555','1302','1550'}, nomina)}">
                         <a th:href="@{/pantallas/aprobaciones-jefe}" class="nav-link nav-link-custom mx-1">
-                            <i class="bi bi-check2-square text-nav-vacaciones"></i> Aprobaciones Vacaciones
+                            <i class="bi bi-check2-square text-nav-vacaciones"></i> <span th:text="#{nav.aprobaciones.vacaciones}"></span>
                         </a>
                         <a th:href="@{/pantallas/aprobaciones-permisos}" class="nav-link nav-link-custom mx-1">
-                            <i class="bi bi-shield-check text-nav-permisos"></i> Bandeja de Permisos
+                            <i class="bi bi-shield-check text-nav-permisos"></i> <span th:text="#{nav.aprobaciones.permisos}"></span>
                         </a>
                     </th:block>
 
                     <th:block th:if="${rol == 'NOMINAS' || rol == 'RH' || rol == 'ADMIN'
                                        || #lists.contains({'1555','1302','1550'}, nomina)}">
                         <a th:href="@{/pantallas/gestion-saldos}" class="nav-link nav-link-custom mx-1">
-                            <i class="bi bi-person-gear text-nav-saldos"></i> Gestión de Saldos
+                            <i class="bi bi-person-gear text-nav-saldos"></i> <span th:text="#{nav.gestion.saldos}"></span>
                         </a>
                         <a th:href="@{/pantallas/torre-control}" class="nav-link nav-link-custom mx-1">
-                            <i class="bi bi-sliders text-nav-control"></i> Torre de Control
+                            <i class="bi bi-sliders text-nav-control"></i> <span th:text="#{nav.torre.control}"></span>
                         </a>
                     </th:block>
                 </th:block>
 
-                <div class="ms-lg-auto d-flex align-items-center mt-2 mt-lg-0 user-section-nav">
+                <!-- SELECTOR DE IDIOMAS -->
+                <div class="nav-item dropdown ms-lg-auto me-3 d-flex align-items-center">
+                    <a class="nav-link nav-link-custom dropdown-toggle" href="#" id="idiomaDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-globe2 text-white"></i>
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0" aria-labelledby="idiomaDropdown">
+                        <li><a class="dropdown-item fw-bold" href="?lang=es">🇲🇽 Español</a></li>
+                        <li><a class="dropdown-item fw-bold" href="?lang=en">🇺🇸 English</a></li>
+                        <li><a class="dropdown-item fw-bold" href="?lang=zh">🇨🇳 中文</a></li>
+                    </ul>
+                </div>
+
+                <div class="d-flex align-items-center mt-2 mt-lg-0 user-section-nav">
                     <span class="text-white small me-3 fw-bold bg-user-badge px-2 py-1 rounded">
                         <i class="bi bi-person-circle text-white-50"></i>
-                        <span th:text="${session.nombreUsuario}" class="ms-1 text-white">Usuario Planta</span>
+                        <span th:text="${session.nombreUsuario}" class="ms-1 text-white"></span>
                     </span>
                     <a th:href="@{/logout}" class="btn btn-danger-nav btn-sm fw-bold">
-                        <i class="bi bi-box-arrow-right"></i> Salir
+                        <i class="bi bi-box-arrow-right"></i> <span th:text="#{nav.salir}"></span>
                     </a>
                 </div>
 

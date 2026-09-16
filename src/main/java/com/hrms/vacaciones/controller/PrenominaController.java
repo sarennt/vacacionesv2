@@ -1,5 +1,7 @@
 package com.hrms.vacaciones.controller;
 
+import com.hrms.vacaciones.model.PrenominaAutorizada;
+import com.hrms.vacaciones.repository.PrenominaAutorizadaRepository;
 import com.hrms.vacaciones.service.PrenominaService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.InputStreamResource;
@@ -12,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.servlet.http.HttpSession;
 import java.io.ByteArrayInputStream;
 import java.time.LocalDate;
 
@@ -21,19 +24,18 @@ import java.time.LocalDate;
 public class PrenominaController {
 
     private final PrenominaService prenominaService;
+    // ✨ INYECCIÓN DEL REPOSITORIO (Lombok se encarga de instanciarlo)
+    private final PrenominaAutorizadaRepository prenominaAutorizadaRepository;
 
     @GetMapping("/descargar")
-    public ResponseEntity<InputStreamResource> descargarPrenomina(
+    public ResponseEntity<org.springframework.core.io.InputStreamResource> descargarPrenomina(
             @RequestParam("jefeId") Integer jefeId,
-            @RequestParam("fechaLunes") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaLunes) {
+            @RequestParam("fechaLunes") @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate fechaLunes) {
 
-        ByteArrayInputStream stream = prenominaService.generarExcelPrenomina(jefeId, fechaLunes);
-        InputStreamResource file = new InputStreamResource(stream);
-
+        java.io.ByteArrayInputStream stream = prenominaService.generarExcelPrenomina(jefeId, fechaLunes);
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=Prenomina_Vacaciones.xlsx")
-                .contentType(
-                        MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-                .body(file);
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=Prenomina_Vacaciones.xlsx")
+                .contentType(org.springframework.http.MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(new org.springframework.core.io.InputStreamResource(stream));
     }
 }
